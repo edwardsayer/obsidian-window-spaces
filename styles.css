@@ -1,0 +1,554 @@
+/* Window Spaces Plugin Styles */
+
+/* Modal Styles */
+.window-spaces-modal {
+  width: 100%;
+  max-width: none;
+}
+
+.window-layouts-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.window-layouts-toolbar input {
+  min-width: 0;
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+}
+
+.window-layouts-sort-select {
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  background: var(--background-primary);
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller, 12px);
+  cursor: pointer;
+}
+
+.window-layouts-list {
+  max-height: 65vh;
+  overflow-y: auto;
+}
+
+.layout-item {
+  padding: 12px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.layout-item:last-child {
+  border-bottom: none;
+}
+
+.layout-name {
+  font-weight: var(--font-semibold);
+  font-size: var(--font-ui-medium);
+  margin-bottom: 4px;
+  color: var(--text-normal);
+}
+
+.layout-details {
+  display: flex;
+  gap: 8px;
+  font-size: var(--font-ui-small);
+  color: var(--text-muted);
+}
+
+.layout-date,
+.layout-files,
+.layout-size {
+  background: var(--background-modifier-border);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: var(--font-ui-smaller);
+}
+
+/* Status Bar Styles */
+.status-bar-item.window-spaces {
+  cursor: pointer;
+  padding: 0 8px;
+  transition: background-color 0.2s;
+}
+
+.status-bar-item.window-spaces:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+/* Popout layout status-style label */
+.window-spaces-layout-status {
+  position: fixed;
+  z-index: var(--layer-popover, 100);
+  max-width: min(420px, 60vw);
+  overflow: hidden;
+  padding: 3px 10px;
+  background: var(--background-secondary);
+  background: color-mix(in srgb, var(--background-secondary) 92%, transparent);
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto;
+  user-select: none;
+}
+
+.window-spaces-layout-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--interactive-accent);
+}
+
+.window-spaces-layout-icon svg {
+  width: 13px;
+  height: 13px;
+}
+
+.window-spaces-layout-status {
+  bottom: 0;
+  left: 0;
+  border-top: 1px solid var(--background-modifier-border);
+  border-right: 1px solid var(--background-modifier-border);
+  border-top-right-radius: 6px;
+  text-align: left;
+}
+
+.window-spaces-layout-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.window-spaces-layout-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.window-spaces-layout-action {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  padding: 2px;
+  border: 0;
+  border-radius: 4px;
+  color: var(--text-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.window-spaces-layout-action:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.window-spaces-layout-action:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 1px;
+}
+
+.window-spaces-layout-action svg {
+  width: var(--icon-s, 16px);
+  height: var(--icon-s, 16px);
+}
+
+@media (max-width: 520px) {
+  .window-spaces-layout-status {
+    max-width: 70vw;
+  }
+}
+
+/* Setting Tab Styles */
+.layout-management-item {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  padding: 16px;
+  margin-bottom: 12px;
+  background: var(--background-secondary);
+}
+
+.layout-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.layout-info {
+  display: flex;
+  gap: 12px;
+  font-size: var(--font-ui-small);
+  color: var(--text-muted);
+}
+
+.layout-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.layout-actions button {
+  padding: 6px 12px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  font-size: var(--font-ui-small);
+  transition: background-color 0.2s;
+}
+
+.layout-actions button:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.layout-actions button.mod-warning {
+  background: var(--color-red);
+  color: white;
+}
+
+.layout-actions button.mod-warning:hover {
+  background: var(--color-red-hover, #dc2626);
+}
+
+/* Layout Stats */
+.layout-stats {
+  background: var(--background-secondary);
+  padding: 12px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  border-left: 4px solid var(--interactive-accent);
+}
+
+/* Responsive Design */
+@media (max-width: 480px) {
+  .layout-details {
+    flex-direction: column;
+    gap: 4px;
+  }
+  
+  .layout-actions {
+    flex-direction: column;
+  }
+  
+  .layout-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+}
+
+/* Animation */
+.layout-item {
+  transition: background-color 0.2s;
+}
+
+.layout-item:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+/* Focus Styles */
+.layout-actions button:focus {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 2px;
+}
+
+/* Unified Window Layouts modal */
+.window-layouts-modal {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(680px, calc(100vw - 40px));
+  max-width: none;
+  padding-bottom: 8px !important;
+}
+
+.window-layouts-modal .modal-content {
+  min-height: 0;
+  flex: 1 1 auto;
+  padding: 8px 3px 0;
+  margin-bottom: 0;
+  overflow-y: auto;
+}
+
+.window-layouts-description {
+  margin: 0 0 16px;
+  color: var(--text-muted);
+}
+
+.window-layouts-modal .window-layouts-toolbar {
+  margin-bottom: 12px;
+  padding: 0 1px;
+}
+
+.window-layouts-modal .window-layouts-toolbar input[type="search"] {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Simplified list items matching native Obsidian workspace layout modal */
+.window-layouts-modal .window-layouts-list {
+  margin: 8px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.window-layouts-modal .suggestion-item.window-layout-item {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--radius-s, 4px);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  background-color: transparent;
+  transition: background-color 0.15s ease;
+}
+
+.window-layouts-modal .suggestion-item.window-layout-item:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.window-layouts-modal .suggestion-item.window-layout-item.is-selected {
+  background-color: var(--background-modifier-hover);
+  box-shadow: none;
+}
+
+.window-layouts-modal .suggestion-content.qsp-content {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  margin-right: 12px;
+}
+
+.window-layouts-modal .suggestion-title.qsp-title {
+  font-weight: var(--font-semibold, 500);
+  font-size: var(--font-ui-medium, 14px);
+  color: var(--text-normal);
+  line-height: 1.3;
+  margin-bottom: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.window-layouts-modal .suggestion-note.qsp-note {
+  font-size: var(--font-ui-smaller, 12px);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  line-height: var(--line-height-tight, 1.3);
+}
+
+.window-layouts-modal .qsp-path {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0;
+  margin: 0;
+}
+
+.window-layouts-modal .layout-date,
+.window-layouts-modal .layout-files {
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  font-size: var(--font-ui-smaller, 12px);
+  color: var(--text-muted);
+}
+
+.window-layouts-modal .suggestion-aux.qsp-aux.layout-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.window-layouts-modal .layout-actions button {
+  padding: 4px 12px;
+  border-radius: var(--radius-s, 4px);
+  border: 1px solid var(--background-modifier-border);
+  background-color: var(--interactive-normal);
+  color: var(--text-normal);
+  cursor: pointer;
+  font-size: var(--font-ui-small, 13px);
+  line-height: var(--line-height-normal, 1.4);
+  box-shadow: var(--input-shadow);
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.window-layouts-modal .layout-actions button:hover {
+  background-color: var(--interactive-hover);
+  border-color: var(--background-modifier-border-hover);
+}
+
+.window-layouts-modal .layout-actions .layout-delete-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  box-shadow: none;
+  cursor: pointer;
+  border-radius: var(--radius-s, 4px);
+}
+
+.window-layouts-modal .layout-actions .layout-delete-btn:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+/* Footer prompt instructions matching native Obsidian suggestion modals */
+.window-layouts-modal .prompt-instructions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 0;
+  margin: 6px 0 0 0;
+  border-top: none;
+  background-color: transparent;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller, 11px);
+  line-height: var(--line-height-normal, 1.4);
+}
+
+.window-layouts-modal .prompt-instruction {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.window-layouts-modal .prompt-instruction-command {
+  font-weight: var(--font-semibold, 600);
+  color: var(--text-muted);
+}
+
+/* Loading State */
+.layout-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  color: var(--text-muted);
+}
+
+.layout-loading::after {
+  content: '';
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--background-modifier-border);
+  border-top: 2px solid var(--interactive-accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-left: 8px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Empty State */
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-muted);
+}
+
+.empty-state h3 {
+  margin-bottom: 8px;
+  color: var(--text-normal);
+}
+
+.empty-state p {
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+/* Success/Error States */
+.success-message {
+  color: var(--text-success);
+  background: var(--background-success);
+  padding: 8px 12px;
+  border-radius: 4px;
+  margin: 8px 0;
+}
+
+.error-message {
+  color: var(--text-error);
+  background: var(--background-error);
+  padding: 8px 12px;
+  border-radius: 4px;
+  margin: 8px 0;
+}
+
+/* Full width input layout for Rename and Save modals */
+.window-spaces-setting-full-width {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-top: none !important;
+  padding: 8px 0 16px 0 !important;
+}
+
+.window-spaces-setting-full-width .setting-item-info {
+  flex: 0 0 auto !important;
+  margin-right: 8px;
+  min-width: 60px;
+}
+
+.window-spaces-setting-full-width .setting-item-control {
+  flex: 1 1 auto !important;
+  width: 100% !important;
+  justify-content: stretch !important;
+}
+
+.window-spaces-setting-full-width .setting-item-control input[type="text"] {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+/* Tooltip text alignment (start-aligned for LTR/RTL multi-language support) */
+.tooltip {
+  text-align: start !important;
+  white-space: pre-line !important;
+}
+
+.layout-auto-save-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  color: var(--interactive-accent);
+  vertical-align: middle;
+}
+
+.layout-auto-save-badge svg {
+  width: 14px;
+  height: 14px;
+}
+
+.layout-auto-save-btn.is-active,
+.window-spaces-layout-action.is-active {
+  color: var(--interactive-accent) !important;
+  opacity: 1 !important;
+}

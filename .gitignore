@@ -1,0 +1,31 @@
+# Node dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build maps & cache
+main.js.map
+*.map
+.eslintcache
+
+# AI & IDE directories
+.agents/
+.claude/
+.gemini/
+.brain/
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# OS temporary files
+.DS_Store
+Thumbs.db
+
+# Test coverage
+coverage/
+.vitest/
