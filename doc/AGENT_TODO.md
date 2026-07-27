@@ -13,13 +13,13 @@
 
 ## P0：降低誤操作與資料遺失風險
 
-### UX-001 Context-Aware Restore 目標視窗選擇與長按/Shift新視窗
+### UX-001 Context-Aware Restore 目標視窗選擇與點擊/長按/Shift 操作
 
-- [x] **目標**：讓使用者流暢地選擇還原至當前 Popout 視窗或開新 Popout 視窗，避免無預期暴增 Popout。
+- [x] **目標**：讓使用者透過不同點擊與鍵盤操作，明確選擇還原至目前 active Popout 視窗或開新 Popout 視窗，避免無預期暴增 Popout。
 - **實作方案**：
-  - **情境感知預設 (Context-Aware)**：若從 Popout 視窗開啟 Restore，預設直接套用並覆蓋當前 Popout；若從主視窗開啟 Restore，預設開啟/切換為獨立 Popout。
-  - **長按/Shift 組合操作**：`Restore` 按鈕 hover 時顯示提示；長按按鈕（> 450ms）或點擊時按住 `Shift`（/ 鍵盤 `Shift + Enter`），強制在全新 Popout 視窗開啟。
-  - **底部 Hint**：Prompt 底部增加 `Shift ↵ 在新視窗開啟` 提示。
+  - **操作規則**：一般點擊或按 `Enter` 在新 Popout 視窗還原；長按 layout 項目（包含 Restore 按鈕，> 450ms）、Shift+點擊或按 `Shift + Enter`，在目前 active Popout 視窗還原。
+  - **來源視窗辨識**：從 Popout 視窗開啟 `Window Layouts` 時，Shift 操作會精確套用至該 active Popout；從主視窗開啟時則依 manager 的安全 fallback 處理。
+  - **底部 Hint**：Prompt 底部明確顯示 `↵ 在新視窗開啟` 與 `Shift ↵ 套用至目前視窗`。
 - **主要檔案**：`src/manager.ts`、`src/modals/restoreModal.ts`、`src/i18n/*`。
 - **完成日期**：2026-07-27
 
@@ -78,7 +78,7 @@
 
 - [x] **目標**：在還原前即可清晰辨識各個 Layout 所收錄的具體筆記檔案。
 - **實作方案**：
-  - **Hover Tooltip 懸停預覽**：當滑鼠懸停在 Restore / Manage 清單項目上時，動態生成原生 Tooltip，條列顯示該佈局所收錄的所有檔案檔名（例如 `收錄檔案 (3): • Welcome.md • Dev.md`）。
+  - **Hover Tooltip 懸停預覽**：當滑鼠懸停在 Window Layouts 清單項目上時，動態生成原生 Tooltip，條列顯示該佈局所收錄的所有檔案檔名（例如 `收錄檔案 (3): • Welcome.md • Dev.md`）。
   - **數量統計與截斷保護**：超過 15 個檔案時自動提供 `... (+N)` 統計保護。
 - **主要檔案**：`src/modals/restoreModal.ts`、`src/i18n/*`。
 - **完成日期**：2026-07-27
@@ -146,26 +146,26 @@
 - **驗收結果**：保留「顯示佈局狀態列」設定且預設啟用；所有新開啟的 Popout 都會顯示狀態列，狀態列提供儲存按鈕可直接開啟儲存佈局對話框。
 - **完成日期**：2026-07-26
 
-### UX-018 統一 Window Layouts 管理視窗、原生對齊與極簡風格
+### UX-018 統一 Window Layouts 視窗、原生對齊與極簡風格
 
-- [x] **目標**：合併 Restore Window Layout 與 Window Layout Manager，並完成精緻的原生視窗視覺與互動對齊。
+- [x] **目標**：以單一 Window Layouts 視窗整合還原與管理功能，並完成精緻的原生視窗視覺與互動對齊。
 - **主要檔案**：`src/modals/restoreModal.ts`、`styles.css`、`src/i18n/*`。
 - **驗收結果**：
-  - Restore 與 Manage 模式共用 `WindowLayoutsModal`。
+  - 使用單一 `WindowLayoutsModal`，同時提供還原與管理功能，不再區分 Restore／Manage 模式。
   - 標題與關閉 (X) 按鈕完全採用 Obsidian 原生 `setTitle`（仿照 obsidian-tasks-plugin Task Modal）。
   - 清單項目採用 Quick Switcher++ 樣式，簡化選中高亮背景，移除左側邊框輔色。
-  - 搜尋框與 Save 按鈕邊界與頂部 Title ("Manage Window Layouts") 左緣及關閉按鈕 ("✕") 右緣精確垂直對齊。
+  - 搜尋框與工具列按鈕邊界與頂部 Title ("Window Layouts") 左緣及關閉按鈕右緣精確垂直對齊。
   - 刪除按鈕改為與內建 Manage workspace layout 一致的 `✕` 圖示 (`clickable-icon`)，滑鼠懸停顯示 "Delete layout" 提示；Restore / Rename 按鈕改為預設灰框按鈕。
-  - 視窗底部加入置中無分割線的 Prompt 提示欄 (`↑ ↓ 選擇項目` `↵ 套用/復原` `esc 關閉`)，且覆蓋 `.modal` 最外層容器預設 24px 大 Padding 留空。
+  - 視窗底部加入置中無分割線的 Prompt 提示欄 (`↑ ↓ 選擇項目` `↵ 新視窗` `Shift ↵ 目前視窗` `esc 關閉`)，且覆蓋 `.modal` 最外層容器預設 24px 大 Padding 留空。
 - **完成日期**：2026-07-26
 
 ### UX-019 主視窗左側 Ribbon 按鈕與組態開關
 
-- [x] **目標**：主視窗左側 Ribbon 按鈕列新增 Restore 與 Manage 視窗按鈕，並於設定中提供動態開關。
+- [x] **目標**：主視窗左側 Ribbon 按鈕列提供單一 Window Layouts 入口，並於設定中提供動態開關。
 - **主要檔案**：`src/types.ts`、`src/main.ts`、`src/settings.ts`、`src/i18n/*`。
 - **驗收結果**：
-  - 支援 Restore Window Layout (`history` 圖示) 與 Manage Window Layouts (`layout` 圖示) Ribbon 按鈕。
-  - 設定頁面提供獨立 Toggle 開關；預設值：`showRestoreRibbonIcon = true`（顯示），`showManageRibbonIcon = false`（隱藏）。
+  - 支援 Window Layouts (`layout` 圖示) Ribbon 按鈕，還原與管理共用同一入口。
+  - 設定頁面提供 `showWindowLayoutsRibbonIcon` Toggle 開關，預設顯示。
   - 切換 Toggle 可即時動態更新 Ribbon 列。
 - **完成日期**：2026-07-26
 
@@ -174,7 +174,7 @@
 - [x] **目標**：將 "Save window layout" 對話窗標題樣式統一，並將所有硬編碼中文進行多語化 (i18n)。
 - **主要檔案**：`src/modals/saveModal.ts`、`src/i18n/*`。
 - **驗收結果**：
-  - 改用 Obsidian 原生 `setTitle(t("saveModal.title"))`，與 Manage Window Layouts 標題視覺 100% 一致。
+  - 改用 Obsidian 原生 `setTitle(t("saveModal.title"))`，與 Window Layouts 標題視覺 100% 一致。
   - 將所有硬編碼中文（檔案數量、建立時間、視窗大小、包含視窗位置/大小選項）抽離至 `src/i18n` 翻譯檔，完整支援 en, zh-TW, zh-CN。
   - 名稱輸入框支援 `Enter` 快捷鍵提交。
 - **完成日期**：2026-07-26
@@ -209,7 +209,7 @@
 - [x] **目標**：配置 Vitest 測試環境並補齊 5 大核心模組之單元測試涵蓋率。
 - **實作成果**：
   - ✅ 配置 `Vitest` + `jsdom` + `obsidian` API Mock 環境。
-  - ✅ 完成 5 大測試套件，**17 個測試個案 100% 全數通過 (PASS)**：
+  - ✅ 完成 6 個測試套件，**25 個測試個案 100% 全數通過 (PASS)**：
     1. `tests/smartName.test.ts` (智慧命名 Pinned 優先、Active 次優先、格式化)
     2. `tests/sorting.test.ts` (6 大維度排序與複製另存新時間戳)
     3. `tests/validationAndGuardrails.test.ts` (0 檔案覆寫攔截與資料結構驗證)
@@ -224,7 +224,7 @@
 
 - **UX-001 ~ UX-014 核心需求**：**100% 大滿貫竣工 Pass** 🎉
 - **全站 Icon 大一統**：`Restore (history)`, `Manage (layout)`, `Save (save)`, `Auto-Save (refresh-cw)`
-- **UI 精簡重構**：Restore Modal `+ 新視窗` 按鈕、Tasks 齒輪 ⚙️ 排序選單、Manage 項目向下箭頭 `∨` 下拉選單 (Auto-save, Rename, Edit, Delete)。
+- **UI 精簡重構**：Window Layouts Modal `+ 新視窗` 按鈕、Tasks 齒輪 ⚙️ 排序選單、項目向下箭頭 `∨` 下拉選單 (Auto-save, Rename, Edit, Delete)。
 - **動態幾分之幾進度 Notice**：Restore 過程中呈現實時進度（例如 `🔄 正在復原佈局... (2/5)`）。
 - **底層優化與安全防呆**：
   - 旁觀 Popout 視窗 Virtual DOM 記憶體引用微創保護（消弭 90% 視窗閃爍抖動）。
@@ -271,4 +271,3 @@
 ## 建議執行順序
 
 `UX-001` → `UX-002` → `UX-003` → `UX-004` → `UX-005` → `UX-007` → `UX-011` → `UX-012` → `UX-014` → `UX-015`
-

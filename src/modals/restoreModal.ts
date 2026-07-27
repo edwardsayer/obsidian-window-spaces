@@ -2,15 +2,11 @@ import { App, Modal, Notice, Setting, setIcon, setTooltip, Menu } from "obsidian
 import { WindowLayout, ViewState } from "../types";
 import { t, getI18n } from "../i18n";
 
-export type WindowLayoutsMode = "restore" | "manage";
-
 /**
- * Restore 與 Manage 共用的 Window Layouts 視窗。
- * Restore 模式專注於搜尋與恢復；Manage 模式提供完整管理操作。
+ * 統一的 Window Layouts 視窗：搜尋、恢復與管理都在同一個入口完成。
  */
 export class WindowLayoutsModal extends Modal {
   private plugin: any;
-  private mode: WindowLayoutsMode;
   private targetWindow?: Window;
   private searchInput: HTMLInputElement;
   private listEl: HTMLElement;
@@ -22,21 +18,30 @@ export class WindowLayoutsModal extends Modal {
   constructor(
     app: App,
     plugin: any,
-    mode: WindowLayoutsMode = "manage",
     targetWindow?: Window
   ) {
     super(app);
     this.plugin = plugin;
-    this.mode = mode;
     this.targetWindow = targetWindow;
   }
 
   onOpen() {
     this.modalEl.addClass("window-layouts-modal");
 
-    this.setTitle(
-      this.mode === "restore" ? t("restoreModal.title") : t("manageModal.title")
-    );
+    // Modal 實際所在的 document 是鍵盤 Enter 操作最可靠的來源視窗。
+    // Command Palette / activeLeaf 可能仍指向另一個 popout。
+    const modalWindow = this.modalEl.ownerDocument?.defaultView;
+    const modalBody = modalWindow?.document?.body;
+    if (
+      modalWindow &&
+      modalBody &&
+      (modalBody.classList.contains("is-popout-window") ||
+        modalBody.classList.contains("mod-popout"))
+    ) {
+      this.targetWindow = modalWindow;
+    }
+
+    this.setTitle(t("common.windowLayouts"));
 
     // 隱藏原生的 modal-close-button，避免觸發 Obsidian 原生 close()
     const nativeCloseBtn = this.containerEl.querySelector<HTMLElement>(".modal-close-button");
@@ -98,7 +103,7 @@ export class WindowLayoutsModal extends Modal {
         event.stopPropagation();
         const targetIndex = this.selectedIndex >= 0 ? this.selectedIndex : 0;
         const selectedLayout = this.filteredLayouts[targetIndex];
-        if (selectedLayout) void this.restoreLayout(selectedLayout, event.shiftKey);
+        if (selectedLayout) void this.restoreLayout(selectedLayout, !event.shiftKey);
       }
     };
     targetDoc.addEventListener("keydown", this.keydownListener, true);
@@ -117,17 +122,15 @@ export class WindowLayoutsModal extends Modal {
       this.renderLayouts();
     });
 
-    if (this.mode === "restore") {
-      const newWinButton = toolbar.createEl("button", {
-        text: `+ ${t("common.newWindow")}`,
-        cls: "mod-cta qsp-action-btn",
-      });
-      setTooltip(newWinButton, t("common.newWindow"));
-      newWinButton.onclick = () => {
-        this.close();
-        this.plugin.manager.openNewPopoutWindow();
-      };
-    }
+    const newWinButton = toolbar.createEl("button", {
+      text: `+ ${t("common.newWindow")}`,
+      cls: "mod-cta qsp-action-btn",
+    });
+    setTooltip(newWinButton, t("common.newWindow"));
+    newWinButton.onclick = () => {
+      this.close();
+      this.plugin.manager.openNewPopoutWindow();
+    };
 
     this.listEl = contentEl.createDiv("window-layouts-list");
     this.listEl.setAttribute("role", "listbox");
@@ -140,11 +143,11 @@ export class WindowLayoutsModal extends Modal {
     navInst.createEl("span", { text: t("instructions.navigate") });
 
     const useInst = instructionsEl.createDiv("prompt-instruction");
-    useInst.createEl("span", { text: "↵", cls: "prompt-instruction-command" });
+    useInst.createEl("span", { text: "Shift ↵", cls: "prompt-instruction-command" });
     useInst.createEl("span", { text: t("instructions.use") });
 
     const newWinInst = instructionsEl.createDiv("prompt-instruction");
-    newWinInst.createEl("span", { text: "Shift ↵", cls: "prompt-instruction-command" });
+    newWinInst.createEl("span", { text: "↵", cls: "prompt-instruction-command" });
     newWinInst.createEl("span", { text: t("instructions.useNewWindow") });
 
     const dismissInst = instructionsEl.createDiv("prompt-instruction");
@@ -204,9 +207,40 @@ export class WindowLayoutsModal extends Modal {
 
     this.setFilesTooltipForLayout(layoutEl, layout);
 
+    let holdTimer: any = null;
+    let isLongPress = false;
+
+    const isActionButtonTarget = (target: EventTarget | null): boolean =>
+      Boolean((target as HTMLElement | null)?.closest?.("button"));
+
+    const cancelHold = () => {
+      if (holdTimer) {
+        clearTimeout(holdTimer);
+        holdTimer = null;
+      }
+    };
+
+    // Long press works across the whole layout item. Action buttons keep their
+    // own behavior and are intentionally excluded from the parent timer.
+    layoutEl.addEventListener("mousedown", (e: MouseEvent) => {
+      if (e.button !== 0 || isActionButtonTarget(e.target)) return;
+      isLongPress = false;
+      holdTimer = setTimeout(() => {
+        isLongPress = true;
+        void this.restoreLayout(layout, false);
+      }, 450);
+    });
+
+    layoutEl.addEventListener("mouseup", cancelHold);
+    layoutEl.addEventListener("mouseleave", cancelHold);
+
     layoutEl.addEventListener("click", (e) => {
-      if ((e.target as HTMLElement).closest("button")) return;
-      const forceNewWindow = e.shiftKey;
+      if (isActionButtonTarget(e.target)) return;
+      if (isLongPress) {
+        isLongPress = false;
+        return;
+      }
+      const forceNewWindow = !e.shiftKey;
       void this.restoreLayout(layout, forceNewWindow);
     });
 
@@ -243,24 +277,14 @@ export class WindowLayoutsModal extends Modal {
     });
     setTooltip(restoreButton, t("restoreModal.restoreHint"));
 
-    let holdTimer: any = null;
-    let isLongPress = false;
-
     restoreButton.addEventListener("mousedown", (e: MouseEvent) => {
       if (e.button !== 0) return;
       isLongPress = false;
       holdTimer = setTimeout(() => {
         isLongPress = true;
-        void this.restoreLayout(layout, true);
+        void this.restoreLayout(layout, false);
       }, 450);
     });
-
-    const cancelHold = () => {
-      if (holdTimer) {
-        clearTimeout(holdTimer);
-        holdTimer = null;
-      }
-    };
 
     restoreButton.addEventListener("mouseup", cancelHold);
     restoreButton.addEventListener("mouseleave", cancelHold);
@@ -268,21 +292,19 @@ export class WindowLayoutsModal extends Modal {
     restoreButton.onclick = (e: MouseEvent) => {
       e.stopPropagation();
       if (isLongPress) return;
-      const forceNewWindow = e.shiftKey;
+      const forceNewWindow = !e.shiftKey;
       void this.restoreLayout(layout, forceNewWindow);
     };
 
-    if (this.mode === "manage") {
-      const moreButton = actionsEl.createEl("button", {
-        cls: "clickable-icon layout-more-btn",
-      });
-      setIcon(moreButton, "chevron-down");
-      setTooltip(moreButton, t("manageModal.actions"));
-      moreButton.onclick = (e: MouseEvent) => {
-        e.stopPropagation();
-        this.showLayoutItemMenu(e, layout);
-      };
-    }
+    const moreButton = actionsEl.createEl("button", {
+      cls: "clickable-icon layout-more-btn",
+    });
+    setIcon(moreButton, "chevron-down");
+    setTooltip(moreButton, t("manageModal.actions"));
+    moreButton.onclick = (e: MouseEvent) => {
+      e.stopPropagation();
+      this.showLayoutItemMenu(e, layout);
+    };
   }
 
   private async restoreLayout(
@@ -292,7 +314,9 @@ export class WindowLayoutsModal extends Modal {
     try {
       this.close();
       await this.plugin.manager.restoreLayout(layout, {
-        targetWindow: forceNewWindow ? undefined : this.targetWindow,
+        // forceNewWindow 只控制 restore 的目標是否新建；仍需傳入來源視窗，
+        // 讓 manager 能保留該 popout 原本的 layout 名稱與狀態列。
+        targetWindow: this.targetWindow,
         forceNewWindow,
       });
     } catch (error: any) {

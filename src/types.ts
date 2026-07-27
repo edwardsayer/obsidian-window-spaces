@@ -52,8 +52,7 @@ export interface WindowSettings {
   showStatusBarIndicator?: boolean;
   showLayoutStatusBar: boolean;
   layoutStatusBarDefaultApplied?: boolean;
-  showRestoreRibbonIcon: boolean;
-  showManageRibbonIcon: boolean;
+  showWindowLayoutsRibbonIcon: boolean;
   sortBy?: "updated-desc" | "updated-asc" | "created-desc" | "created-asc" | "name-asc" | "name-desc";
 }
 

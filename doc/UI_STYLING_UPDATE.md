@@ -1,7 +1,13 @@
-# Window Layout Manager & Restore Modal UI 樣式升級紀錄
+# Window Layouts Modal UI 樣式升級紀錄
+
+## 統一 Window Layouts 入口
+
+- Restore 與 Manage 已合併為單一 `Window Layouts` dialog。
+- Command ID 改為 `open-window-layouts`；同一清單支援一般點擊／Enter 在新視窗還原、長按／Shift+點擊／Shift+Enter 在目前 active 視窗還原，以及 Auto-save、Rename、Edit、Delete。
+- Ribbon 與 Popout 狀態列各只保留一個 `layout` 圖示入口；設定合併為 `showWindowLayoutsRibbonIcon`。
 
 ## 變更概述
-參考 `obsidian-tasks-plugin` 及 `darlal-switcher-plus` (Quick Switcher++) 的介面風格，對 **Window layout manager** 與 **Restore window layout** 視窗進行 UI 樣式優化。
+參考 `obsidian-tasks-plugin` 及 `darlal-switcher-plus` (Quick Switcher++) 的介面風格，對統一後的 **Window Layouts** 視窗進行 UI 樣式優化。
 
 ## 主要修改項目
 
@@ -36,19 +42,18 @@
   5. **Delete 按鈕圖示化**：改為與原生 Manage workspace layout 一致的 `✕` 圖示按鈕 (`clickable-icon`)，滑鼠懸停顯示 "Delete layout" 提示。
   6. **Restore / Rename 按鈕簡化**：改為與原生 Load 按鈕相同的 Obsidian 預設灰框按鈕。
   7. **預設選中第一個項目**：清單數量 > 0 時或搜尋過濾後預設自動選中第 1 個項目 (`selectedIndex = 0`)，按 Enter 可直接執行復原。
-  8. **對話視窗底部提示 (Prompt Footer Instructions)**：在對話視窗內層底部加入極簡提示欄 (`↑ ↓ 選擇項目` `↵ 套用/復原` `esc 關閉`)。樣式設為置中對齊 (`justify-content: center`)、移除上方水平分割線，並覆蓋 Modal 最外層容器的預設底內邊距 (`padding-bottom: 8px !important`)，使 Footer Hint 底部到對話視窗邊框的間距極小，完全對齊 Obsidian 內建對話視窗風格。
-  9. **全對話視窗範圍與 Capture 階段 Keydown 監聽**：採用 Obsidian 原生 `this.scope` 註冊與 `useCapture = true` 捕獲階段 Keydown 事件監聽。即使滑鼠點擊標題 ("Restore Window Layout" / "Manage Window Layouts")、背景或任何區域導致焦點離焦，按下 **`↑` / `↓` 鍵** 依然 100% 能進行清單選擇切換，按下 **`Enter` 鍵** 也能精確觸發復原。
+  8. **對話視窗底部提示 (Prompt Footer Instructions)**：在對話視窗內層底部加入極簡提示欄 (`↑ ↓ 選擇項目` `↵ 新視窗` `Shift ↵ 目前視窗` `esc 關閉`)。樣式設為置中對齊 (`justify-content: center`)、移除上方水平分割線，並覆蓋 Modal 最外層容器的預設底內邊距 (`padding-bottom: 8px !important`)，使 Footer Hint 底部到對話視窗邊框的間距極小，完全對齊 Obsidian 內建對話視窗風格。
+  9. **全對話視窗範圍與 Capture 階段 Keydown 監聽**：採用 Obsidian 原生 `this.scope` 註冊與 `useCapture = true` 捕獲階段 Keydown 事件監聽。即使滑鼠點擊標題 ("Window Layouts")、背景或任何區域導致焦點離焦，按下 **`↑` / `↓` 鍵** 依然 100% 能進行清單選擇切換；按下 **`Enter`** 在新 Popout 還原，按下 **`Shift + Enter`** 則精確套用至目前 active Popout。
   10. **主視窗左側 Ribbon 按鈕與組態開關**：
-      - 在主視窗左側邊欄 (Ribbon) 支援加入 **Restore Window Layout**（歷史/恢復圖示）與 **Manage Window Layouts**（佈局圖示）的快速按鈕。
-      - 在插件組態設定中提供可隨時切換顯示與隱藏的獨立開關 (Toggle)。
-      - 預設值：**`Restore Window Layout` 圖示預設顯示 (true)**，**`Manage Window Layouts` 圖示預設不顯示 (false)**。
+      - 在主視窗左側邊欄 (Ribbon) 提供單一 **Window Layouts**（`layout` 圖示）快速入口，同時支援還原與管理。
+      - 在 plugin 組態設定中提供 `showWindowLayoutsRibbonIcon` 顯示／隱藏開關，預設顯示。
   11. **"Save Window Layout" 對話窗標題與 i18n 統一**：
-      - 改用 Obsidian 原生 `this.setTitle(t("saveModal.title"))`，使 Title 樣式、字體與排版與 **Manage Window Layouts** 完全一致。
+      - 改用 Obsidian 原生 `this.setTitle(t("saveModal.title"))`，使 Title 樣式、字體與排版與 **Window Layouts** 完全一致。
       - 將所有硬編碼中文訊息（如「檔案數量」、「建立時間」、「視窗大小」、「包含視窗位置/大小」等）完全重構並抽離至 `src/i18n` 多語字典中，支援英文、繁體中文、簡體中文。
-  12. **Context-Aware Restore 與 Restore 按鈕長按/Shift 新視窗**：
-      - **情境感知預設**：從 Popout 視窗觸發 Restore 預設套用並覆蓋當前 Popout 視窗；從主視窗觸發預設開啟獨立 Popout。
-      - **Restore 按鈕 Hover Hint & 長按**：按鈕懸停顯示提示文字；長按（> 450ms）或 `Shift + 點擊`（/ 鍵盤 `Shift + Enter`）可在全新 Popout 視窗開啟。
-      - **底部 Hint**：Prompt Instructions 底部加入 `Shift ↵ 在新視窗開啟` 提示。
+  12. **Context-Aware Restore 與 Restore 按鈕長按/Shift 目標切換**：
+      - **一般操作**：清單一般點擊或按 `Enter` 在新 Popout 視窗還原。
+      - **目前視窗操作**：長按 layout 項目（包含 Restore 按鈕，> 450ms）、`Shift + 點擊` 或鍵盤 `Shift + Enter`，套用至目前 active Popout 視窗。
+      - **底部 Hint**：Prompt Instructions 底部加入 `↵ 在新視窗開啟` 與 `Shift ↵ 套用至目前視窗` 提示。
   13. **缺失檔案之原生空 Tab 展現與輕量 Notice 警示 (UX-002)**：
       - **版面結構忠實保留**：若 Layout 中的檔案在外部被刪除或改名，保留其原本的分頁 (Tab) 與視窗分割 (Splits) 結構不塌陷。
       - **原生 New tab 頁面**：缺失檔案的 Tab 重置為 Obsidian 原生 `type: "empty"` ("New tab")，使用者可直接點擊內建的 Create new note 或 Go to file 操作。
@@ -75,9 +80,9 @@
       - 修正 Popout 左下角狀態列按鈕圖示（原本 Restore 誤使用 `rotate-ccw`，Manage 誤使用 `list`）統一為 `history` 與 `layout`。
       - 替換 Popout 狀態列前綴舊有 Unicode 符號 `▣` 為原生 `history` Lucide Icon，達成全站極致一致視覺。
       - 為 Command Palette 命令列全數補上對應 Icon。
-  20. **Restore / Manage Toolbar 頂部按鈕 UX 重構 (Toolbar UX Polish)**：
-      - **Restore 視窗頂部新增 `+ 新視窗 (+ New Window)`**：搜尋框右側新增專屬按鈕，找不到既有 Layout 時可秒點建立全新的獨立 Popout 空白視窗，流程極致順暢。
-      - **Manage 視窗移除冗餘 `Save` 按鈕**：移除 Manage 頂部會跳二階 Modal 的舊 Save 按鈕，讓 Manage Modal 專注於整理、重命名與刪除，畫面乾淨乾淨利落。
+  20. **Window Layouts Toolbar 頂部按鈕 UX 重構 (Toolbar UX Polish)**：
+      - **Window Layouts 視窗新增 `+ 新視窗 (+ New Window)`**：搜尋框右側新增專屬按鈕，找不到既有 Layout 時可秒點建立全新的獨立 Popout 空白視窗，流程極致順暢。
+      - 還原與管理功能共用同一個 Toolbar，不再維護兩套視窗或重複按鈕。
   21. **Restore / Manage 清單 Hover Tooltip 檔案細節預覽 (UX-007)**：
       - 滑鼠懸停於清單項目時，動態顯示原生 Tooltip，詳細條列該 Layout 收錄的所有筆記檔案檔名（含檔案總數統計與超過 15 個檔時的 `... (+N)` 保護）。
       - **靠前對齊與多語系適應 (Start Alignment)**：Tooltip 設定 `text-align: start !important;`，確保清單符號 `•` 與檔案名稱在從左至右 (LTR) 及各語系環境下完美左對齊、視覺排版極度舒適整齊。
@@ -93,7 +98,7 @@
       - 儲存視窗加入「啟用此佈局的自動保存」Toggle 開關；Manage 視窗加入 🔄 快捷切換按鈕。
       - 啟用了自動保存的 Layout，名稱旁顯示高亮的 🔄 (`refresh-cw`) 圖示標籤。
       - 運作時自動套用 5 秒 (5000ms) 防手震 Debounce，且在 Popout 視窗關閉時強制實施最後一次實時快照儲存。
-  25. **Manage Window Layouts 清單項目按鈕下拉選單化重構 (Menu Dropdown UI)**：
+  25. **Window Layouts 清單項目按鈕下拉選單化重構 (Menu Dropdown UI)**：
       - 移除清單項目右側原本散亂的多個按鈕（Auto-Save 🔄、Rename、Delete ✕），替換為極簡的向下箭頭 `∨` (`chevron-down`) 下拉選單按鈕。
       - 點擊向下箭頭 `∨` 按鈕彈出 Obsidian 原生選單 (`new Menu()`)，內含四項功能：
         1. 🔄 **Auto-Save 切換**：帶 Checkmark `✓` 顯示當前狀態，點擊即可切換開啟/關閉。
@@ -131,8 +136,16 @@
       - **零延遲即時切換**：`t(key)`、`formatDate()` 及 `formatNumber()` 改為在調用時實時動態求值，解決了在 Obsidian 設定中切換語言時外掛介面文字無法同步更新的 Bug。
   34. **UX-014 單元測試與自動化測試涵蓋率完成 (Vitest Test Suite Integration)**：
       - 成功整合 `Vitest` + `jsdom` + `obsidian` Mock 測試環境。
-      - 完成 5 大單元測試套件（智慧命名、6 大維度動態排序、0 檔案覆寫防呆攔截、實時語系檢測、Layout Tree 樹狀結構提取），全數 **17 個測試個案 100% PASS** 通過！
+      - 完成 6 個測試套件（智慧命名、6 大維度動態排序、0 檔案覆寫防呆攔截、實時語系檢測、Layout Tree 樹狀結構提取、Window Layouts restore 目標），全數 **25 個測試個案 100% PASS** 通過！
+  35. **Window Layouts 目標匹配強化與舊視窗標籤鎖定保護 (TargetWindow Matching & Label Guard)**：
+      - **多層次 DOM 反查匹配**：重構 `restoreLayout` 中的 `targetIndex` 搜尋邏輯，新增 Leaf ID 比對 ➔ DOM Document `defaultView` 比對 ➔ 浮動索引鎖定三層保障。確保按 `Shift + Enter` 時 **100% 精確套用至當前的 Popout 視窗，絕對不誤取代其他視窗**。
+      - **舊視窗標籤鎖定**：使用一般 `Enter` 在新 Popout 視窗還原時，原先舊 Popout 視窗的 Layout 名稱與狀態列 **100% 保持鎖定維持**，解決了新視窗還原後舊視窗被誤置為 `No layout applied` 的問題。
+  36. **Command Palette 命令感知與雙重拒絕開新視窗防護 (Command Capture & Strict Non-Popout Fallback)**：
+      - **命令發起視窗實時感知**：修正 `openWindowLayoutsModal` 在透過快捷鍵/命令面板 (`Ctrl+P`) 發動時，未帶入 `targetWindow` 參數導致視窗被判斷為 `undefined` 的死穴。現已實施 `manager.getActiveWindow()` 實時 DOM 反查，確保命令面板開啟對話視窗時 100% 準確抓住當前 Popout 視窗。
+      - **目標視窗防護**：在 `restoreLayout` 流程中依據 `forceNewWindow` 與 `targetWindow` 判斷目標；Shift 操作可套用至目前 active Popout，一般 Enter 則建立新的 Popout，避免錯誤取代其他視窗。
+  37. **Popout DOM 級別雙重標籤持久化 (`data-layout-name`)**：
+      - **全性命週期標籤保護**：揭露了 `changeLayout` 過程重構 DOM 時，記憶體 `Map<Window, string>` 因 Window 物件解綁導致舊視窗標籤被強行降級寫入 `No layout applied` 的致命原因。
+      - **DOM 屬性備份與回溯**：在 Popout `body` 上寫入 `data-layout-name` 屬性。當記憶體 Map 找不到時，自動從 DOM 屬性恢復 `layoutName`，並防止無標籤情況下隨意清除舊視窗名稱。一般 `Enter` 在新視窗還原時，原視窗標籤 100% 免疫刷新，永不抹除！
 - **部署狀態**：
   - ✅ 已成功構建並部署至測試 Vault：`E:\vaults\test-vault\.obsidian\plugins\obsidian-window-spaces`
   - ✅ 已成功構建並部署至正式 Vault：`E:\vaults\Note\.obsidian\plugins\obsidian-window-spaces`
-

@@ -2,7 +2,7 @@ import { Plugin, Notice } from "obsidian";
 import { WindowLayout, WindowSettings } from "./types";
 import { WindowLayoutManager } from "./manager";
 import { SaveLayoutModal } from "./modals/saveModal";
-import { WindowLayoutsModal, WindowLayoutsMode } from "./modals/restoreModal";
+import { WindowLayoutsModal } from "./modals/restoreModal";
 import { WindowSpacesSettingTab } from "./settings";
 import { initI18n, t } from "./i18n";
 
@@ -14,16 +14,14 @@ const DEFAULT_SETTINGS: WindowSettings = {
   version: "1.0.0",
   showLayoutStatusBar: true,
   layoutStatusBarDefaultApplied: false,
-  showRestoreRibbonIcon: true,
-  showManageRibbonIcon: false,
+  showWindowLayoutsRibbonIcon: true,
   sortBy: "updated-desc",
 };
 
 export default class WindowSpacesPlugin extends Plugin {
   settings: WindowSettings;
   manager: WindowLayoutManager;
-  restoreRibbonEl: HTMLElement | null = null;
-  manageRibbonEl: HTMLElement | null = null;
+  windowLayoutsRibbonEl: HTMLElement | null = null;
 
   async onload() {
     console.log("Loading Window Spaces plugin");
@@ -61,10 +59,8 @@ export default class WindowSpacesPlugin extends Plugin {
   onunload() {
     console.log("Unloading Window Spaces plugin");
 
-    this.restoreRibbonEl?.remove();
-    this.manageRibbonEl?.remove();
-    this.restoreRibbonEl = null;
-    this.manageRibbonEl = null;
+    this.windowLayoutsRibbonEl?.remove();
+    this.windowLayoutsRibbonEl = null;
 
     this.manager?.clearLayoutLabels();
 
@@ -75,38 +71,17 @@ export default class WindowSpacesPlugin extends Plugin {
   }
 
   refreshRibbonIcons() {
-    if (this.settings.showRestoreRibbonIcon) {
-      if (!this.restoreRibbonEl) {
-        this.restoreRibbonEl = this.addRibbonIcon(
-          "history",
-          t("commands.restoreLayout"),
-          () => {
-            this.openWindowLayoutsModal("restore");
-          }
-        );
-      }
-    } else {
-      if (this.restoreRibbonEl) {
-        this.restoreRibbonEl.remove();
-        this.restoreRibbonEl = null;
-      }
-    }
-
-    if (this.settings.showManageRibbonIcon) {
-      if (!this.manageRibbonEl) {
-        this.manageRibbonEl = this.addRibbonIcon(
+    if (this.settings.showWindowLayoutsRibbonIcon) {
+      if (!this.windowLayoutsRibbonEl) {
+        this.windowLayoutsRibbonEl = this.addRibbonIcon(
           "layout",
-          t("commands.manageLayouts"),
-          () => {
-            this.openWindowLayoutsModal("manage");
-          }
+          t("commands.openLayouts"),
+          () => this.openWindowLayoutsModal()
         );
       }
-    } else {
-      if (this.manageRibbonEl) {
-        this.manageRibbonEl.remove();
-        this.manageRibbonEl = null;
-      }
+    } else if (this.windowLayoutsRibbonEl) {
+      this.windowLayoutsRibbonEl.remove();
+      this.windowLayoutsRibbonEl = null;
     }
   }
 
@@ -147,24 +122,12 @@ export default class WindowSpacesPlugin extends Plugin {
       },
     });
 
-    // 恢復視窗佈局
+    // 開啟統一的視窗佈局對話框
     this.addCommand({
-      id: "restore-window-layout",
-      name: t("commands.restoreLayout"),
-      icon: "history",
-      callback: () => {
-        this.openWindowLayoutsModal("restore");
-      },
-    });
-
-    // 管理佈局
-    this.addCommand({
-      id: "manage-window-layouts",
-      name: t("commands.manageLayouts"),
+      id: "open-window-layouts",
+      name: t("commands.openLayouts"),
       icon: "layout",
-      callback: () => {
-        this.openWindowLayoutsModal("manage");
-      },
+      callback: () => this.openWindowLayoutsModal(),
     });
   }
 
@@ -194,10 +157,10 @@ export default class WindowSpacesPlugin extends Plugin {
   }
 
   openWindowLayoutsModal(
-    mode: WindowLayoutsMode = "manage",
     targetWindow?: Window
   ): void {
-    new WindowLayoutsModal(this.app, this, mode, targetWindow).open();
+    const win = targetWindow || (this.manager ? this.manager.getActiveWindow() : undefined);
+    new WindowLayoutsModal(this.app, this, win).open();
   }
 
   private setupEventListeners() {
@@ -241,7 +204,7 @@ export default class WindowSpacesPlugin extends Plugin {
         });
       } else {
         // 普通點擊：顯示佈局列表
-        this.openWindowLayoutsModal("restore");
+        this.openWindowLayoutsModal();
       }
     });
 

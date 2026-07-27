@@ -62,24 +62,12 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
-      .setName(t("settings.showRestoreRibbonIcon"))
-      .setDesc(t("settings.showRestoreRibbonIconDesc"))
+      .setName(t("settings.showWindowLayoutsRibbonIcon"))
+      .setDesc(t("settings.showWindowLayoutsRibbonIconDesc"))
       .addToggle((toggle) => {
-        toggle.setValue(this.plugin.settings.showRestoreRibbonIcon !== false);
+        toggle.setValue(this.plugin.settings.showWindowLayoutsRibbonIcon !== false);
         toggle.onChange(async (value) => {
-          this.plugin.settings.showRestoreRibbonIcon = value;
-          await this.plugin.saveSettings();
-          this.plugin.refreshRibbonIcons();
-        });
-      });
-
-    new Setting(containerEl)
-      .setName(t("settings.showManageRibbonIcon"))
-      .setDesc(t("settings.showManageRibbonIconDesc"))
-      .addToggle((toggle) => {
-        toggle.setValue(this.plugin.settings.showManageRibbonIcon === true);
-        toggle.onChange(async (value) => {
-          this.plugin.settings.showManageRibbonIcon = value;
+          this.plugin.settings.showWindowLayoutsRibbonIcon = value;
           await this.plugin.saveSettings();
           this.plugin.refreshRibbonIcons();
         });

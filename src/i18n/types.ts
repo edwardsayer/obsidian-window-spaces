@@ -20,13 +20,13 @@ export interface TranslationStrings {
     noLayout: string;
     newWindow: string;
     edit: string;
+    windowLayouts: string;
   };
 
   // 命令
   commands: {
     saveLayout: string;
-    restoreLayout: string;
-    manageLayouts: string;
+    openLayouts: string;
   };
 
   // 保存對話框
@@ -109,10 +109,8 @@ export interface TranslationStrings {
     layoutDisplaySection: string;
     showLayoutStatusBar: string;
     showLayoutStatusBarDesc: string;
-    showRestoreRibbonIcon: string;
-    showRestoreRibbonIconDesc: string;
-    showManageRibbonIcon: string;
-    showManageRibbonIconDesc: string;
+    showWindowLayoutsRibbonIcon: string;
+    showWindowLayoutsRibbonIconDesc: string;
     maxLayouts: string;
     maxLayoutsDesc: string;
     layoutStats: string;

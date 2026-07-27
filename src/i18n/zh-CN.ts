@@ -21,12 +21,12 @@ export const zhCN: TranslationStrings = {
     noLayout: "尚未应用布局",
     newWindow: "新窗口",
     edit: "编辑",
+    windowLayouts: "窗口布局",
   },
 
   commands: {
     saveLayout: "保存当前窗口布局",
-    restoreLayout: "恢复窗口布局",
-    manageLayouts: "管理窗口布局",
+    openLayouts: "打开窗口布局",
   },
 
   saveModal: {
@@ -58,7 +58,7 @@ export const zhCN: TranslationStrings = {
     selectLayout: "选择要恢复的布局：",
     noLayoutsMessage: "没有找到已保存的布局。",
     restoreButton: "恢复",
-    restoreHint: "恢复布局（点击应用至当前窗口，长按或 Shift+点击在新窗口打开）",
+    restoreHint: "恢复布局（点击或按 Enter 在新窗口打开；长按布局项或恢复按钮、按住 Shift 点击或按 Shift+Enter 应用至当前窗口）",
     cancelButton: "取消",
     restoreSuccess: "布局恢复成功",
     restoreError: "恢复布局失败",
@@ -105,10 +105,8 @@ export const zhCN: TranslationStrings = {
     layoutDisplaySection: "Popout 布局显示",
     showLayoutStatusBar: "显示布局状态栏",
     showLayoutStatusBarDesc: "在每个 Popout 窗口左下方以状态栏样式显示当前布局名称与保存按钮",
-    showRestoreRibbonIcon: "显示“恢复窗口布局”侧边栏图标",
-    showRestoreRibbonIconDesc: "在主窗口左侧边栏显示快速恢复窗口布局的图标按钮",
-    showManageRibbonIcon: "显示“管理窗口布局”侧边栏图标",
-    showManageRibbonIconDesc: "在主窗口左侧边栏显示管理窗口布局的图标按钮",
+    showWindowLayoutsRibbonIcon: "显示“窗口布局”侧边栏图标",
+    showWindowLayoutsRibbonIconDesc: "在主窗口左侧边栏显示恢复与管理窗口布局的单一入口",
     maxLayouts: "最大布局数量",
     maxLayoutsDesc: "限制保存的布局数量（0 代表无限制）",
     layoutStats: "已保存布局总数：{{count}} 个",

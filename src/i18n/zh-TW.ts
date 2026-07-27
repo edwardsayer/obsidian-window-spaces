@@ -21,12 +21,12 @@ export const zhTW: TranslationStrings = {
     noLayout: "尚未套用佈局",
     newWindow: "新視窗",
     edit: "編輯",
+    windowLayouts: "視窗佈局",
   },
 
   commands: {
     saveLayout: "儲存目前視窗佈局",
-    restoreLayout: "恢復視窗佈局",
-    manageLayouts: "管理視窗佈局",
+    openLayouts: "開啟視窗佈局",
   },
 
   saveModal: {
@@ -58,7 +58,7 @@ export const zhTW: TranslationStrings = {
     selectLayout: "選擇要復原的佈局：",
     noLayoutsMessage: "沒有找到已儲存的佈局。",
     restoreButton: "復原",
-    restoreHint: "復原佈局（點擊套用至當前視窗，長按或 Shift+點擊在新視窗開啟）",
+    restoreHint: "復原佈局（點擊或按 Enter 在新視窗開啟；長按佈局項目或 Restore 按鈕、按住 Shift 點擊或按 Shift+Enter 套用至目前視窗）",
     cancelButton: "取消",
     restoreSuccess: "佈局復原成功",
     restoreError: "復原佈局失敗",
@@ -105,10 +105,8 @@ export const zhTW: TranslationStrings = {
     layoutDisplaySection: "Popout 佈局顯示",
     showLayoutStatusBar: "顯示佈局狀態列",
     showLayoutStatusBarDesc: "在每個 Popout 視窗左下方以狀態列樣式顯示目前佈局名稱與儲存按鈕",
-    showRestoreRibbonIcon: "顯示「恢復視窗佈局」側邊欄圖示",
-    showRestoreRibbonIconDesc: "在主視窗左側邊欄顯示快速恢復視窗佈局的圖示按鈕",
-    showManageRibbonIcon: "顯示「管理視窗佈局」側邊欄圖示",
-    showManageRibbonIconDesc: "在主視窗左側邊欄顯示管理視窗佈局的圖示按鈕",
+    showWindowLayoutsRibbonIcon: "顯示「視窗佈局」側邊欄圖示",
+    showWindowLayoutsRibbonIconDesc: "在主視窗左側邊欄顯示恢復與管理視窗佈局的單一入口",
     maxLayouts: "最大佈局數量",
     maxLayoutsDesc: "限制儲存的佈局數量（0 代表無限制）",
     layoutStats: "已儲存佈局總數：{{count}} 個",

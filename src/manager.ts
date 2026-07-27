@@ -12,6 +12,13 @@ interface LayoutLabelElements {
   statusBar: HTMLElement | null;
 }
 
+interface PreservedWindowLayout {
+  window: Window;
+  layoutName: string;
+  leaves: ViewState[];
+  windowState: WindowState;
+}
+
 export class WindowLayoutManager {
   private plugin: any;
   private app: App;
@@ -78,11 +85,25 @@ export class WindowLayoutManager {
 
     this.registerPopoutWindow(targetWin);
     this.layoutNames.set(targetWin, layoutName);
+    body.setAttribute("data-layout-name", layoutName);
 
     // 清理舊版浮動 label，避免更新插件後殘留在 Popout 右上角。
     body.querySelectorAll(".window-spaces-layout-label").forEach((element) => element.remove());
 
     this.refreshLayoutStatusBar(targetWin);
+  }
+
+  getLayoutNameForWindow(targetWin: Window): string | null {
+    if (!targetWin) return null;
+    const nameFromMap = this.layoutNames.get(targetWin);
+    if (nameFromMap) return nameFromMap;
+
+    const nameFromDOM = targetWin.document?.body?.getAttribute("data-layout-name");
+    if (nameFromDOM) {
+      this.layoutNames.set(targetWin, nameFromDOM);
+      return nameFromDOM;
+    }
+    return null;
   }
 
   refreshLayoutLabels(): void {
@@ -99,6 +120,8 @@ export class WindowLayoutManager {
     const labels = this.layoutLabels.get(targetWin) || { statusBar: null };
     this.layoutLabels.set(targetWin, labels);
 
+    const layoutName = this.getLayoutNameForWindow(targetWin);
+
     if (this.plugin.settings.showLayoutStatusBar === true) {
       labels.statusBar = this.ensureLayoutLabelElement(
         targetDocument,
@@ -108,7 +131,7 @@ export class WindowLayoutManager {
       );
       this.updateLayoutLabelElement(
         labels.statusBar,
-        this.layoutNames.get(targetWin) || t("common.noLayout"),
+        layoutName || t("common.noLayout"),
         targetWin
       );
     } else {
@@ -229,16 +252,10 @@ export class WindowLayoutManager {
     }
 
     ensureActionButton(
-      "window-spaces-layout-restore",
-      "history",
-      t("commands.restoreLayout"),
-      () => this.plugin.openWindowLayoutsModal("restore", targetWin)
-    );
-    ensureActionButton(
-      "window-spaces-layout-manage",
+      "window-spaces-layout-open",
       "layout",
-      t("commands.manageLayouts"),
-      () => this.plugin.openWindowLayoutsModal("manage", targetWin)
+      t("commands.openLayouts"),
+      () => this.plugin.openWindowLayoutsModal(targetWin)
     );
     element.setAttribute("aria-label", `${t("common.layoutLabel")}: ${layoutName}`);
     element.setAttribute("title", layoutName);
@@ -447,6 +464,44 @@ export class WindowLayoutManager {
     return leaves;
   }
 
+  /** 保存指定 Window 的 live leaf 狀態，供 changeLayout 後重新辨識視窗。 */
+  private getViewStatesForWindow(targetWin: Window): ViewState[] {
+    return this.getLeavesForWindow(targetWin).map((leaf) => {
+      const viewState = typeof (leaf as any).getViewState === "function"
+        ? (leaf as any).getViewState()
+        : {};
+      return {
+        id: (leaf as any).id || this.generateId(),
+        type: viewState.type || leaf.view?.getViewType() || "unknown",
+        state: viewState.state || {},
+      };
+    });
+  }
+
+  /** 快照目前所有已套用 layout 的 live popout，供新視窗 restore 後復原標籤。 */
+  private capturePreservedWindowLayouts(): PreservedWindowLayout[] {
+    const liveWindows = new Set<Window>();
+    (this.app.workspace as any).iterateAllLeaves((leaf: WorkspaceLeaf) => {
+      const targetWin = this.getWindowForLeaf(leaf);
+      if (targetWin && this.isPopoutDocument(targetWin.document)) {
+        liveWindows.add(targetWin);
+      }
+    });
+
+    const snapshots: PreservedWindowLayout[] = [];
+    liveWindows.forEach((targetWin) => {
+      const layoutName = this.getLayoutNameForWindow(targetWin);
+      if (!layoutName) return;
+      snapshots.push({
+        window: targetWin,
+        layoutName,
+        leaves: this.getViewStatesForWindow(targetWin),
+        windowState: this.getWindowState(targetWin),
+      });
+    });
+    return snapshots;
+  }
+
   /**
    * 捕獲當前活動視窗的佈局
    */
@@ -586,6 +641,13 @@ export class WindowLayoutManager {
         throw new Error(t("errors.invalidData"));
       }
 
+      // changeLayout 可能重建任一既有 WorkspaceWindow。所有 restore 都先
+      // 保存 live popout；普通 Enter restore 不保留將被取代的目標名稱。
+      const preservedWindowLayouts = this.capturePreservedWindowLayouts()
+        .filter((snapshot) =>
+          options.forceNewWindow || snapshot.window !== options.targetWindow
+        );
+
       const savedLeaves = this.getSavedViewStates(layout);
       const savedLeafId = layout.windowInfo?.firstLeafId || savedLeaves[0]?.id;
       let currentLayout: any = this.app.workspace.getLayout();
@@ -599,18 +661,12 @@ export class WindowLayoutManager {
         // 強制在新 Popout 視窗開啟
         targetIndex = -1;
       } else if (options.targetWindow && this.isPopoutDocument(options.targetWindow.document)) {
-        // 優先還原至傳入的當前 Popout 視窗
+        // 優先還原至傳入的當前 Popout 視窗 (取代當前視窗)
         targetWin = options.targetWindow;
-        const windowLeaves = this.getLeavesForWindow(targetWin);
-        if (windowLeaves.length > 0 && floatingWindows.length > 0) {
-          const leafId = (windowLeaves[0] as any).id;
-          for (let i = 0; i < floatingWindows.length; i++) {
-            if (this.floatingWindowContainsLeaf(floatingWindows[i], leafId)) {
-              targetIndex = i;
-              break;
-            }
-          }
-        }
+        targetIndex = this.findFloatingWindowIndexForWindow(
+          targetWin,
+          floatingWindows
+        );
       } else if (savedLeafId && floatingWindows.length > 0) {
         for (let i = 0; i < floatingWindows.length; i++) {
           if (this.floatingWindowContainsLeaf(floatingWindows[i], savedLeafId)) {
@@ -623,20 +679,30 @@ export class WindowLayoutManager {
         targetWin = this.getWindowForLeaf(existingTargetLeaf);
       }
 
-      // 2. 若找不到現有視窗，建立一個新 Popout 視窗
+      // 2. 若找不到現有視窗，且非明確指定取代的 Popout 視窗，建立一個新 Popout 視窗
       if (targetIndex < 0) {
-        const popoutLeaf = this.app.workspace.openPopoutLeaf();
-        targetWin = this.getWindowForLeaf(popoutLeaf as WorkspaceLeaf);
+        if (!options.forceNewWindow && options.targetWindow && this.isPopoutDocument(options.targetWindow.document)) {
+          // 最終仍以 live popout 的 DOM/容器順序定位，不因 runtime root
+          // 沒有序列化 ID 而中止正常 Enter restore。
+          targetWin = options.targetWindow;
+          targetIndex = this.findPopoutOrdinal(targetWin, floatingWindows.length);
+          if (targetIndex < 0) {
+            throw new Error(t("errors.cannotRestore"));
+          }
+        } else {
+          const popoutLeaf = this.app.workspace.openPopoutLeaf();
+          targetWin = this.getWindowForLeaf(popoutLeaf as WorkspaceLeaf);
 
-        // 等待 Popout 視窗誕生
-        await new Promise((resolve) => setTimeout(resolve, 150));
+          // 等待 Popout 視窗誕生
+          await new Promise((resolve) => setTimeout(resolve, 150));
 
-        // 重新讀取最新的 Layout
-        currentLayout = this.app.workspace.getLayout();
-        floatingWindows = this.getFloatingWindows(currentLayout);
+          // 重新讀取最新的 Layout
+          currentLayout = this.app.workspace.getLayout();
+          floatingWindows = this.getFloatingWindows(currentLayout);
 
-        // 新開的視窗位於 floating 陣列末尾
-        targetIndex = floatingWindows.length - 1;
+          // 新開的視窗位於 floating 陣列末尾
+          targetIndex = floatingWindows.length - 1;
+        }
       }
 
       // 3. 只替換目標 window 的 children，保留 floating container 與
@@ -665,8 +731,14 @@ export class WindowLayoutManager {
       // changeLayout 可能會重建 leaf，因此若原 ID 不再存在，改用還原後
       // 同一視窗中匹配最多保存 leaf 的方式辨識目標視窗。
       // changeLayout 會清除並重新建立 WorkspaceWindow，舊的 targetWin
-      // 可能已經被關閉；一定要重新從新建的 leaf 找到新的 DOM window。
-      targetWin = this.findWindowForSavedLeaves(savedLeaves) || targetWin;
+      // 可能已經被關閉；但 forceNewWindow 時來源視窗可能仍包含相同的
+      // leaf ID，不能只依 saved leaf ID 找視窗，否則會把檔案開回來源視窗。
+      const preferredTargetWin = targetWin;
+      targetWin = this.findWindowForSavedLeaves(
+        savedLeaves,
+        options.forceNewWindow ? options.targetWindow : undefined,
+        preferredTargetWin
+      ) || targetWin;
 
       let missingFiles: string[] = [];
       if (options.validateFiles !== false && savedLeaves.length > 0) {
@@ -679,14 +751,7 @@ export class WindowLayoutManager {
 
       // 5. 調整視窗尺寸與座標，並聚焦視窗
       if (targetWin) {
-        if (layout.windowState) {
-          if (layout.windowState.size && layout.windowState.size.width > 0 && layout.windowState.size.height > 0) {
-            targetWin.resizeTo(layout.windowState.size.width, layout.windowState.size.height);
-          }
-          if (layout.windowState.position && typeof targetWin.moveTo === "function") {
-            targetWin.moveTo(layout.windowState.position.x, layout.windowState.position.y);
-          }
-        }
+        this.restoreWindowGeometry(targetWin, layout.windowState);
         if (typeof targetWin.focus === "function") {
           try {
             targetWin.focus();
@@ -697,6 +762,8 @@ export class WindowLayoutManager {
       }
 
       this.setLayoutLabelForWindow(targetWin, layout.name);
+      this.restorePreservedWindowLabels(preservedWindowLayouts, targetWin);
+      this.refreshLayoutLabels();
 
       if (options.showNotifications !== false) {
         if (missingFiles.length > 0) {
@@ -827,6 +894,20 @@ export class WindowLayoutManager {
   }
 
   /**
+   * 獲取當前活發對應的 DOM Window (包含當前命令發起所在 Popout 視窗)
+   */
+  getActiveWindow(): Window {
+    const activeLeaf = this.getActiveLeafForCurrentWindow();
+    if (activeLeaf && (activeLeaf as any).containerEl) {
+      const ownerDocument = (activeLeaf as any).containerEl.ownerDocument;
+      if (ownerDocument && ownerDocument.defaultView) {
+        return ownerDocument.defaultView;
+      }
+    }
+    return typeof activeWindow !== "undefined" ? activeWindow : window;
+  }
+
+  /**
    * 獲取當前視窗狀態
    */
   private getCurrentWindowState(): WindowState {
@@ -840,16 +921,24 @@ export class WindowLayoutManager {
       }
     }
 
+    return this.getWindowState(currentWindow);
+  }
+
+  /**
+   * 使用 outer dimensions，與 Window.resizeTo() 的參數語意一致。
+   * innerWidth/innerHeight 是內容區大小，不能直接拿來恢復整個視窗。
+   */
+  private getWindowState(targetWin: Window): WindowState {
     return {
       size: {
-        width: currentWindow.innerWidth,
-        height: currentWindow.innerHeight,
+        width: targetWin.outerWidth || targetWin.innerWidth,
+        height: targetWin.outerHeight || targetWin.innerHeight,
       },
       position:
-        currentWindow.screenX !== undefined
+        targetWin.screenX !== undefined
           ? {
-              x: currentWindow.screenX,
-              y: currentWindow.screenY,
+              x: targetWin.screenX,
+              y: targetWin.screenY,
             }
           : undefined,
     };
@@ -976,6 +1065,89 @@ export class WindowLayoutManager {
       return floating.children;
     }
     return [];
+  }
+
+  /**
+   * 以 live leaf 的 WorkspaceWindow root ID 精確定位 floating index。
+   * Leaf ID 可能在多個 restored layout 中重複，因此只接受唯一 leaf 匹配。
+   */
+  private findFloatingWindowIndexForWindow(
+    targetWin: Window,
+    floatingWindows: any[]
+  ): number {
+    const windowLeaves = this.getLeavesForWindow(targetWin);
+
+    for (const leaf of windowLeaves) {
+      const root = typeof (leaf as any).getRoot === "function"
+        ? (leaf as any).getRoot()
+        : null;
+      const rootLayout = root && typeof root.getLayout === "function"
+        ? root.getLayout()
+        : null;
+      const rootIds = new Set(
+        [(root as any)?.id, rootLayout?.id].filter((id): id is string => !!id)
+      );
+      if (rootIds.size === 0) continue;
+
+      const index = floatingWindows.findIndex((floatingWindow) =>
+        rootIds.has(floatingWindow?.id)
+      );
+      if (index >= 0) return index;
+    }
+
+    const matchingIndices = new Set<number>();
+    windowLeaves.forEach((leaf) => {
+      const leafId = (leaf as any).id;
+      if (!leafId) return;
+      floatingWindows.forEach((floatingWindow, index) => {
+        if (this.floatingWindowContainsLeaf(floatingWindow, leafId)) {
+          matchingIndices.add(index);
+        }
+      });
+    });
+
+    return matchingIndices.size === 1
+      ? Array.from(matchingIndices)[0]
+      : this.findPopoutOrdinal(targetWin, floatingWindows.length);
+  }
+
+  /**
+   * 以 live WorkspaceWindow container 的順序對應 serialized floating children。
+   * Obsidian 公開 API 不保證 WorkspaceWindow 帶有 serialized window ID。
+   */
+  private findPopoutOrdinal(targetWin: Window, floatingCount: number): number {
+    const workspace = this.app.workspace as any;
+    const floatingChildren =
+      workspace.floatingSplit?.children ||
+      workspace.floating?.children ||
+      [];
+
+    if (Array.isArray(floatingChildren)) {
+      const directIndex = floatingChildren.findIndex((container: any) =>
+        container?.win === targetWin || container?.doc?.defaultView === targetWin
+      );
+      if (directIndex >= 0 && directIndex < floatingCount) {
+        return directIndex;
+      }
+    }
+
+    const livePopoutWindows: Window[] = [];
+    (this.app.workspace as any).iterateAllLeaves((leaf: WorkspaceLeaf) => {
+      const container = typeof (leaf as any).getContainer === "function"
+        ? (leaf as any).getContainer()
+        : null;
+      const leafWindow = container?.win || this.getWindowForLeaf(leaf);
+      if (
+        leafWindow &&
+        this.isPopoutDocument(leafWindow.document) &&
+        !livePopoutWindows.includes(leafWindow)
+      ) {
+        livePopoutWindows.push(leafWindow);
+      }
+    });
+
+    const ordinal = livePopoutWindows.indexOf(targetWin);
+    return ordinal >= 0 && ordinal < floatingCount ? ordinal : -1;
   }
 
   /**
@@ -1317,20 +1489,42 @@ export class WindowLayoutManager {
   }
 
   /** 根據保存的 leaf 集合辨識還原後的目標視窗。 */
-  private findWindowForSavedLeaves(leaves: ViewState[]): Window | null {
+  private findWindowForSavedLeaves(
+    leaves: ViewState[],
+    excludedWindow?: Window,
+    preferredWindow?: Window | null,
+    claimedWindows: Set<Window> = new Set()
+  ): Window | null {
     if (leaves.length === 0) return null;
 
     const savedIds = new Set(leaves.map((leaf) => leaf.id));
+    const savedFiles = new Set(
+      leaves
+        .map((leaf) => this.getFilePathFromLeafState(leaf))
+        .filter((filePath): filePath is string => !!filePath)
+    );
     const windows = new Map<Window, number>();
     let bestWindow: Window | null = null;
     let bestScore = 0;
 
     (this.app.workspace as any).iterateAllLeaves((leaf: WorkspaceLeaf) => {
       const targetWindow = this.getWindowForLeaf(leaf);
-      if (!targetWindow) return;
+      if (
+        !targetWindow ||
+        targetWindow === excludedWindow ||
+        claimedWindows.has(targetWindow) ||
+        !this.isPopoutDocument(targetWindow.document)
+      ) return;
 
+      const viewState = typeof (leaf as any).getViewState === "function"
+        ? (leaf as any).getViewState()
+        : null;
+      const filePath = this.getFilePathFromLeafState({
+        state: viewState?.state || {},
+      });
       const score = (windows.get(targetWindow) || 0) +
-        (savedIds.has((leaf as any).id) ? 1 : 0);
+        (savedIds.has((leaf as any).id) ? 100 : 0) +
+        (filePath && savedFiles.has(filePath) ? 10 : 0);
       windows.set(targetWindow, score);
       if (score > bestScore) {
         bestScore = score;
@@ -1338,7 +1532,64 @@ export class WindowLayoutManager {
       }
     });
 
-    return bestWindow;
+    // openPopoutLeaf() 回傳的 Window 若已確認仍是 live popout，優先使用，
+    // 避免來源與新視窗共用 leaf ID 時形成平手。
+    if (preferredWindow && windows.has(preferredWindow)) {
+      return preferredWindow;
+    }
+
+    if (bestWindow) return bestWindow;
+
+    // 首次 restore 時若 Obsidian 已重建 leaf ID，但目前只有一個 popout，
+    // 該視窗就是唯一合法目標。
+    return windows.size === 1 ? Array.from(windows.keys())[0] : null;
+  }
+
+  /**
+   * 將 restore 前保存的所有 layout 名稱，一對一重新綁定到 restore 後的
+   * live popout。目標新視窗與已配對視窗不會被重複使用。
+   */
+  private restorePreservedWindowLabels(
+    snapshots: PreservedWindowLayout[],
+    restoredTargetWindow: Window | null
+  ): void {
+    const claimedWindows = new Set<Window>();
+    if (restoredTargetWindow) claimedWindows.add(restoredTargetWindow);
+
+    snapshots.forEach((snapshot) => {
+      const currentWindow = this.findWindowForSavedLeaves(
+        snapshot.leaves,
+        restoredTargetWindow || undefined,
+        snapshot.window,
+        claimedWindows
+      );
+      if (!currentWindow) return;
+      this.setLayoutLabelForWindow(currentWindow, snapshot.layoutName);
+      this.restoreWindowGeometry(currentWindow, snapshot.windowState);
+      claimedWindows.add(currentWindow);
+    });
+  }
+
+  /** 在 changeLayout 重建 popout 後恢復實際視窗尺寸與座標。 */
+  private restoreWindowGeometry(
+    targetWin: Window,
+    windowState: WindowState | null | undefined
+  ): void {
+    if (!windowState) return;
+
+    const size = windowState.size;
+    if (
+      size &&
+      size.width > 0 &&
+      size.height > 0 &&
+      typeof targetWin.resizeTo === "function"
+    ) {
+      targetWin.resizeTo(size.width, size.height);
+    }
+
+    if (windowState.position && typeof targetWin.moveTo === "function") {
+      targetWin.moveTo(windowState.position.x, windowState.position.y);
+    }
   }
 
   /**

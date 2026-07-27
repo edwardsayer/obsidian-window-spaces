@@ -21,12 +21,12 @@ export const en: TranslationStrings = {
     noLayout: "No layout applied",
     newWindow: "New Window",
     edit: "Edit",
+    windowLayouts: "Window Layouts",
   },
 
   commands: {
     saveLayout: "Save current window layout",
-    restoreLayout: "Restore window layout",
-    manageLayouts: "Manage window layouts",
+    openLayouts: "Open window layouts",
   },
 
   saveModal: {
@@ -58,7 +58,7 @@ export const en: TranslationStrings = {
     selectLayout: "Select a layout to restore:",
     noLayoutsMessage: "No saved window layouts found.",
     restoreButton: "Restore",
-    restoreHint: "Restore layout (click to apply, hold or Shift+click for new window)",
+    restoreHint: "Restore layout (click or Enter for a new window; long-press the item or Restore button, Shift+click, or Shift+Enter for the current window)",
     cancelButton: "Cancel",
     restoreSuccess: "Layout restored successfully",
     restoreError: "Failed to restore layout",
@@ -107,10 +107,8 @@ export const en: TranslationStrings = {
     layoutDisplaySection: "Popout layout display",
     showLayoutStatusBar: "Show layout status bar",
     showLayoutStatusBarDesc: "Display the current layout name and a Save button in a status-style bar at the bottom-left of every Popout window",
-    showRestoreRibbonIcon: "Show 'Restore Window Layout' ribbon icon",
-    showRestoreRibbonIconDesc: "Display a quick-access icon in the left ribbon bar for restoring window layouts",
-    showManageRibbonIcon: "Show 'Manage Window Layouts' ribbon icon",
-    showManageRibbonIconDesc: "Display a quick-access icon in the left ribbon bar for managing window layouts",
+    showWindowLayoutsRibbonIcon: "Show 'Window Layouts' ribbon icon",
+    showWindowLayoutsRibbonIconDesc: "Display one quick-access icon for restoring and managing window layouts",
     maxLayouts: "Max layouts",
     maxLayoutsDesc: "Limit the number of saved layouts (0 = unlimited)",
     layoutStats: "Total saved layouts: {{count}}",
