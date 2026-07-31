@@ -32,8 +32,6 @@ export default class WindowSpacesPlugin extends Plugin {
   windowLayoutsRibbonEl: HTMLElement | null = null;
 
   async onload() {
-    console.log("Loading Window Spaces plugin");
-
     // 初始化國際化
     initI18n(this.app);
 
@@ -66,13 +64,9 @@ export default class WindowSpacesPlugin extends Plugin {
     if (this.settings.showStatusBarIndicator === true) {
       this.addStatusBarIndicator();
     }
-
-    console.log("Window Spaces plugin loaded successfully");
   }
 
   onunload() {
-    console.log("Unloading Window Spaces plugin");
-
     this.windowLayoutsRibbonEl?.remove();
     this.windowLayoutsRibbonEl = null;
 
@@ -272,7 +266,6 @@ export default class WindowSpacesPlugin extends Plugin {
       this.app.workspace.on("window-open", (_workspaceWindow, popoutWindow) => {
         this.manager.registerPopoutWindow(popoutWindow);
         WindowLayoutsModal.renderAllInstances();
-        console.log("New window opened");
       })
     );
 
@@ -280,7 +273,6 @@ export default class WindowSpacesPlugin extends Plugin {
       this.app.workspace.on("window-close", (_workspaceWindow, popoutWindow) => {
         this.manager.unregisterPopoutWindow(popoutWindow);
         WindowLayoutsModal.renderAllInstances();
-        console.log("Popout window closed");
       })
     );
 
@@ -304,8 +296,10 @@ export default class WindowSpacesPlugin extends Plugin {
     statusBarItem.onClickEvent((evt: MouseEvent) => {
       if (evt.shiftKey) {
         // Shift+點擊：快速保存
-        this.manager.captureCurrentLayout().then((layout) => {
+        void this.manager.captureCurrentLayout().then((layout) => {
           this.openSaveLayoutModal(layout);
+        }).catch((error: any) => {
+          new Notice(`${t("errors.failedToSave")}: ${error?.message || error}`);
         });
       } else {
         // 普通點擊：顯示佈局列表

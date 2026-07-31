@@ -1,6 +1,6 @@
 {
 	"name": "window-spaces",
-	"version": "1.0.3",
+	"version": "1.0.4",
 	"description": "Save and restore window layouts for popout windows. Seamlessly manage multi-window popout workspaces.",
 	"main": "main.js",
 	"scripts": {
@@ -41,3 +41,4 @@
 		"vitest": "^4.1.10"
 	}
 }
+

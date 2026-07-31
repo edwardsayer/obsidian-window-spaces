@@ -286,7 +286,7 @@ export class WindowLayoutManager {
           break;
         }
 
-        await new Promise((resolve) => setTimeout(resolve, 50));
+        await new Promise((resolve) => window.setTimeout(resolve, 50));
       }
 
       if (!targetWin) {
@@ -352,10 +352,10 @@ export class WindowLayoutManager {
 
         // 2. 設置 5 秒 Debounce 定時器
         if (this.autoSaveTimers.has(targetWin)) {
-          clearTimeout(this.autoSaveTimers.get(targetWin));
+          window.clearTimeout(this.autoSaveTimers.get(targetWin));
         }
 
-        const timer = setTimeout(() => {
+        const timer = window.setTimeout(() => {
           this.autoSaveTimers.delete(targetWin);
           void this.autoSaveWindowLayout(targetWin);
         }, 5000); // 固定的 5 秒 Debounce 機制
@@ -388,7 +388,7 @@ export class WindowLayoutManager {
           captured.includeGeometry = existing.includeGeometry;
           this.lastValidSnapshots.set(targetWin, captured);
         }
-      } catch (e) {
+      } catch {
         // 視窗已被摧毀時 capture 可能出錯
       }
 
@@ -425,7 +425,7 @@ export class WindowLayoutManager {
   private removeLayoutLabel(targetWin: Window): void {
     // 1. 若有待發動的 5 秒 Debounce 定時器，將其清除
     if (this.autoSaveTimers.has(targetWin)) {
-      clearTimeout(this.autoSaveTimers.get(targetWin));
+      window.clearTimeout(this.autoSaveTimers.get(targetWin));
       this.autoSaveTimers.delete(targetWin);
     }
 
@@ -543,7 +543,7 @@ export class WindowLayoutManager {
    */
   private getActiveLeafForCurrentWindow(targetWindow?: Window): WorkspaceLeaf | null {
     const currentWin = targetWindow || (typeof activeWindow !== "undefined" ? activeWindow : window);
-    const globalActiveLeaf = this.app.workspace.activeLeaf;
+    const globalActiveLeaf = this.app.workspace.getMostRecentLeaf();
 
     // 1. 若全域 activeLeaf 的 ownerWindow 就是 currentWin，直接返回
     if (globalActiveLeaf && (globalActiveLeaf as any).containerEl?.ownerDocument?.defaultView === currentWin) {
@@ -853,7 +853,7 @@ export class WindowLayoutManager {
           // 輪詢等待全新的 Live Popout Window 在 Electron 中被正式掛載建立（最多等待 2 秒）
           let newlyCreatedWin: Window | null = null;
           for (let attempt = 0; attempt < 40; attempt++) {
-            await new Promise((resolve) => setTimeout(resolve, 50));
+            await new Promise((resolve) => window.setTimeout(resolve, 50));
             const currentPopoutWins = this.getLivePopoutWindows();
             newlyCreatedWin = currentPopoutWins.find((w) => !popoutWinsBefore.has(w)) || null;
             if (newlyCreatedWin) break;
@@ -896,7 +896,7 @@ export class WindowLayoutManager {
         await this.app.workspace.changeLayout(currentLayout);
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 150));
+      await new Promise((resolve) => window.setTimeout(resolve, 150));
 
       // 4. 取得目標 Popout 視窗最新活體 DOM Window 並安全開啟所有檔案
       const livePopouts = this.getLivePopoutWindows();
@@ -1832,7 +1832,7 @@ export class WindowLayoutManager {
   private async waitForWindowLeaves(targetWin: Window, expectedCount: number): Promise<WorkspaceLeaf[]> {
     let leaves = this.getLeavesForWindow(targetWin);
     for (let attempt = 0; attempt < 20 && leaves.length < expectedCount; attempt++) {
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await new Promise((resolve) => window.setTimeout(resolve, 50));
       leaves = this.getLeavesForWindow(targetWin);
     }
     return leaves;
@@ -1996,6 +1996,6 @@ export class WindowLayoutManager {
    * 生成唯一 ID
    */
   private generateId(): string {
-    return Date.now().toString(36) + Math.random().toString(36).substr(2);
+    return Date.now().toString(36) + Math.random().toString(36).substring(2);
   }
 }

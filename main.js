@@ -1393,10 +1393,11 @@ class WindowLayoutsModal extends obsidian.Modal {
         const titleSpan = leftEl.createSpan({ text: secName, cls: "space-section-title" });
         leftEl.createSpan({ text: `(${count})`, cls: "space-section-count" });
         const triggerInlineRename = () => {
-            const input = document.createElement("input");
-            input.type = "text";
-            input.value = secName;
-            input.addClass("space-section-rename-input");
+            const input = headerEl.createEl("input", {
+                type: "text",
+                value: secName,
+                cls: "space-section-rename-input",
+            });
             titleSpan.replaceWith(input);
             input.focus();
             const commitRename = () => __awaiter(this, void 0, void 0, function* () {
@@ -2041,7 +2042,7 @@ class WindowLayoutManager {
                         targetWin = candidate;
                         break;
                     }
-                    yield new Promise((resolve) => setTimeout(resolve, 50));
+                    yield new Promise((resolve) => window.setTimeout(resolve, 50));
                 }
                 if (!targetWin) {
                     console.warn("Popout leaf was created, but its Window was not mounted in time.");
@@ -2100,9 +2101,9 @@ class WindowLayoutManager {
                     .catch(() => { });
                 // 2. 設置 5 秒 Debounce 定時器
                 if (this.autoSaveTimers.has(targetWin)) {
-                    clearTimeout(this.autoSaveTimers.get(targetWin));
+                    window.clearTimeout(this.autoSaveTimers.get(targetWin));
                 }
-                const timer = setTimeout(() => {
+                const timer = window.setTimeout(() => {
                     this.autoSaveTimers.delete(targetWin);
                     void this.autoSaveWindowLayout(targetWin);
                 }, 5000); // 固定的 5 秒 Debounce 機制
@@ -2135,7 +2136,7 @@ class WindowLayoutManager {
                         this.lastValidSnapshots.set(targetWin, captured);
                     }
                 }
-                catch (e) {
+                catch (_e) {
                     // 視窗已被摧毀時 capture 可能出錯
                 }
                 // 2. 防呆門檻：若現場 capture 為空/失敗（例如視窗正被關閉），退回使用關閉前最後一次合法的快照
@@ -2171,7 +2172,7 @@ class WindowLayoutManager {
         var _a;
         // 1. 若有待發動的 5 秒 Debounce 定時器，將其清除
         if (this.autoSaveTimers.has(targetWin)) {
-            clearTimeout(this.autoSaveTimers.get(targetWin));
+            window.clearTimeout(this.autoSaveTimers.get(targetWin));
             this.autoSaveTimers.delete(targetWin);
         }
         // 2. 視窗關閉時發動最終安全自動存檔
@@ -2278,7 +2279,7 @@ class WindowLayoutManager {
     getActiveLeafForCurrentWindow(targetWindow) {
         var _a, _b;
         const currentWin = targetWindow || (typeof activeWindow !== "undefined" ? activeWindow : window);
-        const globalActiveLeaf = this.app.workspace.activeLeaf;
+        const globalActiveLeaf = this.app.workspace.getMostRecentLeaf();
         // 1. 若全域 activeLeaf 的 ownerWindow 就是 currentWin，直接返回
         if (globalActiveLeaf && ((_b = (_a = globalActiveLeaf.containerEl) === null || _a === void 0 ? void 0 : _a.ownerDocument) === null || _b === void 0 ? void 0 : _b.defaultView) === currentWin) {
             return globalActiveLeaf;
@@ -2561,7 +2562,7 @@ class WindowLayoutManager {
                         // 輪詢等待全新的 Live Popout Window 在 Electron 中被正式掛載建立（最多等待 2 秒）
                         let newlyCreatedWin = null;
                         for (let attempt = 0; attempt < 40; attempt++) {
-                            yield new Promise((resolve) => setTimeout(resolve, 50));
+                            yield new Promise((resolve) => window.setTimeout(resolve, 50));
                             const currentPopoutWins = this.getLivePopoutWindows();
                             newlyCreatedWin = currentPopoutWins.find((w) => !popoutWinsBefore.has(w)) || null;
                             if (newlyCreatedWin)
@@ -2595,7 +2596,7 @@ class WindowLayoutManager {
                     }
                     yield this.app.workspace.changeLayout(currentLayout);
                 }
-                yield new Promise((resolve) => setTimeout(resolve, 150));
+                yield new Promise((resolve) => window.setTimeout(resolve, 150));
                 // 4. 取得目標 Popout 視窗最新活體 DOM Window 並安全開啟所有檔案
                 const livePopouts = this.getLivePopoutWindows();
                 let liveTargetWin = null;
@@ -3431,7 +3432,7 @@ class WindowLayoutManager {
         return __awaiter(this, void 0, void 0, function* () {
             let leaves = this.getLeavesForWindow(targetWin);
             for (let attempt = 0; attempt < 20 && leaves.length < expectedCount; attempt++) {
-                yield new Promise((resolve) => setTimeout(resolve, 50));
+                yield new Promise((resolve) => window.setTimeout(resolve, 50));
                 leaves = this.getLeavesForWindow(targetWin);
             }
             return leaves;
@@ -3562,7 +3563,7 @@ class WindowLayoutManager {
      * 生成唯一 ID
      */
     generateId() {
-        return Date.now().toString(36) + Math.random().toString(36).substr(2);
+        return Date.now().toString(36) + Math.random().toString(36).substring(2);
     }
 }
 
@@ -4093,7 +4094,7 @@ class WindowLayoutsView extends obsidian.ItemView {
             // command all activate the leaf natively, so arrow-key ownership follows
             // the same rule as every other Obsidian panel.
             this.contentController.mountInContainer(this.contentEl, undefined, () => {
-                return this.app.workspace.activeLeaf === this.leaf;
+                return this.app.workspace.getMostRecentLeaf() === this.leaf;
             });
         });
     }
@@ -4128,7 +4129,6 @@ class WindowSpacesPlugin extends obsidian.Plugin {
     }
     onload() {
         return __awaiter(this, void 0, void 0, function* () {
-            console.log("Loading Window Spaces plugin");
             // 初始化國際化
             initI18n(this.app);
             // 加載設定
@@ -4150,12 +4150,10 @@ class WindowSpacesPlugin extends obsidian.Plugin {
             if (this.settings.showStatusBarIndicator === true) {
                 this.addStatusBarIndicator();
             }
-            console.log("Window Spaces plugin loaded successfully");
         });
     }
     onunload() {
         var _a, _b;
-        console.log("Unloading Window Spaces plugin");
         (_a = this.windowLayoutsRibbonEl) === null || _a === void 0 ? void 0 : _a.remove();
         this.windowLayoutsRibbonEl = null;
         (_b = this.manager) === null || _b === void 0 ? void 0 : _b.clearLayoutLabels();
@@ -4336,12 +4334,10 @@ class WindowSpacesPlugin extends obsidian.Plugin {
         this.registerEvent(this.app.workspace.on("window-open", (_workspaceWindow, popoutWindow) => {
             this.manager.registerPopoutWindow(popoutWindow);
             WindowLayoutsModal.renderAllInstances();
-            console.log("New window opened");
         }));
         this.registerEvent(this.app.workspace.on("window-close", (_workspaceWindow, popoutWindow) => {
             this.manager.unregisterPopoutWindow(popoutWindow);
             WindowLayoutsModal.renderAllInstances();
-            console.log("Popout window closed");
         }));
         // 監聽 Workspace 分頁與佈局變化（用於特定 Layout 的 5 秒 Debounced 自動儲存）
         this.registerEvent(this.app.workspace.on("layout-change", () => {
@@ -4357,8 +4353,10 @@ class WindowSpacesPlugin extends obsidian.Plugin {
         statusBarItem.onClickEvent((evt) => {
             if (evt.shiftKey) {
                 // Shift+點擊：快速保存
-                this.manager.captureCurrentLayout().then((layout) => {
+                void this.manager.captureCurrentLayout().then((layout) => {
                     this.openSaveLayoutModal(layout);
+                }).catch((error) => {
+                    new obsidian.Notice(`${t("errors.failedToSave")}: ${(error === null || error === void 0 ? void 0 : error.message) || error}`);
                 });
             }
             else {

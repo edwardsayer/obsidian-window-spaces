@@ -725,10 +725,11 @@ export class WindowLayoutsModal extends Modal {
     leftEl.createSpan({ text: `(${count})`, cls: "space-section-count" });
 
     const triggerInlineRename = () => {
-      const input = document.createElement("input");
-      input.type = "text";
-      input.value = secName;
-      input.addClass("space-section-rename-input");
+      const input = headerEl.createEl("input", {
+        type: "text",
+        value: secName,
+        cls: "space-section-rename-input",
+      });
 
       titleSpan.replaceWith(input);
       input.focus();
