@@ -39,6 +39,6 @@ jobs:
         with:
           files: |
             main.js
-            main.js.map
             styles.css
             manifest.json
+          generate_release_notes: true
