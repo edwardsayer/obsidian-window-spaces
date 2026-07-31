@@ -20,12 +20,12 @@ export class SaveLayoutModal extends Modal {
   }
 
   onOpen() {
-    this.modalEl.addClass("window-layouts-modal");
     this.setTitle(t("saveModal.title"));
-
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.addClass("window-spaces-modal");
+    this.modalEl.addClass("window-layouts-modal");
+
+    let selectedSections: string[] = Array.from(this.layout.sections || []);
 
     // 名稱輸入與動態同名提示
     let nameInput: HTMLInputElement;
@@ -39,7 +39,7 @@ export class SaveLayoutModal extends Modal {
         text.inputEl.addEventListener("keydown", (e) => {
           if (e.key === "Enter") {
             e.preventDefault();
-            void this.submitForm(nameInput, includeGeometry, autoSave);
+            void this.submitForm(nameInput, includeGeometry, autoSave, selectedSections, archived);
           }
         });
       });
@@ -58,7 +58,10 @@ export class SaveLayoutModal extends Modal {
     // 佈局資訊顯示
     const i18n = getI18n();
     const infoEl = contentEl.createDiv();
-    infoEl.createEl("h3", { text: t("saveModal.infoSection") });
+    infoEl.createEl("div", {
+      text: t("saveModal.infoSection"),
+      cls: "setting-item-name",
+    }).style.marginBottom = "4px";
 
     const infoList = infoEl.createEl("ul");
     infoList.createEl("li", {
@@ -72,13 +75,19 @@ export class SaveLayoutModal extends Modal {
     });
 
     // 選項
-    let includeGeometry = this.layout.windowState.position !== undefined ||
-      (this.layout.windowState.size && this.layout.windowState.size.width > 0);
+    let includeGeometry = this.layout.includeGeometry ?? (
+      this.layout.windowState.position !== undefined ||
+      (this.layout.windowState.size && this.layout.windowState.size.width > 0)
+    );
+    let geometryToggleComponent: any = null;
+
+    let archived = this.layout.archived ?? false;
 
     new Setting(contentEl)
       .setName(t("saveModal.includeGeometry"))
       .setDesc(t("saveModal.includeGeometryDesc"))
       .addToggle((toggle) => {
+        geometryToggleComponent = toggle;
         toggle.setValue(includeGeometry);
         toggle.onChange((value) => {
           includeGeometry = value;
@@ -95,6 +104,97 @@ export class SaveLayoutModal extends Modal {
         });
       });
 
+    new Setting(contentEl)
+      .setName(t("manageModal.archiveSpace") || "Archive Space")
+      .addToggle((toggle) => {
+        toggle.setValue(archived);
+        toggle.onChange((value) => {
+          archived = value;
+        });
+      });
+
+    // Section 分組標籤選單與 Tag-Pills 輸入框
+    selectedSections = Array.from(this.layout.sections || []);
+    
+    // 獲取目前全域已存在的所有 Sections
+    const allSpaces: WindowLayout[] = this.plugin?.manager?.getSavedLayouts() || [];
+    const existingSectionsSet = new Set<string>();
+    (this.plugin?.settings?.sectionsOrder || []).forEach((s: string) => existingSectionsSet.add(s));
+    allSpaces.forEach((s) => (s.sections || []).forEach((sec) => existingSectionsSet.add(sec)));
+    const existingSections = Array.from(existingSectionsSet);
+
+    // 1. 上方 Setting 列：左側 Sections 標籤，右側 新標籤輸入欄 (對齊 Space Name 樣式與大小)
+    const sectionsSetting = new Setting(contentEl)
+      .setName(t("manageModal.sectionsLabel") || "Sections")
+      .addText((text) => {
+        text.setPlaceholder(t("manageModal.sectionsPlaceholder") || "Add section...");
+        text.inputEl.addEventListener("keydown", (e: KeyboardEvent) => {
+          if (e.key === "Enter" || e.key === ",") {
+            e.preventDefault();
+            const val = text.inputEl.value.trim().replace(/^,+|,+$/g, "");
+            if (val && !selectedSections.includes(val)) {
+              selectedSections.push(val);
+              text.inputEl.value = "";
+              renderPills();
+            }
+          }
+        });
+      });
+    sectionsSetting.settingEl.addClass("window-spaces-setting-full-width");
+
+    // 2. 底下：Section 列表選擇器 (Pills Container)
+    const pillsContainer = contentEl.createDiv("space-sections-pills");
+    pillsContainer.style.display = "flex";
+    pillsContainer.style.flexWrap = "wrap";
+    pillsContainer.style.gap = "6px";
+    pillsContainer.style.marginTop = "-4px";
+    pillsContainer.style.marginBottom = "16px";
+    pillsContainer.style.paddingLeft = "2px";
+
+    const renderPills = () => {
+      pillsContainer.empty();
+      selectedSections.forEach((sec) => {
+        const pill = pillsContainer.createDiv("space-section-pill");
+        pill.style.background = "var(--interactive-accent)";
+        pill.style.color = "var(--text-on-accent)";
+        pill.style.padding = "2px 8px";
+        pill.style.borderRadius = "12px";
+        pill.style.fontSize = "12px";
+        pill.style.display = "inline-flex";
+        pill.style.alignItems = "center";
+        pill.style.gap = "4px";
+        pill.style.cursor = "pointer";
+
+        pill.createSpan({ text: sec });
+        const closeSpan = pill.createSpan({ text: "✖" });
+        closeSpan.style.opacity = "0.7";
+        closeSpan.onclick = (e) => {
+          e.stopPropagation();
+          selectedSections = selectedSections.filter((s) => s !== sec);
+          renderPills();
+        };
+      });
+
+      // 呈現在 settings 中但未勾選的既有標籤
+      existingSections.forEach((sec) => {
+        if (selectedSections.includes(sec)) return;
+        const unselectedPill = pillsContainer.createDiv("space-section-pill-unselected");
+        unselectedPill.style.background = "var(--background-secondary)";
+        unselectedPill.style.color = "var(--text-muted)";
+        unselectedPill.style.padding = "2px 8px";
+        unselectedPill.style.borderRadius = "12px";
+        unselectedPill.style.fontSize = "12px";
+        unselectedPill.style.cursor = "pointer";
+        unselectedPill.setText(`+ ${sec}`);
+        unselectedPill.onclick = () => {
+          selectedSections.push(sec);
+          renderPills();
+        };
+      });
+    };
+
+    renderPills();
+
     const checkDuplicateName = () => {
       const currentName = nameInput?.value.trim() || "";
       if (!currentName) {
@@ -109,6 +209,14 @@ export class SaveLayoutModal extends Modal {
           autoSave = !!match.autoSave;
           autoSaveToggleComponent.setValue(autoSave);
         }
+        if (geometryToggleComponent && match.includeGeometry !== undefined) {
+          includeGeometry = !!match.includeGeometry;
+          geometryToggleComponent.setValue(includeGeometry);
+        }
+        if (match.sections && Array.isArray(match.sections) && selectedSections.length === 0) {
+          selectedSections = Array.from(match.sections);
+          renderPills();
+        }
       } else {
         noticeContainer.setText("");
       }
@@ -118,9 +226,10 @@ export class SaveLayoutModal extends Modal {
     checkDuplicateName();
 
     // 按鈕
-    const buttonContainer = contentEl.createDiv();
+    const buttonContainer = contentEl.createDiv("modal-button-container");
     buttonContainer.style.textAlign = "right";
     buttonContainer.style.marginTop = "20px";
+    buttonContainer.style.marginBottom = "12px";
 
     const cancelButton = buttonContainer.createEl("button", {
       text: t("common.cancel"),
@@ -133,7 +242,7 @@ export class SaveLayoutModal extends Modal {
     });
     saveButton.style.marginLeft = "10px";
     saveButton.onclick = () => {
-      void this.submitForm(nameInput, includeGeometry, autoSave);
+      void this.submitForm(nameInput, includeGeometry, autoSave, selectedSections, archived);
     };
 
     setTimeout(() => nameInput?.focus(), 50);
@@ -142,7 +251,9 @@ export class SaveLayoutModal extends Modal {
   private async submitForm(
     nameInput: HTMLInputElement,
     includeGeometry: boolean,
-    autoSave: boolean
+    autoSave: boolean,
+    selectedSections: string[],
+    archived: boolean
   ): Promise<void> {
     const name = nameInput.value.trim();
     if (!name) {
@@ -154,6 +265,9 @@ export class SaveLayoutModal extends Modal {
     // 更新佈局數據
     this.layout.name = name;
     this.layout.autoSave = autoSave;
+    this.layout.includeGeometry = includeGeometry;
+    this.layout.sections = selectedSections;
+    this.layout.archived = archived;
     if (!includeGeometry) {
       this.layout.windowState.position = undefined;
     }

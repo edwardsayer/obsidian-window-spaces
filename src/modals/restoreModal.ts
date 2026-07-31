@@ -14,6 +14,22 @@ export class WindowLayoutsModal extends Modal {
   private selectedIndex = 0;
 
   private keydownListener?: (event: KeyboardEvent) => void;
+  private keydownTarget?: Document | HTMLElement;
+  private panelRootEl?: HTMLElement;
+  private panelMode = false;
+  private panelPointerInside = false;
+  private panelPointerEnterListener?: () => void;
+  private panelPointerLeaveListener?: () => void;
+  private initialSearchQuery?: string;
+  private clearSearchBtn?: HTMLElement;
+
+  public static activeInstances = new Set<WindowLayoutsModal>();
+
+  public static renderAllInstances(): void {
+    for (const instance of WindowLayoutsModal.activeInstances) {
+      instance.renderLayouts();
+    }
+  }
 
   constructor(
     app: App,
@@ -26,6 +42,7 @@ export class WindowLayoutsModal extends Modal {
   }
 
   onOpen() {
+    WindowLayoutsModal.activeInstances.add(this);
     this.modalEl.addClass("window-layouts-modal");
 
     // Modal 實際所在的 document 是鍵盤 Enter 操作最可靠的來源視窗。
@@ -49,29 +66,14 @@ export class WindowLayoutsModal extends Modal {
       nativeCloseBtn.style.display = "none";
     }
 
-    // 在 modal-title 內建立專屬的齒輪 (⚙️) 排序與選項按鈕
+    // Modal 與 ItemView 共用同一組 header actions：排序、以 panel 開啟。
     const titleHeader = this.containerEl.querySelector<HTMLElement>(".modal-title");
     if (titleHeader) {
       titleHeader.style.display = "flex";
       titleHeader.style.alignItems = "center";
       titleHeader.style.justifyContent = "space-between";
       titleHeader.style.width = "100%";
-
-      let gearBtn = titleHeader.querySelector<HTMLElement>(".window-layouts-gear-btn");
-      if (!gearBtn) {
-        gearBtn = titleHeader.createEl("div", {
-          cls: "clickable-icon window-layouts-gear-btn",
-        });
-        setIcon(gearBtn, "gear");
-        setTooltip(gearBtn, t("manageModal.sortDateDesc"));
-        gearBtn.style.cursor = "pointer";
-        gearBtn.style.marginLeft = "auto";
-        gearBtn.onclick = (e: MouseEvent) => {
-          e.preventDefault();
-          e.stopPropagation();
-          this.showSortMenu(e);
-        };
-      }
+      this.createHeaderActions(titleHeader);
     }
 
     // 註冊 Obsidian Scope 鍵盤導覽
@@ -101,36 +103,111 @@ export class WindowLayoutsModal extends Modal {
         }
         event.preventDefault();
         event.stopPropagation();
+        const rawQuery = this.searchInput?.value.trim() || "";
         const targetIndex = this.selectedIndex >= 0 ? this.selectedIndex : 0;
         const selectedLayout = this.filteredLayouts[targetIndex];
-        if (selectedLayout) void this.restoreLayout(selectedLayout, !event.shiftKey);
+        if (selectedLayout) {
+          void this.restoreLayout(selectedLayout, !event.shiftKey);
+        } else if (rawQuery) {
+          void this.createAndSaveLayout(rawQuery, !event.shiftKey);
+        }
       }
     };
-    targetDoc.addEventListener("keydown", this.keydownListener, true);
+    this.keydownTarget = targetDoc;
+    this.keydownTarget.addEventListener("keydown", this.keydownListener, true);
 
-    const { contentEl } = this;
+    this.renderContent();
+  }
+
+  /**
+   * Render this modal's content inside an ItemView (or another host).
+   * The modal instance is intentionally kept as the controller so the panel
+   * and modal always expose the same layout actions and keyboard behavior.
+   */
+  mountInContainer(rootEl: HTMLElement, isSidebar?: boolean): void {
+    // Keep the optional argument for compatibility with older callers. The
+    // panel UI is deliberately identical in editor tabs and sidebars.
+    void isSidebar;
+    WindowLayoutsModal.activeInstances.add(this);
+    this.removePanelPointerTracking();
+    this.panelRootEl = rootEl;
+    this.panelMode = true;
+    this.panelPointerEnterListener = () => {
+      this.panelPointerInside = true;
+    };
+    this.panelPointerLeaveListener = () => {
+      this.panelPointerInside = false;
+    };
+    rootEl.addEventListener("pointerenter", this.panelPointerEnterListener);
+    rootEl.addEventListener("pointerleave", this.panelPointerLeaveListener);
+    this.renderContent();
+  }
+
+  unmountFromContainer(): void {
+    WindowLayoutsModal.activeInstances.delete(this);
+    this.removeKeydownListener();
+    this.removePanelPointerTracking();
+    this.panelRootEl?.empty();
+    this.panelRootEl = undefined;
+    this.panelMode = false;
+  }
+
+  private getRootEl(): HTMLElement {
+    return this.panelRootEl || this.contentEl;
+  }
+
+  private closeHost(): void {
+    if (!this.panelMode) this.close();
+  }
+
+  private renderContent(): void {
+    const contentEl = this.getRootEl();
     contentEl.empty();
+    // This is the shared content component's root class. It must be present
+    // on both the Modal content and the ItemView content so the same layout
+    // item styles are applied in every host.
+    contentEl.addClass("window-layouts-modal");
     contentEl.addClass("window-spaces-modal");
+    if (this.panelMode) contentEl.addClass("window-layouts-panel");
+
+    // The panel header is intentionally recreated after empty() so it is
+    // part of the same root that owns the toolbar and list.
+    if (this.panelMode) {
+      const panelHeader = contentEl.createDiv("nav-header window-layouts-panel-header");
+      this.createHeaderActions(panelHeader);
+    }
 
     const toolbar = contentEl.createDiv("window-layouts-toolbar");
-    this.searchInput = toolbar.createEl("input");
+    const searchContainer = toolbar.createDiv("window-layouts-search-container search-input-container");
+
+    this.searchInput = searchContainer.createEl("input");
     this.searchInput.type = "search";
     this.searchInput.placeholder = t("manageModal.searchPlaceholder");
     this.searchInput.setAttribute("aria-label", t("manageModal.searchPlaceholder"));
+
+    if (this.initialSearchQuery !== undefined) {
+      this.searchInput.value = this.initialSearchQuery;
+      this.initialSearchQuery = undefined;
+    }
+
+    this.clearSearchBtn = searchContainer.createDiv("window-layouts-search-clear");
+    setIcon(this.clearSearchBtn, "x");
+    setTooltip(this.clearSearchBtn, t("manageModal.clearSearch") || "Clear search");
+
+    this.clearSearchBtn.onclick = (e: MouseEvent) => {
+      e.stopPropagation();
+      if (this.searchInput) {
+        this.searchInput.value = "";
+        this.searchInput.focus();
+      }
+      this.selectedIndex = 0;
+      this.renderLayouts();
+    };
+
     this.searchInput.addEventListener("input", () => {
       this.selectedIndex = 0;
       this.renderLayouts();
     });
-
-    const newWinButton = toolbar.createEl("button", {
-      text: `+ ${t("common.newWindow")}`,
-      cls: "mod-cta qsp-action-btn",
-    });
-    setTooltip(newWinButton, t("common.newWindow"));
-    newWinButton.onclick = () => {
-      this.close();
-      this.plugin.manager.openNewPopoutWindow();
-    };
 
     this.listEl = contentEl.createDiv("window-layouts-list");
     this.listEl.setAttribute("role", "listbox");
@@ -154,29 +231,355 @@ export class WindowLayoutsModal extends Modal {
     dismissInst.createEl("span", { text: "esc", cls: "prompt-instruction-command" });
     dismissInst.createEl("span", { text: t("instructions.dismiss") });
 
+    if (this.panelMode) {
+      const targetDoc = contentEl.ownerDocument || document;
+      this.removeKeydownListener();
+      this.keydownListener = (event: KeyboardEvent) => {
+        if (event.key !== "ArrowDown" && event.key !== "ArrowUp" && event.key !== "Enter") {
+          return;
+        }
+
+        const activeEl = targetDoc.activeElement;
+
+        // Determine if ANY instance in this document currently has keyboard focus
+        let focusedInstance: WindowLayoutsModal | null = null;
+        for (const instance of WindowLayoutsModal.activeInstances) {
+          const root = instance.getRootEl();
+          if (activeEl && root && root.contains(activeEl)) {
+            focusedInstance = instance;
+            break;
+          }
+        }
+
+        // Strict focus priority: if a panel has keyboard focus, ONLY that panel processes keydown.
+        // Otherwise, fallback to the panel currently receiving pointer hover.
+        const shouldHandle = focusedInstance
+          ? focusedInstance === this
+          : this.panelPointerInside;
+
+        if (!shouldHandle) return;
+
+        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+          event.preventDefault();
+          event.stopPropagation();
+          this.handleArrowKey(event.key === "ArrowDown" ? 1 : -1);
+        } else if (event.key === "Enter") {
+          if (activeEl && activeEl.tagName === "BUTTON") return;
+          event.preventDefault();
+          event.stopPropagation();
+          const rawQuery = this.searchInput?.value.trim() || "";
+          const selectedLayout = this.filteredLayouts[this.selectedIndex >= 0 ? this.selectedIndex : 0];
+          if (selectedLayout) {
+            void this.restoreLayout(selectedLayout, !event.shiftKey);
+          } else if (rawQuery) {
+            void this.createAndSaveLayout(rawQuery, !event.shiftKey);
+          }
+        }
+      };
+      // Keep listening at document level so hover over any part of the panel
+      // grants keyboard navigation even when another element owns focus.
+      this.keydownTarget = targetDoc;
+      this.keydownTarget.addEventListener("keydown", this.keydownListener, true);
+    }
+
     window.setTimeout(() => this.searchInput?.focus(), 50);
   }
 
+  private createPanelButton(parentEl: HTMLElement): void {
+    const panelButton = parentEl.createEl("button", {
+      cls: "clickable-icon nav-action-button window-layouts-panel-btn",
+      attr: { "aria-label": t("common.openAsPanel") },
+    });
+    setIcon(panelButton, "layout");
+    setTooltip(panelButton, t("common.openAsPanel"));
+    panelButton.onclick = (e: MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.showPanelMenu(e);
+    };
+  }
+
+  private createHeaderActions(parentEl: HTMLElement): void {
+    const isPanelHeader = parentEl.classList.contains("window-layouts-panel-header");
+    const actionsEl = parentEl.createDiv(
+      isPanelHeader
+        ? "nav-buttons-container window-layouts-header-actions"
+        : "window-layouts-header-actions"
+    );
+    actionsEl.style.display = "flex";
+    actionsEl.style.alignItems = "center";
+    actionsEl.style.gap = "4px";
+
+    if (isPanelHeader) {
+      actionsEl.style.marginLeft = "0";
+      actionsEl.style.justifyContent = "center";
+      actionsEl.style.width = "100%";
+    }
+
+    // 1. 顯示選項按鈕 (View Options Dropdown)
+    const viewOptionsButton = actionsEl.createEl("button", {
+      cls: "clickable-icon nav-action-button window-layouts-view-options-btn",
+      attr: { "aria-label": t("manageModal.viewOptions") || "View Options" },
+    });
+    setIcon(viewOptionsButton, "eye");
+    setTooltip(viewOptionsButton, t("manageModal.viewOptions") || "View Options");
+    viewOptionsButton.onclick = (e: MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.showViewOptionsMenu(e);
+    };
+
+    // 2. 排序按鈕 (Sort Dropdown)
+    const sortButton = actionsEl.createEl("button", {
+      cls: "clickable-icon nav-action-button window-layouts-sort-btn",
+      attr: { "aria-label": t("manageModal.sortDateDesc") },
+    });
+    setIcon(sortButton, "sort-asc");
+    setTooltip(sortButton, t("manageModal.sortDateDesc"));
+    sortButton.onclick = (e: MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.showSortMenu(e);
+    };
+    this.createPanelButton(actionsEl);
+  }
+
+  public showViewOptionsMenu(event: MouseEvent): void {
+    const menu = new Menu();
+    const settings = this.plugin.settings;
+    const isGrouped = settings.groupBySection !== false;
+    const isShowArchived = settings.showArchived === true;
+
+    // 依 Section 分組切換
+    menu.addItem((item) => {
+      item
+        .setTitle(isGrouped ? (t("manageModal.groupBySection") || "Group by Section") : (t("manageModal.flatView") || "Flat List"))
+        .setIcon(isGrouped ? "check" : "grid")
+        .onClick(async () => {
+          settings.groupBySection = !isGrouped;
+          await this.plugin.saveSettings();
+          WindowLayoutsModal.renderAllInstances();
+        });
+    });
+
+    menu.addSeparator();
+
+    // 顯示/隱藏封存空間切換
+    menu.addItem((item) => {
+      item
+        .setTitle(isShowArchived ? (t("manageModal.hideArchived") || "Hide Archived") : (t("manageModal.showArchived") || "Show Archived"))
+        .setIcon(isShowArchived ? "check" : "box")
+        .onClick(async () => {
+          settings.showArchived = !isShowArchived;
+          await this.plugin.saveSettings();
+          WindowLayoutsModal.renderAllInstances();
+        });
+    });
+
+    const target = event.currentTarget as HTMLElement;
+    const rect = target.getBoundingClientRect();
+    menu.showAtPosition({ x: rect.left, y: rect.bottom + 4 });
+  }
+
   private handleArrowKey(direction: number): void {
-    if (this.filteredLayouts.length === 0) return;
+    if (this.renderedLayoutEntries.length === 0) return;
     if (this.selectedIndex < 0) {
-      this.selectedIndex = direction > 0 ? 0 : this.filteredLayouts.length - 1;
+      this.selectedIndex = direction > 0 ? 0 : this.renderedLayoutEntries.length - 1;
     } else {
       this.selectedIndex =
-        (this.selectedIndex + direction + this.filteredLayouts.length) % this.filteredLayouts.length;
+        (this.selectedIndex + direction + this.renderedLayoutEntries.length) % this.renderedLayoutEntries.length;
     }
-    this.renderLayouts();
+    this.updateSelectedItemHighlight();
     this.scrollSelectedIntoView();
   }
+
+  private updateSelectedItemHighlight(): void {
+    this.renderedLayoutEntries.forEach((entry, idx) => {
+      const isSelected = idx === this.selectedIndex;
+      entry.element.setAttribute("aria-selected", String(isSelected));
+      entry.element.classList.toggle("is-selected", isSelected);
+    });
+  }
+
+  private updateSearchUI(): void {
+    const rawQuery = this.searchInput?.value.trim() || "";
+    if (this.clearSearchBtn) {
+      this.clearSearchBtn.style.display = rawQuery ? "flex" : "none";
+    }
+  }
+
+  private async createAndSaveLayout(name: string, forceNewWindow = true): Promise<void> {
+    const cleanName = name.trim();
+    if (!cleanName) return;
+    try {
+      const isPopout = (win?: Window | null): win is Window => {
+        if (!win || !win.document?.body) return false;
+        const cl = win.document.body.classList;
+        return cl.contains("is-popout-window") || cl.contains("mod-popout");
+      };
+
+      const activeWin = typeof this.plugin.manager?.getActiveWindow === "function"
+        ? this.plugin.manager.getActiveWindow()
+        : (this.targetWindow || (typeof activeWindow !== "undefined" ? activeWindow : window));
+
+      const popoutWin = isPopout(activeWin) ? activeWin : (isPopout(this.targetWindow) ? this.targetWindow : null);
+
+      if (popoutWin) {
+        // 紀錄來源 Popout 視窗原本的佈局名稱，避免 Clone 到新視窗時將原視窗誤重命名
+        const originalName = typeof this.plugin.manager?.getLayoutNameForWindow === "function"
+          ? this.plugin.manager.getLayoutNameForWindow(popoutWin)
+          : null;
+
+        // 情境 1：在 Popout 視窗內執行 -> 複製 (Clone) 當前 Popout 視窗的活動佈局與檔案
+        const layout = await this.plugin.manager.captureCurrentLayout({ name: cleanName }, popoutWin);
+        layout.name = cleanName;
+
+        // 當要在新視窗開啟時，切斷此 layout 與原視窗的存取對應，避免 saveLayout 將原視窗改名
+        if (forceNewWindow && this.plugin.manager?.layoutWindows) {
+          this.plugin.manager.layoutWindows.delete(layout);
+        }
+
+        await this.plugin.manager.saveLayout(layout);
+
+        if (forceNewWindow) {
+          // 恢復原 Popout 視窗原本的狀態列名稱
+          if (originalName && typeof this.plugin.manager?.setLayoutLabelForWindow === "function") {
+            this.plugin.manager.setLayoutLabelForWindow(popoutWin, originalName);
+          }
+          // 先關閉 Modal，防止 Modal 關閉生命週期奪回原視窗的焦點
+          this.closeHost();
+          // 預設 (Enter / Click)：Clone 佈局後在「新 Popout 視窗」開啟該佈局 (傳入 targetWindow 作為排除目標)
+          await this.plugin.manager.restoreLayout(layout, { forceNewWindow: true, targetWindow: popoutWin });
+
+          const newTargetWin = typeof this.plugin.manager?.getWindowForLayout === "function"
+            ? this.plugin.manager.getWindowForLayout(layout)
+            : null;
+          if (newTargetWin && newTargetWin !== popoutWin && typeof newTargetWin.focus === "function") {
+            try { newTargetWin.focus(); } catch { /* Ignore focus error */ }
+            newTargetWin.setTimeout(() => {
+              try { newTargetWin.focus(); } catch { /* Ignore focus error */ }
+            }, 100);
+            newTargetWin.setTimeout(() => {
+              try { newTargetWin.focus(); } catch { /* Ignore focus error */ }
+            }, 300);
+          }
+        } else {
+          // 修飾鍵 (Shift+Enter / Shift+Click)：直接在「當前 Popout 視窗」套用與更新狀態列標籤
+          if (this.plugin.manager?.layoutWindows) {
+            this.plugin.manager.layoutWindows.set(layout, popoutWin);
+          }
+          if (typeof this.plugin.manager?.setLayoutLabelForWindow === "function") {
+            this.plugin.manager.setLayoutLabelForWindow(popoutWin, cleanName);
+          }
+          this.closeHost();
+        }
+      } else {
+        // 情境 2：在主視窗中執行 -> 建立全新的 0 檔案 Popout 佈局，並開啟新 Popout 視窗
+        const newWin = this.plugin.manager.openNewPopoutWindow();
+
+        const emptyLayout: WindowLayout = {
+          id: typeof (this.plugin.manager as any).generateId === "function"
+            ? (this.plugin.manager as any).generateId()
+            : `layout_${Date.now()}`,
+          name: cleanName,
+          timestamp: Date.now(),
+          windowState: {
+            size: { width: 800, height: 600 },
+            position: undefined,
+          },
+          workspace: {
+            layout: {
+              type: "leaf",
+              id: `leaf_${Date.now()}`,
+              state: { type: "empty", state: {} },
+            },
+            activeFile: undefined,
+            leaves: [],
+          },
+          metadata: {
+            fileCount: 0,
+            tabCount: 0,
+            splitCount: 0,
+            createdAt: new Date().toISOString(),
+            obsidianVersion: (this.app as any).version || "unknown",
+            pluginVersion: this.plugin?.manifest?.version || "1.0.0",
+          },
+        };
+
+        await this.plugin.manager.saveLayout(emptyLayout);
+
+        if (newWin) {
+          if (this.plugin.manager?.layoutWindows) {
+            this.plugin.manager.layoutWindows.set(emptyLayout, newWin);
+          }
+          if (typeof this.plugin.manager?.setLayoutLabelForWindow === "function") {
+            this.plugin.manager.setLayoutLabelForWindow(newWin, cleanName);
+            newWin.setTimeout(() => {
+              this.plugin.manager.setLayoutLabelForWindow(newWin, cleanName);
+            }, 50);
+            newWin.setTimeout(() => {
+              this.plugin.manager.setLayoutLabelForWindow(newWin, cleanName);
+            }, 300);
+          }
+
+          this.closeHost();
+
+          if (typeof newWin.focus === "function") {
+            try {
+              newWin.focus();
+            } catch {
+              // Ignore focus error
+            }
+            newWin.setTimeout(() => {
+              try {
+                newWin.focus();
+              } catch {
+                // Ignore focus error
+              }
+            }, 100);
+          }
+        } else {
+          this.closeHost();
+        }
+      }
+
+      new Notice(`${t("saveModal.saveSuccess")}: ${cleanName}`);
+
+      if (this.searchInput) {
+        this.searchInput.value = "";
+      }
+      this.selectedIndex = 0;
+      WindowLayoutsModal.renderAllInstances();
+    } catch (err: any) {
+      new Notice(err?.message || String(err));
+    }
+  }
+
+  private static collapsedSections = new Set<string>();
+  private renderedLayoutEntries: { layout: WindowLayout; element: HTMLElement }[] = [];
 
   private renderLayouts(): void {
     if (!this.listEl) return;
     this.listEl.empty();
+    this.renderedLayoutEntries = [];
 
-    const query = this.searchInput?.value.trim().toLowerCase() || "";
-    this.filteredLayouts = this.plugin.manager
-      .getSavedLayouts()
-      .filter((layout: WindowLayout) => !query || layout.name.toLowerCase().includes(query));
+    const rawQuery = this.searchInput?.value.trim() || "";
+    const query = rawQuery.toLowerCase();
+    const allSpaces = this.plugin?.manager?.getSavedLayouts() || [];
+    const settings = this.plugin?.settings || {};
+    const showArchived = settings.showArchived === true;
+    const groupBySection = settings.groupBySection !== false;
+
+    // 搜尋與封存過濾
+    const searchFiltered = allSpaces.filter((layout: WindowLayout) => {
+      if (!showArchived && layout.archived === true) return false;
+      if (!query) return true;
+      const matchName = layout.name.toLowerCase().includes(query);
+      const matchSec = (layout.sections || []).some((s: string) => s.toLowerCase().includes(query));
+      return matchName || matchSec;
+    });
+
+    this.filteredLayouts = searchFiltered;
 
     if (this.filteredLayouts.length > 0) {
       if (this.selectedIndex < 0 || this.selectedIndex >= this.filteredLayouts.length) {
@@ -186,24 +589,270 @@ export class WindowLayoutsModal extends Modal {
       this.selectedIndex = -1;
     }
 
+    this.updateSearchUI();
+
     if (this.filteredLayouts.length === 0) {
-      this.listEl.createEl("p", {
-        text: t("manageModal.noLayoutsMessage"),
-        cls: "setting-item-description",
-      });
+      if (rawQuery) {
+        const createItem = this.listEl.createDiv("suggestion-item window-layout-item is-selected");
+        const content = createItem.createDiv("suggestion-content qsp-content");
+        const title = content.createDiv("suggestion-title qsp-title");
+        title.createSpan({ text: rawQuery });
+
+        const aux = createItem.createDiv("suggestion-aux qsp-aux");
+        aux.createEl("span", {
+          text: t("manageModal.enterToCreate") || "Enter to create",
+          cls: "suggestion-flair",
+        });
+
+        createItem.onclick = (e: MouseEvent) => {
+          void this.createAndSaveLayout(rawQuery, !e.shiftKey);
+        };
+      } else {
+        this.listEl.createEl("p", {
+          text: t("manageModal.noLayoutsMessage"),
+          cls: "setting-item-description",
+        });
+      }
       return;
     }
 
-    this.filteredLayouts.forEach((layout: WindowLayout, index: number) => {
-      this.renderLayoutItem(layout, index);
+    // 平舖清單 (Flat View 或搜尋狀態下)
+    if (!groupBySection || rawQuery) {
+      const activeSpaces = this.filteredLayouts.filter((l: WindowLayout) => !l.archived);
+      const archivedSpaces = this.filteredLayouts.filter((l: WindowLayout) => l.archived === true);
+
+      activeSpaces.forEach((layout: WindowLayout) => {
+        this.renderLayoutItem(this.listEl, layout);
+      });
+      if (showArchived) {
+        archivedSpaces.forEach((layout: WindowLayout) => {
+          this.renderLayoutItem(this.listEl, layout);
+        });
+      }
+      this.updateSelectedItemHighlight();
+      return;
+    }
+
+    // 分組清單 (Grouped View)
+    const knownSectionsOrder: string[] = Array.from(settings.sectionsOrder || []);
+    const presentSectionsSet = new Set<string>();
+    this.filteredLayouts.forEach((space: WindowLayout) => {
+      (space.sections || []).forEach((sec: string) => presentSectionsSet.add(sec));
     });
+
+    presentSectionsSet.forEach((sec) => {
+      if (!knownSectionsOrder.includes(sec)) {
+        knownSectionsOrder.push(sec);
+      }
+    });
+
+    knownSectionsOrder.forEach((secName: string) => {
+      const matchingSpaces = this.filteredLayouts.filter((s: WindowLayout) => (s.sections || []).includes(secName));
+      const activeInSec = matchingSpaces.filter((s) => !s.archived);
+      const archivedInSec = showArchived ? matchingSpaces.filter((s) => s.archived === true) : [];
+      const totalCount = activeInSec.length + archivedInSec.length;
+
+      if (totalCount === 0) return;
+
+      this.renderSectionHeader(this.listEl, secName, totalCount, knownSectionsOrder, true);
+
+      const isCollapsed = WindowLayoutsModal.collapsedSections.has(secName);
+      if (!isCollapsed) {
+        const secContainer = this.listEl.createDiv("space-section-container");
+        activeInSec.forEach((layout: WindowLayout) => {
+          this.renderLayoutItem(secContainer, layout);
+        });
+        archivedInSec.forEach((layout: WindowLayout) => {
+          this.renderLayoutItem(secContainer, layout);
+        });
+      }
+    });
+
+    // 未分類 (Uncategorized)
+    const uncategorizedSpaces = this.filteredLayouts.filter((s: WindowLayout) => !s.sections || s.sections.length === 0);
+    const activeUncat = uncategorizedSpaces.filter((s) => !s.archived);
+    const archivedUncat = showArchived ? uncategorizedSpaces.filter((s) => s.archived === true) : [];
+    const totalUncat = activeUncat.length + archivedUncat.length;
+
+    if (totalUncat > 0) {
+      const uncatTitle = t("manageModal.uncategorized") || "Uncategorized";
+      this.renderSectionHeader(this.listEl, uncatTitle, totalUncat, null, false);
+      const isCollapsed = WindowLayoutsModal.collapsedSections.has(uncatTitle);
+      if (!isCollapsed) {
+        const secContainer = this.listEl.createDiv("space-section-container");
+        activeUncat.forEach((layout: WindowLayout) => {
+          this.renderLayoutItem(secContainer, layout);
+        });
+        archivedUncat.forEach((layout: WindowLayout) => {
+          this.renderLayoutItem(secContainer, layout);
+        });
+      }
+    }
+
+    this.updateSelectedItemHighlight();
   }
 
-  private renderLayoutItem(layout: WindowLayout, index: number): void {
-    const layoutEl = this.listEl.createDiv("suggestion-item window-layout-item");
+  private renderSectionHeader(
+    parentEl: HTMLElement,
+    secName: string,
+    count: number,
+    allSectionsOrder: string[] | null,
+    isReorderable = true
+  ): void {
+    const headerEl = parentEl.createDiv("space-section-header");
+    headerEl.style.display = "flex";
+    headerEl.style.alignItems = "center";
+    headerEl.style.justifyContent = "space-between";
+    headerEl.style.padding = "8px 4px 6px 4px";
+    headerEl.style.marginTop = "4px";
+    headerEl.style.marginBottom = "4px";
+    headerEl.style.background = "transparent";
+    headerEl.style.borderBottom = "1px solid var(--background-modifier-border)";
+    headerEl.style.userSelect = "none";
+    headerEl.style.cursor = "pointer";
+
+    if (isReorderable && allSectionsOrder) {
+      headerEl.setAttribute("draggable", "true");
+
+      headerEl.ondragstart = (e: DragEvent) => {
+        e.dataTransfer?.setData("text/plain", secName);
+        headerEl.style.opacity = "0.5";
+      };
+
+      headerEl.ondragend = () => {
+        headerEl.style.opacity = "1";
+      };
+
+      headerEl.ondragover = (e: DragEvent) => {
+        e.preventDefault();
+      };
+
+      headerEl.ondrop = async (e: DragEvent) => {
+        e.preventDefault();
+        const draggedSec = e.dataTransfer?.getData("text/plain");
+        if (draggedSec && draggedSec !== secName && allSectionsOrder.includes(draggedSec)) {
+          const fromIdx = allSectionsOrder.indexOf(draggedSec);
+          const toIdx = allSectionsOrder.indexOf(secName);
+          if (fromIdx !== -1 && toIdx !== -1) {
+            const newOrder = [...allSectionsOrder];
+            newOrder.splice(fromIdx, 1);
+            newOrder.splice(toIdx, 0, draggedSec);
+            await this.plugin.manager.reorderSections(newOrder);
+          }
+        }
+      };
+    }
+
+    const isCollapsed = WindowLayoutsModal.collapsedSections.has(secName);
+
+    // 左側：Section 名稱、計數與更名按鈕
+    const leftEl = headerEl.createDiv("space-section-header-left");
+    leftEl.style.display = "flex";
+    leftEl.style.alignItems = "center";
+    leftEl.style.gap = "6px";
+
+    const titleSpan = leftEl.createSpan({ text: secName, cls: "space-section-title" });
+    titleSpan.style.fontWeight = "600";
+    titleSpan.style.fontSize = "13px";
+    titleSpan.style.color = "var(--text-normal)";
+
+    const badgeSpan = leftEl.createSpan({ text: `(${count})`, cls: "space-section-count" });
+    badgeSpan.style.fontSize = "11px";
+    badgeSpan.style.color = "var(--text-muted)";
+    badgeSpan.style.opacity = "0.8";
+
+    const triggerInlineRename = () => {
+      const input = document.createElement("input");
+      input.type = "text";
+      input.value = secName;
+      input.style.fontSize = "13px";
+      input.style.fontWeight = "600";
+      input.style.padding = "1px 4px";
+      input.style.maxWidth = "150px";
+
+      titleSpan.replaceWith(input);
+      input.focus();
+
+      const commitRename = async () => {
+        const newName = input.value.trim();
+        if (newName && newName !== secName) {
+          await this.plugin.manager.renameSection(secName, newName);
+        } else {
+          WindowLayoutsModal.renderAllInstances();
+        }
+      };
+
+      input.onblur = () => { void commitRename(); };
+      input.onkeydown = (ke: KeyboardEvent) => {
+        if (ke.key === "Enter") {
+          ke.preventDefault();
+          input.blur();
+        } else if (ke.key === "Escape") {
+          WindowLayoutsModal.renderAllInstances();
+        }
+      };
+    };
+
+    if (isReorderable) {
+      // 雙擊整列群組標頭觸發更名 (Double click group header to rename)
+      headerEl.ondblclick = (e: MouseEvent) => {
+        e.stopPropagation();
+        triggerInlineRename();
+      };
+
+      // 右鍵選單觸發更名
+      headerEl.oncontextmenu = (e: MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const menu = new Menu();
+        menu.addItem((item) => {
+          item
+            .setTitle(t("manageModal.renameSection") || "Rename Section")
+            .setIcon("pencil")
+            .onClick(() => triggerInlineRename());
+        });
+        menu.showAtMouseEvent(e);
+      };
+    }
+
+    // 右側：展開 / 收合箭頭 (最右端，無高亮背景輕量化)
+    const rightEl = headerEl.createDiv("space-section-header-right");
+    rightEl.style.display = "flex";
+    rightEl.style.alignItems = "center";
+
+    const arrowIcon = rightEl.createSpan({ cls: "clickable-icon space-section-arrow" });
+    arrowIcon.style.color = "var(--text-muted)";
+    arrowIcon.style.padding = "2px";
+    setIcon(arrowIcon, isCollapsed ? "chevron-right" : "chevron-down");
+
+    headerEl.onclick = (e: MouseEvent) => {
+      if (e.detail > 1) return; // 雙擊時不觸發單擊的展開/收合
+      const target = e.target as HTMLElement;
+      if (target.tagName === "INPUT") return;
+      if (WindowLayoutsModal.collapsedSections.has(secName)) {
+        WindowLayoutsModal.collapsedSections.delete(secName);
+      } else {
+        WindowLayoutsModal.collapsedSections.add(secName);
+      }
+      this.renderLayouts();
+    };
+  }
+
+  private renderLayoutItem(containerEl: HTMLElement, layout: WindowLayout): void {
+    const layoutEl = containerEl.createDiv("suggestion-item window-layout-item");
+    const itemIndex = this.renderedLayoutEntries.length;
+    this.renderedLayoutEntries.push({ layout, element: layoutEl });
+
+    const isSelected = itemIndex === this.selectedIndex;
     layoutEl.setAttribute("role", "option");
-    layoutEl.setAttribute("aria-selected", String(index === this.selectedIndex));
-    if (index === this.selectedIndex) layoutEl.addClass("is-selected");
+    layoutEl.setAttribute("aria-selected", String(isSelected));
+    if (isSelected) layoutEl.addClass("is-selected");
+
+    if (layout.archived === true) {
+      layoutEl.addClass("is-archived");
+      layoutEl.style.opacity = "0.55";
+      layoutEl.style.color = "var(--text-muted)";
+    }
 
     this.setFilesTooltipForLayout(layoutEl, layout);
 
@@ -220,28 +869,10 @@ export class WindowLayoutsModal extends Modal {
       }
     };
 
-    // Long press works across the whole layout item. Action buttons keep their
-    // own behavior and are intentionally excluded from the parent timer.
-    layoutEl.addEventListener("mousedown", (e: MouseEvent) => {
-      if (e.button !== 0 || isActionButtonTarget(e.target)) return;
-      isLongPress = false;
-      holdTimer = setTimeout(() => {
-        isLongPress = true;
-        void this.restoreLayout(layout, false);
-      }, 450);
-    });
-
-    layoutEl.addEventListener("mouseup", cancelHold);
-    layoutEl.addEventListener("mouseleave", cancelHold);
-
     layoutEl.addEventListener("click", (e) => {
       if (isActionButtonTarget(e.target)) return;
-      if (isLongPress) {
-        isLongPress = false;
-        return;
-      }
-      const forceNewWindow = !e.shiftKey;
-      void this.restoreLayout(layout, forceNewWindow);
+      this.selectedIndex = itemIndex;
+      this.updateSelectedItemHighlight();
     });
 
     const itemContentEl = layoutEl.createDiv("suggestion-content qsp-content");
@@ -249,6 +880,16 @@ export class WindowLayoutsModal extends Modal {
       cls: "suggestion-title qsp-title",
     });
     titleEl.createSpan({ text: layout.name });
+
+    if (layout.archived === true) {
+      const archivedBadge = titleEl.createSpan({
+        cls: "layout-archived-badge",
+      });
+      archivedBadge.style.marginLeft = "6px";
+      archivedBadge.style.opacity = "0.75";
+      archivedBadge.setText("📦");
+      setTooltip(archivedBadge, t("manageModal.archivedGroup") || "Archived");
+    }
 
     if (layout.autoSave) {
       const autoSaveBadge = titleEl.createSpan({
@@ -271,9 +912,21 @@ export class WindowLayoutsModal extends Modal {
       cls: "layout-files",
     });
 
+    const openWin = typeof this.plugin.manager?.getOpenWindowForLayout === "function"
+      ? this.plugin.manager.getOpenWindowForLayout(layout)
+      : null;
+
+    if (openWin) {
+      pathEl.createEl("span", {
+        text: `🟢 ${t("manageModal.windowOpenBadge") || "視窗開啟中"}`,
+        cls: "layout-open-status",
+      });
+    }
+
     const actionsEl = layoutEl.createDiv("suggestion-aux qsp-aux layout-actions");
     const restoreButton = actionsEl.createEl("button", {
       text: t("common.restore"),
+      cls: "layout-restore-btn mod-cta",
     });
     setTooltip(restoreButton, t("restoreModal.restoreHint"));
 
@@ -312,12 +965,13 @@ export class WindowLayoutsModal extends Modal {
     forceNewWindow = false
   ): Promise<void> {
     try {
-      this.close();
+      this.closeHost();
       await this.plugin.manager.restoreLayout(layout, {
         // forceNewWindow 只控制 restore 的目標是否新建；仍需傳入來源視窗，
         // 讓 manager 能保留該 popout 原本的 layout 名稱與狀態列。
         targetWindow: this.targetWindow,
         forceNewWindow,
+        forceReload: !forceNewWindow,
       });
     } catch (error: any) {
       new Notice(`${t("errors.failedToRestore")}: ${error?.message || error}`);
@@ -325,8 +979,15 @@ export class WindowLayoutsModal extends Modal {
   }
 
   private scrollSelectedIntoView(): void {
-    const selected = this.listEl.querySelector<HTMLElement>(".window-layout-item.is-selected");
-    selected?.scrollIntoView({ block: "nearest" });
+    const entry = this.renderedLayoutEntries[this.selectedIndex];
+    if (entry && entry.element && typeof entry.element.scrollIntoView === "function") {
+      entry.element.scrollIntoView({ block: "nearest" });
+    } else {
+      const selected = this.listEl?.querySelector<HTMLElement>(".window-layout-item.is-selected");
+      if (selected && typeof selected.scrollIntoView === "function") {
+        selected.scrollIntoView({ block: "nearest" });
+      }
+    }
   }
 
   private showRenameDialog(layout: WindowLayout): void {
@@ -373,7 +1034,7 @@ export class WindowLayoutsModal extends Modal {
           return;
         }
 
-        const duplicate = this.plugin.settings.layouts.some(
+        const duplicate = this.plugin.settings.spaces.some(
           (item: WindowLayout) => item.id !== layout.id && item.name === newName
         );
         if (duplicate) {
@@ -385,7 +1046,7 @@ export class WindowLayoutsModal extends Modal {
         layout.name = newName;
         await this.plugin.saveSettings();
         modal.close();
-        this.renderLayouts();
+        WindowLayoutsModal.renderAllInstances();
         new Notice(t("notifications.layoutRenamed"));
       };
 
@@ -404,7 +1065,7 @@ export class WindowLayoutsModal extends Modal {
 
       try {
         await this.plugin.manager.deleteLayout(layout.id);
-        this.renderLayouts();
+        WindowLayoutsModal.renderAllInstances();
       } catch (error: any) {
         new Notice(`${t("errors.failedToDelete")}: ${error?.message || error}`);
       }
@@ -475,7 +1136,7 @@ export class WindowLayoutsModal extends Modal {
     }
   }
 
-  private showSortMenu(event: MouseEvent): void {
+  public showSortMenu(event: MouseEvent): void {
     const menu = new Menu();
     const currentSort = this.plugin.settings.sortBy || "updated-desc";
 
@@ -492,8 +1153,7 @@ export class WindowLayoutsModal extends Modal {
           .onClick(async () => {
             this.plugin.settings.sortBy = id;
             await this.plugin.saveSettings();
-            this.selectedIndex = 0;
-            this.renderLayouts();
+            WindowLayoutsModal.renderAllInstances();
           });
       });
     };
@@ -505,13 +1165,27 @@ export class WindowLayoutsModal extends Modal {
     addSortItem("name-asc", t("manageModal.sortNameAsc"), "sort-asc");
     addSortItem("name-desc", t("manageModal.sortNameDesc"), "sort-desc");
 
-    const targetEl = (event.currentTarget as HTMLElement) || this.modalEl;
-    const rect = targetEl.getBoundingClientRect();
+    menu.showAtMouseEvent(event);
+  }
 
-    menu.showAtPosition({
-      x: Math.max(10, rect.right - 145),
-      y: rect.bottom + 6,
+  public showPanelMenu(event: MouseEvent): void {
+    const menu = new Menu();
+    const openPanel = (location: "left" | "right" | "tab") => {
+      this.closeHost();
+      void this.plugin.openWindowLayoutsPanel(location);
+    };
+
+    menu.addItem((item) => {
+      item.setTitle(t("common.panelLeft")).setIcon("panel-left").onClick(() => openPanel("left"));
     });
+    menu.addItem((item) => {
+      item.setTitle(t("common.panelRight")).setIcon("panel-right").onClick(() => openPanel("right"));
+    });
+    menu.addItem((item) => {
+      item.setTitle(t("common.panelTab")).setIcon("layout").onClick(() => openPanel("tab"));
+    });
+
+    menu.showAtMouseEvent(event);
   }
 
   private showLayoutItemMenu(event: MouseEvent, layout: WindowLayout): void {
@@ -535,7 +1209,7 @@ export class WindowLayoutsModal extends Modal {
               ? `${layout.name}: ${t("manageModal.autoSaveEnabled")}`
               : `${layout.name}: ${t("manageModal.autoSaveDisabled")}`
           );
-          this.renderLayouts();
+          WindowLayoutsModal.renderAllInstances();
         });
     });
 
@@ -557,8 +1231,19 @@ export class WindowLayoutsModal extends Modal {
         .setTitle(t("common.edit"))
         .setIcon("edit-3")
         .onClick(() => {
-          this.close();
+          this.closeHost();
           this.plugin.openSaveLayoutModal(layout);
+        });
+    });
+
+    // 3.5 Archive / Unarchive (封存 / 取消封存)
+    menu.addItem((item) => {
+      const isArchived = layout.archived === true;
+      item
+        .setTitle(isArchived ? (t("manageModal.unarchiveSpace") || "Unarchive Space") : (t("manageModal.archiveSpace") || "Archive Space"))
+        .setIcon("box")
+        .onClick(() => {
+          void this.plugin.manager.toggleArchiveSpace(layout.id);
         });
     });
 
@@ -575,19 +1260,33 @@ export class WindowLayoutsModal extends Modal {
         });
     });
 
-    const targetEl = (event.currentTarget as HTMLElement) || this.modalEl;
-    const rect = targetEl.getBoundingClientRect();
-    menu.showAtPosition({
-      x: Math.max(10, rect.right - 120),
-      y: rect.bottom + 4,
-    });
+    menu.showAtMouseEvent(event);
   }
 
   onClose() {
-    if (this.keydownListener) {
-      const targetDoc = this.modalEl.ownerDocument || document;
-      targetDoc.removeEventListener("keydown", this.keydownListener, true);
-    }
+    WindowLayoutsModal.activeInstances.delete(this);
+    this.removeKeydownListener();
     this.contentEl.empty();
+  }
+
+  private removeKeydownListener(): void {
+    if (this.keydownListener) {
+      const target = this.keydownTarget || this.panelRootEl?.ownerDocument || this.modalEl?.ownerDocument || document;
+      target.removeEventListener("keydown", this.keydownListener, true);
+      this.keydownListener = undefined;
+      this.keydownTarget = undefined;
+    }
+  }
+
+  private removePanelPointerTracking(): void {
+    if (this.panelRootEl && this.panelPointerEnterListener) {
+      this.panelRootEl.removeEventListener("pointerenter", this.panelPointerEnterListener);
+    }
+    if (this.panelRootEl && this.panelPointerLeaveListener) {
+      this.panelRootEl.removeEventListener("pointerleave", this.panelPointerLeaveListener);
+    }
+    this.panelPointerEnterListener = undefined;
+    this.panelPointerLeaveListener = undefined;
+    this.panelPointerInside = false;
   }
 }

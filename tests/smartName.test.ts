@@ -18,7 +18,7 @@ describe("Smart Layout Name Generation (generateSmartLayoutName)", () => {
     initI18n(mockApp);
     const mockPlugin: any = {
       app: mockApp,
-      settings: { layouts: [] },
+      settings: { spaces: [] },
     };
     manager = new WindowLayoutManager(mockPlugin);
   });

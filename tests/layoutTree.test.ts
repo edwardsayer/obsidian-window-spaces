@@ -7,7 +7,7 @@ describe("Layout Tree Parsing & Extraction (layoutTree.test.ts)", () => {
 
   beforeEach(() => {
     const mockApp: any = { workspace: { getLayout: () => ({}) }, vault: {} };
-    const mockPlugin: any = { app: mockApp, settings: { layouts: [] } };
+    const mockPlugin: any = { app: mockApp, settings: { spaces: [] } };
     manager = new WindowLayoutManager(mockPlugin);
   });
 

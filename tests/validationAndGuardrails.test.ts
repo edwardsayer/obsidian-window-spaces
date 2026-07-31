@@ -1,6 +1,7 @@
 import { describe, test, expect, beforeEach, vi } from "vitest";
 import { WindowLayoutManager } from "../src/manager";
 import { WindowLayout } from "../src/types";
+import { initI18n } from "../src/i18n";
 
 describe("Validation & Auto-Save Guardrails (validationAndGuardrails.test.ts)", () => {
   let manager: WindowLayoutManager;
@@ -10,11 +11,12 @@ describe("Validation & Auto-Save Guardrails (validationAndGuardrails.test.ts)", 
     mockPlugin = {
       app: { workspace: { getLayout: () => ({}) }, vault: {} },
       settings: {
-        layouts: [],
+        spaces: [],
         sortBy: "updated-desc",
       },
       saveSettings: async () => {},
     };
+    initI18n(mockPlugin.app);
     manager = new WindowLayoutManager(mockPlugin);
   });
 
@@ -50,7 +52,7 @@ describe("Validation & Auto-Save Guardrails (validationAndGuardrails.test.ts)", 
       metadata: { fileCount: 1, tabCount: 1, splitCount: 0 },
     };
 
-    mockPlugin.settings.layouts.push(existingLayout);
+    mockPlugin.settings.spaces.push(existingLayout);
 
     // 模擬 Popout 視窗 DOM
     const mockWindow = { document: {} } as Window;
@@ -71,7 +73,7 @@ describe("Validation & Auto-Save Guardrails (validationAndGuardrails.test.ts)", 
     await manager.autoSaveWindowLayout(mockWindow);
 
     // 驗證原本有 1 個檔案的既有 Layout 未被覆寫為 0 個檔案
-    const currentSettingsLayout = mockPlugin.settings.layouts[0];
+    const currentSettingsLayout = mockPlugin.settings.spaces[0];
     expect(currentSettingsLayout.metadata.fileCount).toBe(1);
     expect(consoleWarnSpy).toHaveBeenCalledWith(
       expect.stringContaining('Suppressed auto-save for layout "My Work Layout"')
@@ -105,6 +107,25 @@ describe("Validation & Auto-Save Guardrails (validationAndGuardrails.test.ts)", 
     expect(
       (manager as any).findWindowForSavedLeaves(savedLeaves, sourceWindow, newWindow)
     ).toBe(newWindow);
+  });
+
+  test("coalesces overlapping restore requests into one popout rebuild", async () => {
+    let resolveRestore!: () => void;
+    const restoreInternal = vi
+      .spyOn(manager as any, "restoreLayoutInternal")
+      .mockImplementation(
+        () => new Promise<void>((resolve) => {
+          resolveRestore = resolve;
+        })
+      );
+    const layout = { id: "layout-duplicate", name: "Duplicate" } as WindowLayout;
+
+    const firstRestore = manager.restoreLayout(layout);
+    const secondRestore = manager.restoreLayout(layout);
+
+    expect(restoreInternal).toHaveBeenCalledTimes(1);
+    resolveRestore();
+    await Promise.all([firstRestore, secondRestore]);
   });
 
   test("first restore should ignore the main window and select the only popout", () => {
@@ -296,5 +317,197 @@ describe("Validation & Auto-Save Guardrails (validationAndGuardrails.test.ts)", 
     (manager as any).restoreWindowGeometry(popoutWindow, state);
     expect(resizeTo).toHaveBeenCalledWith(1280, 720);
     expect(moveTo).toHaveBeenCalledWith(100, 200);
+  });
+
+  test("getOpenWindowForLayout should detect live popout window running target layout", () => {
+    const mockWindow = {
+      closed: false,
+      document: {
+        body: { classList: { contains: (cls: string) => cls === "is-popout-window" } },
+      },
+    } as unknown as Window;
+
+    const layout: WindowLayout = {
+      id: "l-open",
+      name: "Open Workspace",
+      timestamp: Date.now(),
+      windowState: { size: { width: 800, height: 600 } },
+      workspace: { layout: {}, leaves: [] },
+      metadata: { fileCount: 1, tabCount: 1, splitCount: 0 },
+    };
+
+    (manager as any).layoutWindows.set(layout, mockWindow);
+    mockPlugin.app.workspace.iterateAllLeaves = (cb: any) => {
+      cb({ containerEl: { ownerDocument: { defaultView: mockWindow } } });
+    };
+
+    expect(manager.getOpenWindowForLayout(layout)).toBe(mockWindow);
+  });
+
+  test("getOpenWindowForLayout should return null for unrelated layouts when 1 popout is open", () => {
+    const mockWindow = {
+      closed: false,
+      document: {
+        body: { classList: { contains: (cls: string) => cls === "is-popout-window" } },
+      },
+    } as unknown as Window;
+
+    const openLayout: WindowLayout = {
+      id: "l-open",
+      name: "Open Workspace",
+      timestamp: Date.now(),
+      windowState: { size: { width: 800, height: 600 } },
+      workspace: {
+        layout: {},
+        leaves: [{ id: "leaf-open", type: "markdown", state: { file: "Open.md" } }],
+      },
+      metadata: { fileCount: 1, tabCount: 1, splitCount: 0 },
+    };
+
+    const unrelatedLayout: WindowLayout = {
+      id: "l-unrelated",
+      name: "Unrelated Workspace",
+      timestamp: Date.now(),
+      windowState: { size: { width: 800, height: 600 } },
+      workspace: {
+        layout: {},
+        leaves: [{ id: "leaf-other", type: "markdown", state: { file: "Other.md" } }],
+      },
+      metadata: { fileCount: 1, tabCount: 1, splitCount: 0 },
+    };
+
+    mockPlugin.app.workspace.iterateAllLeaves = (cb: any) => {
+      cb({
+        id: "leaf-open",
+        containerEl: { ownerDocument: { defaultView: mockWindow } },
+        getViewState: () => ({ type: "markdown", state: { file: "Open.md" } }),
+      });
+    };
+
+    expect(manager.getOpenWindowForLayout(openLayout)).toBe(mockWindow);
+    expect(manager.getOpenWindowForLayout(unrelatedLayout)).toBe(null);
+  });
+
+  test("restoreWindowGeometry should skip resize and move when includeGeometry is false", () => {
+    const resizeTo = vi.fn();
+    const moveTo = vi.fn();
+    const popoutWindow = {
+      resizeTo,
+      moveTo,
+    } as unknown as Window;
+
+    const state = {
+      size: { width: 1280, height: 720 },
+      position: { x: 100, y: 200 },
+    };
+
+    (manager as any).restoreWindowGeometry(popoutWindow, state, false);
+    expect(resizeTo).not.toHaveBeenCalled();
+    expect(moveTo).not.toHaveBeenCalled();
+  });
+
+  test("prepareFloatingWindowForRestore should strip geometry fields when includeGeometry is false", () => {
+    const currentWindow = {
+      type: "window",
+      id: "win-curr",
+    };
+
+    const savedLayout = {
+      type: "window",
+      id: "win-saved",
+      x: 300,
+      y: 300,
+      width: 1280,
+      height: 720,
+      dimension: { width: 1280, height: 720 },
+      children: [],
+    };
+
+    const res = (manager as any).prepareFloatingWindowForRestore(savedLayout, currentWindow, false);
+    expect(res.width).toBeUndefined();
+    expect(res.height).toBeUndefined();
+    expect(res.x).toBeUndefined();
+    expect(res.y).toBeUndefined();
+    expect(res.dimension).toBeUndefined();
+  });
+
+  test("autoSaveWindowLayout should preserve includeGeometry: false from existing layout", async () => {
+    const existingLayout: WindowLayout = {
+      id: "l-geom-false",
+      name: "Geom False Layout",
+      timestamp: 1000,
+      createdAt: 1000,
+      updatedAt: 1000,
+      autoSave: true,
+      includeGeometry: false,
+      windowState: { size: { width: 1000, height: 800 } },
+      workspace: {
+        layout: {},
+        leaves: [{ id: "leaf-1", type: "markdown", state: { file: "Notes.md" } }],
+      },
+      metadata: { fileCount: 1, tabCount: 1, splitCount: 0 },
+    };
+
+    mockPlugin.settings.spaces.push(existingLayout);
+
+    const mockWindow = { document: {} } as Window;
+    (manager as any).layoutNames.set(mockWindow, "Geom False Layout");
+
+    vi.spyOn(manager, "captureCurrentLayout").mockResolvedValue({
+      id: "l-new-cap",
+      name: "Geom False Layout",
+      timestamp: Date.now(),
+      windowState: { size: { width: 1000, height: 800 } },
+      workspace: {
+        layout: {},
+        leaves: [{ id: "leaf-1", type: "markdown", state: { file: "Notes.md" } }],
+      },
+      metadata: { fileCount: 1, tabCount: 1, splitCount: 0 },
+    });
+
+    await manager.autoSaveWindowLayout(mockWindow);
+
+    const currentLayoutInSettings = mockPlugin.settings.spaces[0];
+    expect(currentLayoutInSettings.includeGeometry).toBe(false);
+  });
+
+  test("renameSection should update sectionsOrder and space.sections tag array", async () => {
+    mockPlugin.settings.sectionsOrder = ["Work", "Personal"];
+    mockPlugin.settings.spaces = [
+      {
+        id: "s-1",
+        name: "Space 1",
+        timestamp: 1000,
+        sections: ["Work", "Projects"],
+        windowState: { size: { width: 1000, height: 800 } },
+        workspace: { layout: {}, leaves: [] },
+        metadata: { fileCount: 1, tabCount: 1, splitCount: 0 },
+      },
+    ];
+
+    await manager.renameSection("Work", "Office");
+
+    expect(mockPlugin.settings.sectionsOrder).toEqual(["Office", "Personal"]);
+    expect(mockPlugin.settings.spaces[0].sections).toEqual(["Office", "Projects"]);
+  });
+
+  test("toggleArchiveSpace should toggle archived flag on target space", async () => {
+    mockPlugin.settings.spaces = [
+      {
+        id: "s-arch",
+        name: "Space Arch",
+        timestamp: 1000,
+        archived: false,
+        windowState: { size: { width: 1000, height: 800 } },
+        workspace: { layout: {}, leaves: [] },
+        metadata: { fileCount: 1, tabCount: 1, splitCount: 0 },
+      },
+    ];
+
+    await manager.toggleArchiveSpace("s-arch");
+    expect(mockPlugin.settings.spaces[0].archived).toBe(true);
+
+    await manager.toggleArchiveSpace("s-arch");
+    expect(mockPlugin.settings.spaces[0].archived).toBe(false);
   });
 });

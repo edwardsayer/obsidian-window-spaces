@@ -6,21 +6,29 @@
   max-width: none;
 }
 
+/* CRITICAL: user 驗證過，不要動到!! (Verified by user, DO NOT MODIFY) */
 .window-layouts-toolbar {
   display: flex;
   gap: 8px;
   align-items: center;
   margin-bottom: 12px;
+  flex-shrink: 0 !important;
+  min-height: 32px;
 }
 
+/* CRITICAL: user 驗證過，不要動到!! (Verified by user, DO NOT MODIFY) */
 .window-layouts-toolbar input {
   min-width: 0;
   flex: 1;
+  height: 32px;
+  min-height: 32px;
   padding: 6px 8px;
   border: 1px solid var(--background-modifier-border);
   border-radius: 4px;
   background: var(--background-primary);
   color: var(--text-normal);
+  flex-shrink: 0 !important;
+  box-sizing: border-box;
 }
 
 .window-layouts-sort-select {
@@ -265,21 +273,39 @@
 }
 
 /* Unified Window Layouts modal */
+/* CRITICAL: user 驗證過，不要動到!! (Verified by user, DO NOT MODIFY) */
 .window-layouts-modal {
   position: relative;
   display: flex;
   flex-direction: column;
   width: min(680px, calc(100vw - 40px));
   max-width: none;
-  padding-bottom: 8px !important;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow-x: hidden;
+  padding-bottom: 2px !important;
 }
 
+/* The shared content root sits inside the Modal host. Do not let its
+   desktop width exceed the actual popout dialog width. */
+/* CRITICAL: user 驗證過，不要動到!! (Verified by user, DO NOT MODIFY) */
+.window-layouts-modal .window-layouts-modal {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow-x: hidden;
+  padding-bottom: 0 !important;
+}
+
+/* CRITICAL: user 驗證過，不要動到!! (Verified by user, DO NOT MODIFY) */
 .window-layouts-modal .modal-content {
   min-height: 0;
   flex: 1 1 auto;
-  padding: 8px 3px 0;
-  margin-bottom: 0;
+  padding: 6px 0 0 !important;
+  margin-bottom: 0 !important;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .window-layouts-description {
@@ -288,13 +314,185 @@
 }
 
 .window-layouts-modal .window-layouts-toolbar {
-  margin-bottom: 12px;
-  padding: 0 1px;
-}
-
-.window-layouts-modal .window-layouts-toolbar input[type="search"] {
+  margin-bottom: 4px;
+  padding: 0 2px;
   width: 100%;
   box-sizing: border-box;
+}
+
+/* CRITICAL: user 驗證過，不要動到!! (Verified by user, DO NOT MODIFY) */
+.window-layouts-modal .window-layouts-search-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  box-sizing: border-box;
+  flex-shrink: 0 !important;
+  min-height: 32px;
+}
+
+.window-layouts-modal .window-layouts-search-container input[type="search"] {
+  width: 100%;
+  box-sizing: border-box;
+  padding-left: 28px !important;
+  padding-right: 36px !important;
+}
+
+.window-layouts-modal .window-layouts-search-clear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-muted);
+  background-color: transparent;
+  transition: background-color 0.15s ease, color 0.15s ease;
+  z-index: 2;
+}
+
+.window-layouts-modal .window-layouts-search-clear:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.window-layouts-modal .suggestion-flair {
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--font-ui-smaller, 11px);
+  padding: 2px 6px;
+  border-radius: var(--tag-radius, var(--radius-s, 4px));
+  background-color: var(--tag-background, var(--background-modifier-accent-subtle, var(--background-modifier-border)));
+  color: var(--tag-color, var(--text-accent));
+  font-weight: var(--font-semibold, 500);
+  white-space: nowrap;
+}
+
+/* Persistent ItemView version of the layouts picker */
+/* CRITICAL: user 驗證過，不要動到!! (Verified by user, DO NOT MODIFY) */
+.window-layouts-panel {
+  height: 100%;
+  box-sizing: border-box;
+  /* File Explorer starts its nav-header at the top of the leaf. Keep the
+     same top edge so the toolbar buttons have the same vertical padding. */
+  padding: 0 8px 6px 8px !important;
+  margin-top: 0 !important;
+  overflow: hidden;
+}
+
+/* The ItemView is also the content component's root. Keep its width fluid;
+   the Modal host supplies its own constrained width. */
+/* CRITICAL: user 驗證過，不要動到!! (Verified by user, DO NOT MODIFY) */
+.window-layouts-panel.window-layouts-modal {
+  width: 100%;
+  max-width: none;
+  min-height: 0;
+  padding-bottom: 4px !important;
+}
+
+/* CRITICAL: user 驗證過，不要動到!! (Verified by user, DO NOT MODIFY) */
+.window-layouts-panel .window-layouts-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 0 !important;
+  flex-shrink: 0 !important;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.window-layouts-header-actions {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.window-layouts-panel .window-layouts-panel-header h2 {
+  margin: 0;
+  padding: 0;
+  font-size: var(--font-ui-medium, 14px);
+  line-height: 1.2;
+}
+
+/* Both locations receive the same native nav-header/nav-buttons-container
+   DOM, so Obsidian governs their height and border identically. */
+.window-layouts-panel .window-layouts-header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin-left: 0;
+  gap: var(--size-2-1, 2px);
+}
+
+.window-layouts-panel .window-layouts-toolbar {
+  margin-bottom: var(--size-4-1, 4px);
+}
+
+/* Hide standard view-header for Window Spaces leaves in both tab and sidebar, matching File Explorer */
+.workspace-leaf:has([data-type="window-spaces-layouts"]) .view-header,
+.workspace-leaf-content[data-type="window-spaces-layouts"] ~ .view-header,
+.workspace-leaf-content[data-type="window-spaces-layouts"] .view-header {
+  display: none !important;
+}
+
+/* CRITICAL: user 驗證過，不要動到!! (Verified by user, DO NOT MODIFY) */
+.window-layouts-panel .window-layouts-toolbar {
+  flex-wrap: nowrap;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
+  flex-shrink: 0 !important;
+  min-height: 32px;
+}
+
+.window-layouts-panel .window-layouts-list {
+  max-height: none;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.window-layouts-panel .prompt-instructions {
+  flex-wrap: wrap;
+  max-width: 100%;
+  overflow: hidden !important;
+  overflow-y: hidden !important;
+  flex-shrink: 0;
+  gap: 4px 10px;
+  margin-top: 4px;
+}
+
+/* CRITICAL: user 驗證過，不要動到!! (Verified by user, DO NOT MODIFY) */
+.window-layouts-panel .window-layouts-toolbar .qsp-action-btn {
+  flex: 0 0 auto;
+  height: 32px;
+  min-height: 32px;
+  padding-left: 10px;
+  padding-right: 10px;
+  white-space: nowrap;
+  flex-shrink: 0 !important;
+  box-sizing: border-box;
+}
+
+.window-layouts-panel .suggestion-aux.qsp-aux.layout-actions {
+  gap: 4px;
+}
+
+.window-layouts-panel .layout-actions button {
+  padding-left: 6px;
+  padding-right: 6px;
 }
 
 /* Simplified list items matching native Obsidian workspace layout modal */
@@ -302,9 +500,16 @@
   margin: 8px 0 0;
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
   gap: 3px;
 }
 
+/* CRITICAL: user 驗證過，不要動到!! (Verified by user, DO NOT MODIFY) */
 .window-layouts-modal .suggestion-item.window-layout-item {
   margin: 0;
   padding: 8px 10px;
@@ -313,9 +518,17 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  position: relative;
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden !important;
   cursor: pointer;
   background-color: transparent;
   transition: background-color 0.15s ease;
+  flex-shrink: 0 !important;
+  min-height: 44px;
 }
 
 .window-layouts-modal .suggestion-item.window-layout-item:hover {
@@ -330,8 +543,9 @@
 .window-layouts-modal .suggestion-content.qsp-content {
   flex: 1 1 auto;
   min-width: 0;
-  overflow: hidden;
-  margin-right: 12px;
+  max-width: 100%;
+  overflow: hidden !important;
+  margin-right: 0;
 }
 
 .window-layouts-modal .suggestion-title.qsp-title {
@@ -343,6 +557,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .window-layouts-modal .suggestion-note.qsp-note {
@@ -350,14 +566,22 @@
   color: var(--text-muted);
   display: flex;
   align-items: center;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden !important;
   line-height: var(--line-height-tight, 1.3);
 }
 
 .window-layouts-modal .qsp-path {
   display: flex;
   align-items: center;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden !important;
   padding: 0;
   margin: 0;
 }
@@ -369,6 +593,20 @@
   border-radius: 0;
   font-size: var(--font-ui-smaller, 12px);
   color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.window-layouts-modal .layout-open-status {
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  font-size: var(--font-ui-smaller, 12px);
+  color: var(--text-success, #2ea44f);
+  font-weight: 500;
+  white-space: nowrap;
 }
 
 .window-layouts-modal .suggestion-aux.qsp-aux.layout-actions {
@@ -397,6 +635,18 @@
   border-color: var(--background-modifier-border-hover);
 }
 
+.window-layouts-modal .layout-actions .layout-restore-btn {
+  border-color: var(--interactive-accent);
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent, white);
+}
+
+.window-layouts-modal .layout-actions .layout-restore-btn:hover {
+  border-color: var(--interactive-accent-hover, var(--interactive-accent));
+  background-color: var(--interactive-accent-hover, var(--interactive-accent));
+  color: var(--text-on-accent, white);
+}
+
 .window-layouts-modal .layout-actions .layout-delete-btn {
   display: inline-flex;
   align-items: center;
@@ -417,30 +667,93 @@
   color: var(--text-normal);
 }
 
+/* Floating layout actions: keep the list visually clean until the user
+   points at an item (or reaches its controls with the keyboard). */
+.window-layouts-modal .suggestion-item.window-layout-item .layout-actions {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  right: 8px;
+  margin: 0;
+  padding: 3px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-s, 4px);
+  background: transparent;
+  box-shadow: none;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate3d(8px, -50%, 0);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.window-layouts-modal .suggestion-item.window-layout-item:hover .layout-actions,
+.window-layouts-modal .suggestion-item.window-layout-item:focus-within .layout-actions {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate3d(0, -50%, 0);
+}
+
+.window-layouts-modal .suggestion-item.window-layout-item .layout-actions button {
+  white-space: nowrap;
+}
+
+.window-layouts-modal .layout-actions .layout-more-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  box-shadow: none;
+}
+
+.window-layouts-modal .layout-actions .layout-more-btn:hover,
+.window-layouts-modal .layout-actions .layout-more-btn:focus-visible {
+  border: none;
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+  box-shadow: none;
+}
+
+/* Leave enough room for the floating layer when the item is narrow. */
+.window-layouts-panel .suggestion-item.window-layout-item {
+  padding-right: 8px;
+}
+
 /* Footer prompt instructions matching native Obsidian suggestion modals */
+/* CRITICAL: user 驗證過，不要動到!! (Verified by user, DO NOT MODIFY) */
 .window-layouts-modal .prompt-instructions {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 16px;
+  gap: 4px 12px;
   padding: 0;
-  margin: 6px 0 0 0;
+  margin: 4px 0 2px 0 !important;
   border-top: none;
   background-color: transparent;
   color: var(--text-muted);
   font-size: var(--font-ui-smaller, 11px);
-  line-height: var(--line-height-normal, 1.4);
+  line-height: var(--line-height-tight, 1.15);
+  overflow: hidden !important;
+  overflow-y: hidden !important;
+  flex-shrink: 0;
 }
 
 .window-layouts-modal .prompt-instruction {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
+  line-height: 1.15;
 }
 
 .window-layouts-modal .prompt-instruction-command {
   font-weight: var(--font-semibold, 600);
   color: var(--text-muted);
+  line-height: 1.15;
 }
 
 /* Loading State */

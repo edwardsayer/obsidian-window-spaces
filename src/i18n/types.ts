@@ -21,12 +21,19 @@ export interface TranslationStrings {
     newWindow: string;
     edit: string;
     windowLayouts: string;
+    openAsPanel: string;
+    panelLeft: string;
+    panelRight: string;
+    panelTab: string;
   };
 
   // 命令
   commands: {
     saveLayout: string;
     openLayouts: string;
+    openLayoutsPanel: string;
+    openLayoutsPanelLeft: string;
+    openLayoutsPanelRight: string;
   };
 
   // 保存對話框
@@ -73,6 +80,8 @@ export interface TranslationStrings {
     title: string;
     noLayoutsMessage: string;
     searchPlaceholder: string;
+    enterToCreate?: string;
+    clearSearch?: string;
     saveCurrentButton: string;
     layoutName: string;
     createdDate: string;
@@ -95,6 +104,21 @@ export interface TranslationStrings {
     sortNameDesc: string;
     autoSaveEnabled: string;
     autoSaveDisabled: string;
+    windowOpenBadge?: string;
+    viewOptions?: string;
+    groupBySection?: string;
+    flatView?: string;
+    showArchived?: string;
+    hideArchived?: string;
+    uncategorized?: string;
+    archivedGroup?: string;
+    archiveSpace?: string;
+    unarchiveSpace?: string;
+    archiveSuccess?: string;
+    unarchiveSuccess?: string;
+    renameSection?: string;
+    sectionsLabel?: string;
+    sectionsPlaceholder?: string;
   };
 
   // 設定頁面
@@ -144,6 +168,7 @@ export interface TranslationStrings {
     invalidLayout: string;
     cannotRestore: string;
     missingFilesNotice: string;
+    switchedToOpenWindow: string;
   };
 
   // 錯誤訊息

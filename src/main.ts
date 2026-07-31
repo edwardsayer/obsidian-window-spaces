@@ -5,9 +5,14 @@ import { SaveLayoutModal } from "./modals/saveModal";
 import { WindowLayoutsModal } from "./modals/restoreModal";
 import { WindowSpacesSettingTab } from "./settings";
 import { initI18n, t } from "./i18n";
+import {
+  WINDOW_LAYOUTS_VIEW_TYPE,
+  WindowLayoutsPanelLocation,
+  WindowLayoutsView,
+} from "./views/windowLayoutsView";
 
 const DEFAULT_SETTINGS: WindowSettings = {
-  layouts: [],
+  spaces: [],
   autoSave: false,
   showNotifications: true,
   maxLayouts: 20,
@@ -16,6 +21,9 @@ const DEFAULT_SETTINGS: WindowSettings = {
   layoutStatusBarDefaultApplied: false,
   showWindowLayoutsRibbonIcon: true,
   sortBy: "updated-desc",
+  sectionsOrder: [],
+  groupBySection: true,
+  showArchived: false,
 };
 
 export default class WindowSpacesPlugin extends Plugin {
@@ -35,6 +43,12 @@ export default class WindowSpacesPlugin extends Plugin {
     // 初始化管理器
     this.manager = new WindowLayoutManager(this);
     this.manager.registerExistingPopoutWindows();
+
+    // 註冊可固定在側欄或主工作區分頁的 Window Layouts view
+    this.registerView(
+      WINDOW_LAYOUTS_VIEW_TYPE,
+      (leaf) => new WindowLayoutsView(leaf, this)
+    );
 
     // 註冊命令
     this.registerCommands();
@@ -87,6 +101,10 @@ export default class WindowSpacesPlugin extends Plugin {
 
   async loadSettings() {
     const savedSettings = await this.loadData();
+    if (savedSettings && (savedSettings as any).layouts && !savedSettings.spaces) {
+      savedSettings.spaces = (savedSettings as any).layouts;
+      delete (savedSettings as any).layouts;
+    }
     this.settings = Object.assign({}, DEFAULT_SETTINGS, savedSettings);
 
     // 將舊版「預設關閉」的狀態列設定遷移為新版預設開啟；之後尊重使用者的手動選擇。
@@ -129,6 +147,27 @@ export default class WindowSpacesPlugin extends Plugin {
       icon: "layout",
       callback: () => this.openWindowLayoutsModal(),
     });
+
+    this.addCommand({
+      id: "open-window-layouts-panel",
+      name: t("commands.openLayoutsPanel"),
+      icon: "layout",
+      callback: () => void this.openWindowLayoutsPanel("tab"),
+    });
+
+    this.addCommand({
+      id: "open-window-layouts-panel-left",
+      name: t("commands.openLayoutsPanelLeft"),
+      icon: "panel-left",
+      callback: () => void this.openWindowLayoutsPanel("left"),
+    });
+
+    this.addCommand({
+      id: "open-window-layouts-panel-right",
+      name: t("commands.openLayoutsPanelRight"),
+      icon: "panel-right",
+      callback: () => void this.openWindowLayoutsPanel("right"),
+    });
   }
 
   openSaveLayoutModal(layout: WindowLayout) {
@@ -163,11 +202,45 @@ export default class WindowSpacesPlugin extends Plugin {
     new WindowLayoutsModal(this.app, this, win).open();
   }
 
+  async openWindowLayoutsPanel(
+    location: WindowLayoutsPanelLocation = "tab"
+  ): Promise<void> {
+    const workspace = this.app.workspace as any;
+    let leaf;
+
+    if (location === "left") {
+      leaf = workspace.getLeftLeaf(false);
+    } else if (location === "right") {
+      leaf = workspace.getRightLeaf(false);
+    } else {
+      // Commands can be invoked while a popout is focused. Select a main
+      // workspace leaf first so getLeaf("tab") cannot create the view in a
+      // popout window by accident.
+      let mainLeaf = null;
+      workspace.iterateAllLeaves((candidate: any) => {
+        const body = candidate.containerEl?.ownerDocument?.body;
+        const isPopout = body?.classList?.contains("is-popout-window") ||
+          body?.classList?.contains("mod-popout");
+        if (!mainLeaf && !isPopout) mainLeaf = candidate;
+      });
+      if (mainLeaf) workspace.setActiveLeaf(mainLeaf, { focus: false });
+      leaf = workspace.getLeaf("tab");
+    }
+
+    if (!leaf) {
+      throw new Error("Unable to create a Window Layouts panel");
+    }
+
+    await leaf.setViewState({ type: WINDOW_LAYOUTS_VIEW_TYPE, state: {} });
+    await workspace.revealLeaf(leaf);
+  }
+
   private setupEventListeners() {
     // 監聽視窗開關
     this.registerEvent(
       this.app.workspace.on("window-open", (_workspaceWindow, popoutWindow) => {
         this.manager.registerPopoutWindow(popoutWindow);
+        WindowLayoutsModal.renderAllInstances();
         console.log("New window opened");
       })
     );
@@ -175,6 +248,7 @@ export default class WindowSpacesPlugin extends Plugin {
     this.registerEvent(
       this.app.workspace.on("window-close", (_workspaceWindow, popoutWindow) => {
         this.manager.unregisterPopoutWindow(popoutWindow);
+        WindowLayoutsModal.renderAllInstances();
         console.log("Popout window closed");
       })
     );
@@ -211,7 +285,7 @@ export default class WindowSpacesPlugin extends Plugin {
     // 添加工具提示
     statusBarItem.setAttribute(
       "aria-label",
-      "Window Spaces - Click to restore layout, Shift+Click to save layout"
+      "Window Spaces - Click to restore space, Shift+Click to save space"
     );
   }
 

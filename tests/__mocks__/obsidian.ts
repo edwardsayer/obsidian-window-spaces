@@ -35,6 +35,8 @@ export class Setting {
 }
 
 export class Menu {
+  domEl: HTMLElement = document.createElement("div");
+
   addItem(cb: any) {
     const item = {
       setTitle: () => item,
@@ -47,5 +49,12 @@ export class Menu {
     return this;
   }
   addSeparator() { return this; }
-  showAtPosition() { return this; }
+  showAtPosition(pos: { x: number; y: number }, _doc?: any) {
+    this.domEl.style.left = `${pos.x}px`;
+    this.domEl.style.top = `${pos.y}px`;
+    return this;
+  }
+  showAtMouseEvent(_evt: any) {
+    return this;
+  }
 }

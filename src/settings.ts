@@ -1,5 +1,6 @@
 import { App, PluginSettingTab, Setting, Notice, Modal } from "obsidian";
 import { t, tWithParams } from "./i18n";
+import { WindowLayoutsModal } from "./modals/restoreModal";
 
 export class WindowSpacesSettingTab extends PluginSettingTab {
   private plugin: any;
@@ -182,7 +183,7 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
               t("settings.resetConfirmTitle")
             );
             if (confirmed) {
-              this.plugin.settings.layouts = [];
+              this.plugin.settings.spaces = [];
               await this.plugin.saveSettings();
               this.display(); // 重新顯示設定頁面
               new Notice(t("settings.resetSuccess"));
@@ -259,6 +260,7 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
         if (newName && newName !== layout.name) {
           layout.name = newName;
           await this.plugin.saveSettings();
+          WindowLayoutsModal.renderAllInstances();
           this.display();
           new Notice(t("notifications.layoutRenamed"));
         }

@@ -49,23 +49,30 @@ const en = {
         loading: "Loading",
         close: "Close",
         ok: "OK",
-        layoutLabel: "Window Spaces layout",
-        noLayout: "No layout applied",
+        layoutLabel: "Window Space",
+        noLayout: "No space applied",
         newWindow: "New Window",
         edit: "Edit",
-        windowLayouts: "Window Layouts",
+        windowLayouts: "Window Spaces",
+        openAsPanel: "Open as panel",
+        panelLeft: "Open in left sidebar",
+        panelRight: "Open in right sidebar",
+        panelTab: "Open in main workspace tab",
     },
     commands: {
-        saveLayout: "Save current window layout",
-        openLayouts: "Open window layouts",
+        saveLayout: "Save current Space",
+        openLayouts: "Open Window Spaces",
+        openLayoutsPanel: "Open Window Spaces as a panel",
+        openLayoutsPanelLeft: "Open Window Spaces in left sidebar",
+        openLayoutsPanelRight: "Open Window Spaces in right sidebar",
     },
     saveModal: {
-        title: "Save Window Layout",
-        nameLabel: "Layout Name",
-        namePlaceholder: "Enter layout name...",
+        title: "Save Space",
+        nameLabel: "Space Name",
+        namePlaceholder: "Enter space name...",
         descriptionLabel: "Description (optional)",
-        descriptionPlaceholder: "Enter layout description...",
-        infoSection: "Layout Details",
+        descriptionPlaceholder: "Enter space description...",
+        infoSection: "Space Details",
         windowSize: "Window Size",
         includePosition: "Include Window Position",
         includePositionDesc: "Save the window position coordinates on screen",
@@ -74,42 +81,44 @@ const en = {
         includeGeometry: "Include window position & size",
         includeGeometryDesc: "Save the window coordinates and dimensions on screen",
         andOthers: "and others",
-        overwriteNotice: "Will overwrite existing layout",
-        saveButton: "Save Layout",
+        overwriteNotice: "Will overwrite existing space",
+        saveButton: "Save Space",
         cancelButton: "Cancel",
-        emptyNameError: "Layout name cannot be empty",
-        duplicateNameError: "A layout with this name already exists",
-        saveSuccess: "Layout saved successfully",
-        autoSaveToggle: "Enable auto-save for this layout",
+        emptyNameError: "Space name cannot be empty",
+        duplicateNameError: "A space with this name already exists",
+        saveSuccess: "Space saved successfully",
+        autoSaveToggle: "Enable auto-save for this space",
     },
     restoreModal: {
-        title: "Restore Window Layout",
-        selectLayout: "Select a layout to restore:",
-        noLayoutsMessage: "No saved window layouts found.",
-        restoreButton: "Restore",
-        restoreHint: "Restore layout (click or Enter for a new window; long-press the item or Restore button, Shift+click, or Shift+Enter for the current window)",
+        title: "Restore Space",
+        selectLayout: "Select a space to restore:",
+        noLayoutsMessage: "No saved spaces found.",
+        restoreButton: "Restore Space",
+        restoreHint: "Restore space (click or Enter for a new window; long-press the item or Restore button, Shift+click, or Shift+Enter for the current window)",
         cancelButton: "Cancel",
-        restoreSuccess: "Layout restored successfully",
-        restoreError: "Failed to restore layout",
+        restoreSuccess: "Space restored successfully",
+        restoreError: "Failed to restore space",
         includedFiles: "Included files",
-        restoringLayout: "Restoring layout",
+        restoringLayout: "Restoring space",
     },
     manageModal: {
-        title: "Manage Window Layouts",
-        noLayoutsMessage: "No saved layouts found.",
-        searchPlaceholder: "Search layouts...",
+        title: "Manage Window Spaces",
+        noLayoutsMessage: "No saved spaces found.",
+        searchPlaceholder: "Find or create a space...",
+        enterToCreate: "Enter to create",
+        clearSearch: "Clear search",
         saveCurrentButton: "Save",
-        layoutName: "Layout Name",
+        layoutName: "Space Name",
         createdDate: "Created",
         updatedDate: "Updated",
         fileCount: "Files",
         actions: "Actions",
         renameButton: "Rename",
         deleteButton: "Delete",
-        confirmDeleteTitle: "Delete Layout",
-        confirmDeleteMessage: "Are you sure you want to delete this layout? This action cannot be undone.",
-        deleteSuccess: "Layout deleted successfully",
-        renameSuccess: "Layout renamed successfully",
+        confirmDeleteTitle: "Delete Space",
+        confirmDeleteMessage: "Are you sure you want to delete this space? This action cannot be undone.",
+        deleteSuccess: "Space deleted successfully",
+        renameSuccess: "Space renamed successfully",
         sortDateDesc: "Updated (Newest)",
         sortDateAsc: "Updated (Oldest)",
         sortUpdatedDesc: "Updated (Newest)",
@@ -120,58 +129,74 @@ const en = {
         sortNameDesc: "Name (Z to A)",
         autoSaveEnabled: "Auto-save enabled",
         autoSaveDisabled: "Auto-save disabled",
+        windowOpenBadge: "Active",
+        viewOptions: "View Options",
+        groupBySection: "Group by Section",
+        flatView: "Flat List",
+        showArchived: "Show Archived",
+        hideArchived: "Hide Archived",
+        uncategorized: "Uncategorized",
+        archivedGroup: "Archived",
+        archiveSpace: "Archive Space",
+        unarchiveSpace: "Unarchive Space",
+        archiveSuccess: "Space archived",
+        unarchiveSuccess: "Space unarchived",
+        renameSection: "Rename Section",
+        sectionsLabel: "Sections",
+        sectionsPlaceholder: "Type section name and press Enter...",
     },
     settings: {
         title: "Window Spaces Settings",
-        description: "Manage your window layouts and configure auto-save options.",
+        description: "Manage your Window Spaces and configure auto-save options.",
         autoSaveSection: "General & Auto-Save Settings",
-        autoSaveDescription: "Automatically save window layouts at regular intervals.",
+        autoSaveDescription: "Automatically save Window Spaces at regular intervals.",
         autoSaveEnabled: "Enable auto-save",
         showNotifications: "Show notifications",
-        showNotificationsDesc: "Display notice toasts on saving or restoring layouts",
-        layoutDisplaySection: "Popout layout display",
-        showLayoutStatusBar: "Show layout status bar",
-        showLayoutStatusBarDesc: "Display the current layout name and a Save button in a status-style bar at the bottom-left of every Popout window",
-        showWindowLayoutsRibbonIcon: "Show 'Window Layouts' ribbon icon",
-        showWindowLayoutsRibbonIconDesc: "Display one quick-access icon for restoring and managing window layouts",
-        maxLayouts: "Max layouts",
-        maxLayoutsDesc: "Limit the number of saved layouts (0 = unlimited)",
-        layoutStats: "Total saved layouts: {{count}}",
+        showNotificationsDesc: "Display notice toasts on saving or restoring spaces",
+        layoutDisplaySection: "Popout space display",
+        showLayoutStatusBar: "Show space status bar",
+        showLayoutStatusBarDesc: "Display the current space name and a Save button in a status-style bar at the bottom-left of every Popout window",
+        showWindowLayoutsRibbonIcon: "Show 'Window Spaces' ribbon icon",
+        showWindowLayoutsRibbonIconDesc: "Display one quick-access icon for restoring and managing Window Spaces",
+        maxLayouts: "Max spaces",
+        maxLayoutsDesc: "Limit the number of saved spaces (0 = unlimited)",
+        layoutStats: "Total saved spaces: {{count}}",
         autoSaveInterval: "Auto-save interval",
         minutes: "minutes",
-        layoutsSection: "Saved Layouts",
-        layoutsDescription: "Manage your saved window layouts.",
-        noLayouts: "No saved layouts found.",
-        layoutInfo: "Layout: {{name}}",
+        layoutsSection: "Saved Window Spaces",
+        layoutsDescription: "Manage your saved Window Spaces.",
+        noLayouts: "No saved spaces found.",
+        layoutInfo: "Space: {{name}}",
         createdOn: "Created: {{date}}",
         includesFiles: "Includes {{count}} files",
-        deleteLayout: "Delete Layout",
-        confirmDelete: "Are you sure you want to delete this layout?",
+        deleteLayout: "Delete Space",
+        confirmDelete: "Are you sure you want to delete this space?",
         resetSettings: "Reset Settings",
         resetSettingsDescription: "Reset all settings to default values.",
         resetButton: "Reset Settings",
         resetConfirmTitle: "Confirm Reset",
-        resetConfirmMessage: "Are you sure you want to reset all settings? This will not delete your saved layouts.",
+        resetConfirmMessage: "Are you sure you want to reset all settings? This will not delete your saved spaces.",
         resetSuccess: "Settings reset successfully",
     },
     notifications: {
-        layoutSaved: "Layout saved successfully",
-        layoutOverwritten: "Layout overwritten successfully",
-        layoutRestored: "Layout restored successfully",
-        layoutDeleted: "Layout deleted successfully",
-        layoutRenamed: "Layout renamed successfully",
+        layoutSaved: "Space saved successfully",
+        layoutOverwritten: "Space overwritten successfully",
+        layoutRestored: "Space restored successfully",
+        layoutDeleted: "Space deleted successfully",
+        layoutRenamed: "Space renamed successfully",
         settingsReset: "Settings reset successfully",
         errorOccurred: "An error occurred",
-        invalidLayout: "Invalid layout data",
-        cannotRestore: "Cannot restore layout",
+        invalidLayout: "Invalid space data",
+        cannotRestore: "Cannot restore space",
         missingFilesNotice: "missing files",
+        switchedToOpenWindow: "Switched to active window for space \"{{name}}\"",
     },
     errors: {
-        failedToSave: "Failed to save layout",
-        failedToRestore: "Failed to restore layout",
-        failedToDelete: "Failed to delete layout",
-        failedToRename: "Failed to rename layout",
-        layoutNotFound: "Layout not found",
+        failedToSave: "Failed to save space",
+        failedToRestore: "Failed to restore space",
+        failedToDelete: "Failed to delete space",
+        failedToRename: "Failed to rename space",
+        layoutNotFound: "Space not found",
         invalidData: "Invalid data format",
         permissionDenied: "Permission denied",
         notInPopoutWindow: "Please execute this command inside a popout window.",
@@ -202,23 +227,30 @@ const zhTW = {
         loading: "載入中",
         close: "關閉",
         ok: "確定",
-        layoutLabel: "Window Spaces 佈局",
-        noLayout: "尚未套用佈局",
+        layoutLabel: "空間",
+        noLayout: "尚未套用空間",
         newWindow: "新視窗",
         edit: "編輯",
-        windowLayouts: "視窗佈局",
+        windowLayouts: "Window Spaces",
+        openAsPanel: "以面板開啟",
+        panelLeft: "開啟於左側欄",
+        panelRight: "開啟於右側欄",
+        panelTab: "開啟於主視窗分頁",
     },
     commands: {
-        saveLayout: "儲存目前視窗佈局",
-        openLayouts: "開啟視窗佈局",
+        saveLayout: "儲存目前空間",
+        openLayouts: "開啟 Window Spaces",
+        openLayoutsPanel: "以面板開啟 Window Spaces",
+        openLayoutsPanelLeft: "在左側欄開啟 Window Spaces",
+        openLayoutsPanelRight: "在右側欄開啟 Window Spaces",
     },
     saveModal: {
-        title: "儲存視窗佈局",
-        nameLabel: "佈局名稱",
-        namePlaceholder: "輸入佈局名稱...",
+        title: "儲存空間",
+        nameLabel: "空間名稱",
+        namePlaceholder: "輸入空間名稱...",
         descriptionLabel: "描述（選填）",
-        descriptionPlaceholder: "輸入佈局描述...",
-        infoSection: "佈局資訊",
+        descriptionPlaceholder: "輸入空間描述...",
+        infoSection: "空間資訊",
         windowSize: "視窗大小",
         includePosition: "包含視窗位置",
         includePositionDesc: "儲存視窗在螢幕上的位置",
@@ -227,42 +259,44 @@ const zhTW = {
         includeGeometry: "包含視窗位置與大小",
         includeGeometryDesc: "保存並還原視窗在螢幕上的座標位置與寬高尺寸",
         andOthers: "及其他",
-        overwriteNotice: "將覆蓋更新既有佈局",
-        saveButton: "儲存佈局",
+        overwriteNotice: "將覆蓋更新既有空間",
+        saveButton: "儲存空間",
         cancelButton: "取消",
-        emptyNameError: "佈局名稱不能為空",
-        duplicateNameError: "此名稱的佈局已經存在",
-        saveSuccess: "佈局儲存成功",
-        autoSaveToggle: "啟用此佈局的自動保存",
+        emptyNameError: "空間名稱不能為空",
+        duplicateNameError: "此名稱的空間已經存在",
+        saveSuccess: "空間儲存成功",
+        autoSaveToggle: "啟用此空間的自動保存",
     },
     restoreModal: {
-        title: "復原視窗佈局",
-        selectLayout: "選擇要復原的佈局：",
-        noLayoutsMessage: "沒有找到已儲存的佈局。",
-        restoreButton: "復原",
-        restoreHint: "復原佈局（點擊或按 Enter 在新視窗開啟；長按佈局項目或 Restore 按鈕、按住 Shift 點擊或按 Shift+Enter 套用至目前視窗）",
+        title: "復原空間",
+        selectLayout: "選擇要復原的空間：",
+        noLayoutsMessage: "沒有找到已儲存的空間。",
+        restoreButton: "復原空間",
+        restoreHint: "復原空間（點擊或按 Enter 在新視窗開啟；長按空間項目或 Restore 按鈕、按住 Shift 點擊或按 Shift+Enter 套用至目前視窗）",
         cancelButton: "取消",
-        restoreSuccess: "佈局復原成功",
-        restoreError: "復原佈局失敗",
+        restoreSuccess: "空間復原成功",
+        restoreError: "復原空間失敗",
         includedFiles: "收錄檔案",
-        restoringLayout: "正在復原佈局",
+        restoringLayout: "正在復原空間",
     },
     manageModal: {
-        title: "管理視窗佈局",
-        noLayoutsMessage: "沒有找到已儲存的佈局。",
-        searchPlaceholder: "搜尋佈局...",
+        title: "管理 Window Spaces",
+        noLayoutsMessage: "沒有找到已儲存的空間。",
+        searchPlaceholder: "尋找或建立空間...",
+        enterToCreate: "Enter 鍵以建立",
+        clearSearch: "清除搜尋",
         saveCurrentButton: "Save",
-        layoutName: "佈局名稱",
+        layoutName: "空間名稱",
         createdDate: "建立時間",
         updatedDate: "更新時間",
         fileCount: "檔案數",
         actions: "操作",
         renameButton: "重命名",
         deleteButton: "刪除",
-        confirmDeleteTitle: "確認刪除",
-        confirmDeleteMessage: "您確定要刪除這個佈局嗎？此操作無法復原。",
-        deleteSuccess: "佈局刪除成功",
-        renameSuccess: "佈局重新命名成功",
+        confirmDeleteTitle: "刪除空間",
+        confirmDeleteMessage: "您確定要刪除這個空間嗎？此操作無法復原。",
+        deleteSuccess: "空間刪除成功",
+        renameSuccess: "空間重新命名成功",
         sortDateDesc: "更新時間 (最新)",
         sortDateAsc: "更新時間 (較舊)",
         sortUpdatedDesc: "更新時間 (最新)",
@@ -273,58 +307,74 @@ const zhTW = {
         sortNameDesc: "名稱 (Z-A)",
         autoSaveEnabled: "自動保存已啟用",
         autoSaveDisabled: "自動保存已停用",
+        windowOpenBadge: "視窗開啟中",
+        viewOptions: "顯示選項",
+        groupBySection: "依 Section 分組",
+        flatView: "不分組清單",
+        showArchived: "顯示封存空間",
+        hideArchived: "隱藏封存空間",
+        uncategorized: "未分類",
+        archivedGroup: "📦 封存空間",
+        archiveSpace: "封存空間",
+        unarchiveSpace: "取消封存",
+        archiveSuccess: "已封存空間",
+        unarchiveSuccess: "已取消封存空間",
+        renameSection: "重命名 Section",
+        sectionsLabel: "Section 分組標籤",
+        sectionsPlaceholder: "輸入 Section 名稱後按 Enter...",
     },
     settings: {
         title: "Window Spaces 設定",
-        description: "管理您的視窗佈局並設定自動儲存選項。",
+        description: "管理您的 Window Spaces 並設定自動儲存選項。",
         autoSaveSection: "一般與自動儲存設定",
-        autoSaveDescription: "定期自動儲存視窗佈局。",
+        autoSaveDescription: "定期自動儲存 Window Spaces。",
         autoSaveEnabled: "啟用自動儲存",
         showNotifications: "顯示通知",
-        showNotificationsDesc: "在儲存或恢復佈局時顯示通知快訊",
-        layoutDisplaySection: "Popout 佈局顯示",
-        showLayoutStatusBar: "顯示佈局狀態列",
-        showLayoutStatusBarDesc: "在每個 Popout 視窗左下方以狀態列樣式顯示目前佈局名稱與儲存按鈕",
-        showWindowLayoutsRibbonIcon: "顯示「視窗佈局」側邊欄圖示",
-        showWindowLayoutsRibbonIconDesc: "在主視窗左側邊欄顯示恢復與管理視窗佈局的單一入口",
-        maxLayouts: "最大佈局數量",
-        maxLayoutsDesc: "限制儲存的佈局數量（0 代表無限制）",
-        layoutStats: "已儲存佈局總數：{{count}} 個",
+        showNotificationsDesc: "在儲存或恢復空間時顯示通知快訊",
+        layoutDisplaySection: "Popout 空間顯示",
+        showLayoutStatusBar: "顯示空間狀態列",
+        showLayoutStatusBarDesc: "在每個 Popout 視窗左下方以狀態列樣式顯示目前空間名稱與儲存按鈕",
+        showWindowLayoutsRibbonIcon: "顯示「Window Spaces」側邊欄圖示",
+        showWindowLayoutsRibbonIconDesc: "在主視窗左側邊欄顯示恢復與管理 Window Spaces 的單一入口",
+        maxLayouts: "最大空間數量",
+        maxLayoutsDesc: "限制儲存的空間數量（0 代表無限制）",
+        layoutStats: "已儲存空間總數：{{count}} 個",
         autoSaveInterval: "自動儲存間隔",
         minutes: "分鐘",
-        layoutsSection: "已儲存的佈局",
-        layoutsDescription: "管理您已儲存的視窗佈局。",
-        noLayouts: "沒有找到已儲存的佈局。",
-        layoutInfo: "佈局：{{name}}",
+        layoutsSection: "已儲存的 Window Spaces",
+        layoutsDescription: "管理您已儲存的 Window Spaces。",
+        noLayouts: "沒有找到已儲存的空間。",
+        layoutInfo: "空間：{{name}}",
         createdOn: "建立時間：{{date}}",
         includesFiles: "包含 {{count}} 個檔案",
-        deleteLayout: "刪除佈局",
-        confirmDelete: "您確定要刪除這個佈局嗎？",
+        deleteLayout: "刪除空間",
+        confirmDelete: "您確定要刪除這個空間嗎？",
         resetSettings: "重設設定",
         resetSettingsDescription: "將所有設定重設為預設值。",
         resetButton: "重設設定",
         resetConfirmTitle: "確認重設",
-        resetConfirmMessage: "您確定要重設所有設定嗎？這不會刪除您已儲存的佈局。",
+        resetConfirmMessage: "您確定要重設所有設定嗎？這不會刪除您已儲存的空間。",
         resetSuccess: "設定重設成功",
     },
     notifications: {
-        layoutSaved: "佈局儲存成功",
-        layoutOverwritten: "已覆蓋更新佈局",
-        layoutRestored: "佈局復原成功",
-        layoutDeleted: "佈局刪除成功",
-        layoutRenamed: "佈局重新命名成功",
+        layoutSaved: "空間儲存成功",
+        layoutOverwritten: "已覆蓋更新空間",
+        layoutRestored: "空間復原成功",
+        layoutDeleted: "空間刪除成功",
+        layoutRenamed: "空間重新命名成功",
         settingsReset: "設定重設成功",
         errorOccurred: "發生錯誤",
-        invalidLayout: "無效的佈局資料",
-        cannotRestore: "無法復原佈局",
+        invalidLayout: "無效的空間資料",
+        cannotRestore: "無法復原空間",
         missingFilesNotice: "包含不存在的檔案",
+        switchedToOpenWindow: "已切換至「{{name}}」之已開啟空間",
     },
     errors: {
-        failedToSave: "儲存佈局失敗",
-        failedToRestore: "恢復佈局失敗",
-        failedToDelete: "刪除佈局失敗",
-        failedToRename: "重新命名佈局失敗",
-        layoutNotFound: "找不到佈局",
+        failedToSave: "儲存空間失敗",
+        failedToRestore: "恢復空間失敗",
+        failedToDelete: "刪除空間失敗",
+        failedToRename: "重新命名空間失敗",
+        layoutNotFound: "找不到空間",
         invalidData: "無效的資料格式",
         permissionDenied: "權限被拒絕",
         notInPopoutWindow: "請在彈出視窗（Popout Window）中執行此命令。",
@@ -355,23 +405,30 @@ const zhCN = {
         loading: "加载中",
         close: "关闭",
         ok: "确定",
-        layoutLabel: "Window Spaces 布局",
-        noLayout: "尚未应用布局",
+        layoutLabel: "空间",
+        noLayout: "尚未应用空间",
         newWindow: "新窗口",
         edit: "编辑",
-        windowLayouts: "窗口布局",
+        windowLayouts: "Window Spaces",
+        openAsPanel: "作为面板打开",
+        panelLeft: "在左侧边栏打开",
+        panelRight: "在右侧边栏打开",
+        panelTab: "在主窗口标签页打开",
     },
     commands: {
-        saveLayout: "保存当前窗口布局",
-        openLayouts: "打开窗口布局",
+        saveLayout: "保存当前空间",
+        openLayouts: "打开 Window Spaces",
+        openLayoutsPanel: "作为面板打开 Window Spaces",
+        openLayoutsPanelLeft: "在左侧边栏打开 Window Spaces",
+        openLayoutsPanelRight: "在右侧边栏打开 Window Spaces",
     },
     saveModal: {
-        title: "保存窗口布局",
-        nameLabel: "布局名称",
-        namePlaceholder: "输入布局名称...",
+        title: "保存空间",
+        nameLabel: "空间名称",
+        namePlaceholder: "输入空间名称...",
         descriptionLabel: "描述（可选）",
-        descriptionPlaceholder: "输入布局描述...",
-        infoSection: "布局信息",
+        descriptionPlaceholder: "输入空间描述...",
+        infoSection: "空间信息",
         windowSize: "窗口大小",
         includePosition: "包含窗口位置",
         includePositionDesc: "保存窗口在屏幕上的位置坐标",
@@ -380,42 +437,44 @@ const zhCN = {
         includeGeometry: "包含窗口位置与大小",
         includeGeometryDesc: "保存并恢复窗口在屏幕上的坐标位置与宽高尺寸",
         andOthers: "及其他",
-        overwriteNotice: "将覆盖更新现有布局",
-        saveButton: "保存布局",
+        overwriteNotice: "将覆盖更新现有空间",
+        saveButton: "保存空间",
         cancelButton: "取消",
-        emptyNameError: "布局名称不能为空",
-        duplicateNameError: "此名称的布局已存在",
-        saveSuccess: "布局保存成功",
-        autoSaveToggle: "启用此布局的自动保存",
+        emptyNameError: "空间名称不能为空",
+        duplicateNameError: "此名称的空间已存在",
+        saveSuccess: "空间保存成功",
+        autoSaveToggle: "启用此空间的自动保存",
     },
     restoreModal: {
-        title: "恢复窗口布局",
-        selectLayout: "选择要恢复的布局：",
-        noLayoutsMessage: "没有找到已保存的布局。",
-        restoreButton: "恢复",
-        restoreHint: "恢复布局（点击或按 Enter 在新窗口打开；长按布局项或恢复按钮、按住 Shift 点击或按 Shift+Enter 应用至当前窗口）",
+        title: "恢复空间",
+        selectLayout: "选择要恢复的空间：",
+        noLayoutsMessage: "没有找到已保存的空间。",
+        restoreButton: "恢复空间",
+        restoreHint: "恢复空间（点击或按 Enter 在新窗口打开；长按空间项或恢复按钮、按住 Shift 点击或按 Shift+Enter 应用至当前窗口）",
         cancelButton: "取消",
-        restoreSuccess: "布局恢复成功",
-        restoreError: "恢复布局失败",
+        restoreSuccess: "空间恢复成功",
+        restoreError: "恢复空间失败",
         includedFiles: "包含文件",
-        restoringLayout: "正在恢复布局",
+        restoringLayout: "正在恢复空间",
     },
     manageModal: {
-        title: "管理窗口布局",
-        noLayoutsMessage: "没有找到已保存的布局。",
-        searchPlaceholder: "搜索布局...",
+        title: "管理 Window Spaces",
+        noLayoutsMessage: "没有找到已保存的空间。",
+        searchPlaceholder: "查找或创建空间...",
+        enterToCreate: "Enter 键以创建",
+        clearSearch: "清除搜索",
         saveCurrentButton: "Save",
-        layoutName: "布局名称",
+        layoutName: "空间名称",
         createdDate: "创建时间",
         updatedDate: "更新时间",
         fileCount: "文件数",
         actions: "操作",
         renameButton: "重命名",
         deleteButton: "删除",
-        confirmDeleteTitle: "确认删除",
-        confirmDeleteMessage: "您确定要删除这个布局吗？此操作无法撤销。",
-        deleteSuccess: "布局删除成功",
-        renameSuccess: "布局重命名成功",
+        confirmDeleteTitle: "删除空间",
+        confirmDeleteMessage: "您确定要删除这个空间吗？此操作无法撤销。",
+        deleteSuccess: "空间删除成功",
+        renameSuccess: "空间重命名成功",
         sortDateDesc: "更新时间 (最新)",
         sortDateAsc: "更新时间 (较旧)",
         sortUpdatedDesc: "更新时间 (最新)",
@@ -426,58 +485,74 @@ const zhCN = {
         sortNameDesc: "名称 (Z-A)",
         autoSaveEnabled: "自动保存已启用",
         autoSaveDisabled: "自动保存已禁用",
+        windowOpenBadge: "窗口已打开",
+        viewOptions: "显示选项",
+        groupBySection: "按 Section 分组",
+        flatView: "不分组列表",
+        showArchived: "显示归档空间",
+        hideArchived: "隐藏归档空间",
+        uncategorized: "未分类",
+        archivedGroup: "📦 归档空间",
+        archiveSpace: "归档空间",
+        unarchiveSpace: "取消归档",
+        archiveSuccess: "已归档空间",
+        unarchiveSuccess: "已取消归档空间",
+        renameSection: "重命名 Section",
+        sectionsLabel: "Section 分组标签",
+        sectionsPlaceholder: "输入 Section 名称后按 Enter...",
     },
     settings: {
         title: "Window Spaces 设置",
-        description: "管理您的窗口布局并配置自动保存选项。",
+        description: "管理您的 Window Spaces 并配置自动保存选项。",
         autoSaveSection: "常规与自动保存设置",
-        autoSaveDescription: "定期自动保存窗口布局。",
+        autoSaveDescription: "定期自动保存 Window Spaces。",
         autoSaveEnabled: "启用自动保存",
         showNotifications: "显示通知",
-        showNotificationsDesc: "在保存或恢复布局时显示通知消息",
-        layoutDisplaySection: "Popout 布局显示",
-        showLayoutStatusBar: "显示布局状态栏",
-        showLayoutStatusBarDesc: "在每个 Popout 窗口左下方以状态栏样式显示当前布局名称与保存按钮",
-        showWindowLayoutsRibbonIcon: "显示“窗口布局”侧边栏图标",
-        showWindowLayoutsRibbonIconDesc: "在主窗口左侧边栏显示恢复与管理窗口布局的单一入口",
-        maxLayouts: "最大布局数量",
-        maxLayoutsDesc: "限制保存的布局数量（0 代表无限制）",
-        layoutStats: "已保存布局总数：{{count}} 个",
+        showNotificationsDesc: "在保存或恢复空间时显示通知消息",
+        layoutDisplaySection: "Popout 空间显示",
+        showLayoutStatusBar: "显示空间状态栏",
+        showLayoutStatusBarDesc: "在每个 Popout 窗口左下方以状态栏样式显示当前空间名称与保存按钮",
+        showWindowLayoutsRibbonIcon: "显示“Window Spaces”侧边栏图标",
+        showWindowLayoutsRibbonIconDesc: "在主窗口左侧边栏显示恢复与管理 Window Spaces 的单一入口",
+        maxLayouts: "最大空间数量",
+        maxLayoutsDesc: "限制保存的空间数量（0 代表无限制）",
+        layoutStats: "已保存空间总数：{{count}} 个",
         autoSaveInterval: "自动保存间隔",
         minutes: "分钟",
-        layoutsSection: "已保存的布局",
-        layoutsDescription: "管理您已保存的窗口布局。",
-        noLayouts: "没有找到已保存的布局。",
-        layoutInfo: "布局：{{name}}",
+        layoutsSection: "已保存的 Window Spaces",
+        layoutsDescription: "管理您已保存的 Window Spaces。",
+        noLayouts: "没有找到已保存的空间。",
+        layoutInfo: "空间：{{name}}",
         createdOn: "创建时间：{{date}}",
         includesFiles: "包含 {{count}} 个文件",
-        deleteLayout: "删除布局",
-        confirmDelete: "您确定要删除这个布局吗？",
+        deleteLayout: "删除空间",
+        confirmDelete: "您确定要删除这个空间吗？",
         resetSettings: "重置设置",
         resetSettingsDescription: "将所有设置重置为默认值。",
         resetButton: "重置设置",
         resetConfirmTitle: "确认重置",
-        resetConfirmMessage: "您确定要重置所有设置吗？这不会删除您已保存的布局。",
+        resetConfirmMessage: "您确定要重置所有设置吗？这不会删除您已保存的空间。",
         resetSuccess: "设置重置成功",
     },
     notifications: {
-        layoutSaved: "布局保存成功",
-        layoutOverwritten: "已覆盖更新布局",
-        layoutRestored: "布局恢复成功",
-        layoutDeleted: "布局删除成功",
-        layoutRenamed: "布局重命名成功",
+        layoutSaved: "空间保存成功",
+        layoutOverwritten: "已覆盖更新空间",
+        layoutRestored: "空间恢复成功",
+        layoutDeleted: "空间删除成功",
+        layoutRenamed: "空间重命名成功",
         settingsReset: "设置重置成功",
         errorOccurred: "发生错误",
-        invalidLayout: "无效的布局数据",
-        cannotRestore: "无法恢复布局",
+        invalidLayout: "无效的空间数据",
+        cannotRestore: "无法恢复空间",
         missingFilesNotice: "包含不存在的文件",
+        switchedToOpenWindow: "已切换至「{{name}}」的已打开空间",
     },
     errors: {
-        failedToSave: "保存布局失败",
-        failedToRestore: "恢复布局失败",
-        failedToDelete: "删除布局失败",
-        failedToRename: "重命名布局失败",
-        layoutNotFound: "找不到布局",
+        failedToSave: "保存空间失败",
+        failedToRestore: "恢复空间失败",
+        failedToDelete: "删除空间失败",
+        failedToRename: "重命名空间失败",
+        layoutNotFound: "找不到空间",
         invalidData: "无效的数据格式",
         permissionDenied: "权限被拒绝",
         notInPopoutWindow: "请在弹出窗口（Popout Window）中执行此命令。",
@@ -682,12 +757,1150 @@ function tWithParams(key, params) {
     return getI18n().tWithParams(key, params);
 }
 
+/**
+ * 統一的 Window Layouts 視窗：搜尋、恢復與管理都在同一個入口完成。
+ */
+class WindowLayoutsModal extends obsidian.Modal {
+    static renderAllInstances() {
+        for (const instance of WindowLayoutsModal.activeInstances) {
+            instance.renderLayouts();
+        }
+    }
+    constructor(app, plugin, targetWindow) {
+        super(app);
+        this.filteredLayouts = [];
+        this.selectedIndex = 0;
+        this.panelMode = false;
+        this.panelPointerInside = false;
+        this.renderedLayoutEntries = [];
+        this.plugin = plugin;
+        this.targetWindow = targetWindow;
+    }
+    onOpen() {
+        var _a, _b;
+        WindowLayoutsModal.activeInstances.add(this);
+        this.modalEl.addClass("window-layouts-modal");
+        // Modal 實際所在的 document 是鍵盤 Enter 操作最可靠的來源視窗。
+        // Command Palette / activeLeaf 可能仍指向另一個 popout。
+        const modalWindow = (_a = this.modalEl.ownerDocument) === null || _a === void 0 ? void 0 : _a.defaultView;
+        const modalBody = (_b = modalWindow === null || modalWindow === void 0 ? void 0 : modalWindow.document) === null || _b === void 0 ? void 0 : _b.body;
+        if (modalWindow &&
+            modalBody &&
+            (modalBody.classList.contains("is-popout-window") ||
+                modalBody.classList.contains("mod-popout"))) {
+            this.targetWindow = modalWindow;
+        }
+        this.setTitle(t("common.windowLayouts"));
+        // 隱藏原生的 modal-close-button，避免觸發 Obsidian 原生 close()
+        const nativeCloseBtn = this.containerEl.querySelector(".modal-close-button");
+        if (nativeCloseBtn) {
+            nativeCloseBtn.style.display = "none";
+        }
+        // Modal 與 ItemView 共用同一組 header actions：排序、以 panel 開啟。
+        const titleHeader = this.containerEl.querySelector(".modal-title");
+        if (titleHeader) {
+            titleHeader.style.display = "flex";
+            titleHeader.style.alignItems = "center";
+            titleHeader.style.justifyContent = "space-between";
+            titleHeader.style.width = "100%";
+            this.createHeaderActions(titleHeader);
+        }
+        // 註冊 Obsidian Scope 鍵盤導覽
+        this.scope.register([], "ArrowDown", (evt) => {
+            this.handleArrowKey(1);
+            evt.preventDefault();
+            return false;
+        });
+        this.scope.register([], "ArrowUp", (evt) => {
+            this.handleArrowKey(-1);
+            evt.preventDefault();
+            return false;
+        });
+        // 捕獲階段全域 Keydown 監聽（無論焦點在標題、空白處還是任何元素上均 100% 生效）
+        const targetDoc = this.modalEl.ownerDocument || document;
+        this.keydownListener = (event) => {
+            var _a;
+            if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                event.preventDefault();
+                event.stopPropagation();
+                this.handleArrowKey(event.key === "ArrowDown" ? 1 : -1);
+            }
+            else if (event.key === "Enter") {
+                const activeEl = targetDoc.activeElement;
+                if (activeEl && activeEl.tagName === "BUTTON") {
+                    return;
+                }
+                event.preventDefault();
+                event.stopPropagation();
+                const rawQuery = ((_a = this.searchInput) === null || _a === void 0 ? void 0 : _a.value.trim()) || "";
+                const targetIndex = this.selectedIndex >= 0 ? this.selectedIndex : 0;
+                const selectedLayout = this.filteredLayouts[targetIndex];
+                if (selectedLayout) {
+                    void this.restoreLayout(selectedLayout, !event.shiftKey);
+                }
+                else if (rawQuery) {
+                    void this.createAndSaveLayout(rawQuery, !event.shiftKey);
+                }
+            }
+        };
+        this.keydownTarget = targetDoc;
+        this.keydownTarget.addEventListener("keydown", this.keydownListener, true);
+        this.renderContent();
+    }
+    /**
+     * Render this modal's content inside an ItemView (or another host).
+     * The modal instance is intentionally kept as the controller so the panel
+     * and modal always expose the same layout actions and keyboard behavior.
+     */
+    mountInContainer(rootEl, isSidebar) {
+        WindowLayoutsModal.activeInstances.add(this);
+        this.removePanelPointerTracking();
+        this.panelRootEl = rootEl;
+        this.panelMode = true;
+        this.panelPointerEnterListener = () => {
+            this.panelPointerInside = true;
+        };
+        this.panelPointerLeaveListener = () => {
+            this.panelPointerInside = false;
+        };
+        rootEl.addEventListener("pointerenter", this.panelPointerEnterListener);
+        rootEl.addEventListener("pointerleave", this.panelPointerLeaveListener);
+        this.renderContent();
+    }
+    unmountFromContainer() {
+        var _a;
+        WindowLayoutsModal.activeInstances.delete(this);
+        this.removeKeydownListener();
+        this.removePanelPointerTracking();
+        (_a = this.panelRootEl) === null || _a === void 0 ? void 0 : _a.empty();
+        this.panelRootEl = undefined;
+        this.panelMode = false;
+    }
+    getRootEl() {
+        return this.panelRootEl || this.contentEl;
+    }
+    closeHost() {
+        if (!this.panelMode)
+            this.close();
+    }
+    renderContent() {
+        const contentEl = this.getRootEl();
+        contentEl.empty();
+        // This is the shared content component's root class. It must be present
+        // on both the Modal content and the ItemView content so the same layout
+        // item styles are applied in every host.
+        contentEl.addClass("window-layouts-modal");
+        contentEl.addClass("window-spaces-modal");
+        if (this.panelMode)
+            contentEl.addClass("window-layouts-panel");
+        // The panel header is intentionally recreated after empty() so it is
+        // part of the same root that owns the toolbar and list.
+        if (this.panelMode) {
+            const panelHeader = contentEl.createDiv("nav-header window-layouts-panel-header");
+            this.createHeaderActions(panelHeader);
+        }
+        const toolbar = contentEl.createDiv("window-layouts-toolbar");
+        const searchContainer = toolbar.createDiv("window-layouts-search-container search-input-container");
+        this.searchInput = searchContainer.createEl("input");
+        this.searchInput.type = "search";
+        this.searchInput.placeholder = t("manageModal.searchPlaceholder");
+        this.searchInput.setAttribute("aria-label", t("manageModal.searchPlaceholder"));
+        if (this.initialSearchQuery !== undefined) {
+            this.searchInput.value = this.initialSearchQuery;
+            this.initialSearchQuery = undefined;
+        }
+        this.clearSearchBtn = searchContainer.createDiv("window-layouts-search-clear");
+        obsidian.setIcon(this.clearSearchBtn, "x");
+        obsidian.setTooltip(this.clearSearchBtn, t("manageModal.clearSearch") || "Clear search");
+        this.clearSearchBtn.onclick = (e) => {
+            e.stopPropagation();
+            if (this.searchInput) {
+                this.searchInput.value = "";
+                this.searchInput.focus();
+            }
+            this.selectedIndex = 0;
+            this.renderLayouts();
+        };
+        this.searchInput.addEventListener("input", () => {
+            this.selectedIndex = 0;
+            this.renderLayouts();
+        });
+        this.listEl = contentEl.createDiv("window-layouts-list");
+        this.listEl.setAttribute("role", "listbox");
+        this.renderLayouts();
+        const instructionsEl = contentEl.createDiv("prompt-instructions window-layouts-instructions");
+        const navInst = instructionsEl.createDiv("prompt-instruction");
+        navInst.createEl("span", { text: "↑ ↓", cls: "prompt-instruction-command" });
+        navInst.createEl("span", { text: t("instructions.navigate") });
+        const useInst = instructionsEl.createDiv("prompt-instruction");
+        useInst.createEl("span", { text: "Shift ↵", cls: "prompt-instruction-command" });
+        useInst.createEl("span", { text: t("instructions.use") });
+        const newWinInst = instructionsEl.createDiv("prompt-instruction");
+        newWinInst.createEl("span", { text: "↵", cls: "prompt-instruction-command" });
+        newWinInst.createEl("span", { text: t("instructions.useNewWindow") });
+        const dismissInst = instructionsEl.createDiv("prompt-instruction");
+        dismissInst.createEl("span", { text: "esc", cls: "prompt-instruction-command" });
+        dismissInst.createEl("span", { text: t("instructions.dismiss") });
+        if (this.panelMode) {
+            const targetDoc = contentEl.ownerDocument || document;
+            this.removeKeydownListener();
+            this.keydownListener = (event) => {
+                var _a;
+                if (event.key !== "ArrowDown" && event.key !== "ArrowUp" && event.key !== "Enter") {
+                    return;
+                }
+                const activeEl = targetDoc.activeElement;
+                // Determine if ANY instance in this document currently has keyboard focus
+                let focusedInstance = null;
+                for (const instance of WindowLayoutsModal.activeInstances) {
+                    const root = instance.getRootEl();
+                    if (activeEl && root && root.contains(activeEl)) {
+                        focusedInstance = instance;
+                        break;
+                    }
+                }
+                // Strict focus priority: if a panel has keyboard focus, ONLY that panel processes keydown.
+                // Otherwise, fallback to the panel currently receiving pointer hover.
+                const shouldHandle = focusedInstance
+                    ? focusedInstance === this
+                    : this.panelPointerInside;
+                if (!shouldHandle)
+                    return;
+                if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    this.handleArrowKey(event.key === "ArrowDown" ? 1 : -1);
+                }
+                else if (event.key === "Enter") {
+                    if (activeEl && activeEl.tagName === "BUTTON")
+                        return;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const rawQuery = ((_a = this.searchInput) === null || _a === void 0 ? void 0 : _a.value.trim()) || "";
+                    const selectedLayout = this.filteredLayouts[this.selectedIndex >= 0 ? this.selectedIndex : 0];
+                    if (selectedLayout) {
+                        void this.restoreLayout(selectedLayout, !event.shiftKey);
+                    }
+                    else if (rawQuery) {
+                        void this.createAndSaveLayout(rawQuery, !event.shiftKey);
+                    }
+                }
+            };
+            // Keep listening at document level so hover over any part of the panel
+            // grants keyboard navigation even when another element owns focus.
+            this.keydownTarget = targetDoc;
+            this.keydownTarget.addEventListener("keydown", this.keydownListener, true);
+        }
+        window.setTimeout(() => { var _a; return (_a = this.searchInput) === null || _a === void 0 ? void 0 : _a.focus(); }, 50);
+    }
+    createPanelButton(parentEl) {
+        const panelButton = parentEl.createEl("button", {
+            cls: "clickable-icon nav-action-button window-layouts-panel-btn",
+            attr: { "aria-label": t("common.openAsPanel") },
+        });
+        obsidian.setIcon(panelButton, "layout");
+        obsidian.setTooltip(panelButton, t("common.openAsPanel"));
+        panelButton.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.showPanelMenu(e);
+        };
+    }
+    createHeaderActions(parentEl) {
+        const isPanelHeader = parentEl.classList.contains("window-layouts-panel-header");
+        const actionsEl = parentEl.createDiv(isPanelHeader
+            ? "nav-buttons-container window-layouts-header-actions"
+            : "window-layouts-header-actions");
+        actionsEl.style.display = "flex";
+        actionsEl.style.alignItems = "center";
+        actionsEl.style.gap = "4px";
+        if (isPanelHeader) {
+            actionsEl.style.marginLeft = "0";
+            actionsEl.style.justifyContent = "center";
+            actionsEl.style.width = "100%";
+        }
+        // 1. 顯示選項按鈕 (View Options Dropdown)
+        const viewOptionsButton = actionsEl.createEl("button", {
+            cls: "clickable-icon nav-action-button window-layouts-view-options-btn",
+            attr: { "aria-label": t("manageModal.viewOptions") || "View Options" },
+        });
+        obsidian.setIcon(viewOptionsButton, "eye");
+        obsidian.setTooltip(viewOptionsButton, t("manageModal.viewOptions") || "View Options");
+        viewOptionsButton.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.showViewOptionsMenu(e);
+        };
+        // 2. 排序按鈕 (Sort Dropdown)
+        const sortButton = actionsEl.createEl("button", {
+            cls: "clickable-icon nav-action-button window-layouts-sort-btn",
+            attr: { "aria-label": t("manageModal.sortDateDesc") },
+        });
+        obsidian.setIcon(sortButton, "sort-asc");
+        obsidian.setTooltip(sortButton, t("manageModal.sortDateDesc"));
+        sortButton.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.showSortMenu(e);
+        };
+        this.createPanelButton(actionsEl);
+    }
+    showViewOptionsMenu(event) {
+        const menu = new obsidian.Menu();
+        const settings = this.plugin.settings;
+        const isGrouped = settings.groupBySection !== false;
+        const isShowArchived = settings.showArchived === true;
+        // 依 Section 分組切換
+        menu.addItem((item) => {
+            item
+                .setTitle(isGrouped ? (t("manageModal.groupBySection") || "Group by Section") : (t("manageModal.flatView") || "Flat List"))
+                .setIcon(isGrouped ? "check" : "grid")
+                .onClick(() => __awaiter(this, void 0, void 0, function* () {
+                settings.groupBySection = !isGrouped;
+                yield this.plugin.saveSettings();
+                WindowLayoutsModal.renderAllInstances();
+            }));
+        });
+        menu.addSeparator();
+        // 顯示/隱藏封存空間切換
+        menu.addItem((item) => {
+            item
+                .setTitle(isShowArchived ? (t("manageModal.hideArchived") || "Hide Archived") : (t("manageModal.showArchived") || "Show Archived"))
+                .setIcon(isShowArchived ? "check" : "box")
+                .onClick(() => __awaiter(this, void 0, void 0, function* () {
+                settings.showArchived = !isShowArchived;
+                yield this.plugin.saveSettings();
+                WindowLayoutsModal.renderAllInstances();
+            }));
+        });
+        const target = event.currentTarget;
+        const rect = target.getBoundingClientRect();
+        menu.showAtPosition({ x: rect.left, y: rect.bottom + 4 });
+    }
+    handleArrowKey(direction) {
+        if (this.renderedLayoutEntries.length === 0)
+            return;
+        if (this.selectedIndex < 0) {
+            this.selectedIndex = direction > 0 ? 0 : this.renderedLayoutEntries.length - 1;
+        }
+        else {
+            this.selectedIndex =
+                (this.selectedIndex + direction + this.renderedLayoutEntries.length) % this.renderedLayoutEntries.length;
+        }
+        this.updateSelectedItemHighlight();
+        this.scrollSelectedIntoView();
+    }
+    updateSelectedItemHighlight() {
+        this.renderedLayoutEntries.forEach((entry, idx) => {
+            const isSelected = idx === this.selectedIndex;
+            entry.element.setAttribute("aria-selected", String(isSelected));
+            entry.element.classList.toggle("is-selected", isSelected);
+        });
+    }
+    updateSearchUI() {
+        var _a;
+        const rawQuery = ((_a = this.searchInput) === null || _a === void 0 ? void 0 : _a.value.trim()) || "";
+        if (this.clearSearchBtn) {
+            this.clearSearchBtn.style.display = rawQuery ? "flex" : "none";
+        }
+    }
+    createAndSaveLayout(name, forceNewWindow = true) {
+        var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l;
+        return __awaiter(this, void 0, void 0, function* () {
+            const cleanName = name.trim();
+            if (!cleanName)
+                return;
+            try {
+                const isPopout = (win) => {
+                    var _a;
+                    if (!win || !((_a = win.document) === null || _a === void 0 ? void 0 : _a.body))
+                        return false;
+                    const cl = win.document.body.classList;
+                    return cl.contains("is-popout-window") || cl.contains("mod-popout");
+                };
+                const activeWin = typeof ((_a = this.plugin.manager) === null || _a === void 0 ? void 0 : _a.getActiveWindow) === "function"
+                    ? this.plugin.manager.getActiveWindow()
+                    : (this.targetWindow || (typeof activeWindow !== "undefined" ? activeWindow : window));
+                const popoutWin = isPopout(activeWin) ? activeWin : (isPopout(this.targetWindow) ? this.targetWindow : null);
+                if (popoutWin) {
+                    // 紀錄來源 Popout 視窗原本的佈局名稱，避免 Clone 到新視窗時將原視窗誤重命名
+                    const originalName = typeof ((_b = this.plugin.manager) === null || _b === void 0 ? void 0 : _b.getLayoutNameForWindow) === "function"
+                        ? this.plugin.manager.getLayoutNameForWindow(popoutWin)
+                        : null;
+                    // 情境 1：在 Popout 視窗內執行 -> 複製 (Clone) 當前 Popout 視窗的活動佈局與檔案
+                    const layout = yield this.plugin.manager.captureCurrentLayout({ name: cleanName }, popoutWin);
+                    layout.name = cleanName;
+                    // 當要在新視窗開啟時，切斷此 layout 與原視窗的存取對應，避免 saveLayout 將原視窗改名
+                    if (forceNewWindow && ((_c = this.plugin.manager) === null || _c === void 0 ? void 0 : _c.layoutWindows)) {
+                        this.plugin.manager.layoutWindows.delete(layout);
+                    }
+                    yield this.plugin.manager.saveLayout(layout);
+                    if (forceNewWindow) {
+                        // 恢復原 Popout 視窗原本的狀態列名稱
+                        if (originalName && typeof ((_d = this.plugin.manager) === null || _d === void 0 ? void 0 : _d.setLayoutLabelForWindow) === "function") {
+                            this.plugin.manager.setLayoutLabelForWindow(popoutWin, originalName);
+                        }
+                        // 先關閉 Modal，防止 Modal 關閉生命週期奪回原視窗的焦點
+                        this.closeHost();
+                        // 預設 (Enter / Click)：Clone 佈局後在「新 Popout 視窗」開啟該佈局 (傳入 targetWindow 作為排除目標)
+                        yield this.plugin.manager.restoreLayout(layout, { forceNewWindow: true, targetWindow: popoutWin });
+                        const newTargetWin = typeof ((_e = this.plugin.manager) === null || _e === void 0 ? void 0 : _e.getWindowForLayout) === "function"
+                            ? this.plugin.manager.getWindowForLayout(layout)
+                            : null;
+                        if (newTargetWin && newTargetWin !== popoutWin && typeof newTargetWin.focus === "function") {
+                            try {
+                                newTargetWin.focus();
+                            }
+                            catch ( /* Ignore focus error */_m) { /* Ignore focus error */ }
+                            newTargetWin.setTimeout(() => {
+                                try {
+                                    newTargetWin.focus();
+                                }
+                                catch ( /* Ignore focus error */_a) { /* Ignore focus error */ }
+                            }, 100);
+                            newTargetWin.setTimeout(() => {
+                                try {
+                                    newTargetWin.focus();
+                                }
+                                catch ( /* Ignore focus error */_a) { /* Ignore focus error */ }
+                            }, 300);
+                        }
+                    }
+                    else {
+                        // 修飾鍵 (Shift+Enter / Shift+Click)：直接在「當前 Popout 視窗」套用與更新狀態列標籤
+                        if ((_f = this.plugin.manager) === null || _f === void 0 ? void 0 : _f.layoutWindows) {
+                            this.plugin.manager.layoutWindows.set(layout, popoutWin);
+                        }
+                        if (typeof ((_g = this.plugin.manager) === null || _g === void 0 ? void 0 : _g.setLayoutLabelForWindow) === "function") {
+                            this.plugin.manager.setLayoutLabelForWindow(popoutWin, cleanName);
+                        }
+                        this.closeHost();
+                    }
+                }
+                else {
+                    // 情境 2：在主視窗中執行 -> 建立全新的 0 檔案 Popout 佈局，並開啟新 Popout 視窗
+                    const newWin = this.plugin.manager.openNewPopoutWindow();
+                    const emptyLayout = {
+                        id: typeof this.plugin.manager.generateId === "function"
+                            ? this.plugin.manager.generateId()
+                            : `layout_${Date.now()}`,
+                        name: cleanName,
+                        timestamp: Date.now(),
+                        windowState: {
+                            size: { width: 800, height: 600 },
+                            position: undefined,
+                        },
+                        workspace: {
+                            layout: {
+                                type: "leaf",
+                                id: `leaf_${Date.now()}`,
+                                state: { type: "empty", state: {} },
+                            },
+                            activeFile: undefined,
+                            leaves: [],
+                        },
+                        metadata: {
+                            fileCount: 0,
+                            tabCount: 0,
+                            splitCount: 0,
+                            createdAt: new Date().toISOString(),
+                            obsidianVersion: this.app.version || "unknown",
+                            pluginVersion: ((_j = (_h = this.plugin) === null || _h === void 0 ? void 0 : _h.manifest) === null || _j === void 0 ? void 0 : _j.version) || "1.0.0",
+                        },
+                    };
+                    yield this.plugin.manager.saveLayout(emptyLayout);
+                    if (newWin) {
+                        if ((_k = this.plugin.manager) === null || _k === void 0 ? void 0 : _k.layoutWindows) {
+                            this.plugin.manager.layoutWindows.set(emptyLayout, newWin);
+                        }
+                        if (typeof ((_l = this.plugin.manager) === null || _l === void 0 ? void 0 : _l.setLayoutLabelForWindow) === "function") {
+                            this.plugin.manager.setLayoutLabelForWindow(newWin, cleanName);
+                            newWin.setTimeout(() => {
+                                this.plugin.manager.setLayoutLabelForWindow(newWin, cleanName);
+                            }, 50);
+                            newWin.setTimeout(() => {
+                                this.plugin.manager.setLayoutLabelForWindow(newWin, cleanName);
+                            }, 300);
+                        }
+                        this.closeHost();
+                        if (typeof newWin.focus === "function") {
+                            try {
+                                newWin.focus();
+                            }
+                            catch (_o) {
+                                // Ignore focus error
+                            }
+                            newWin.setTimeout(() => {
+                                try {
+                                    newWin.focus();
+                                }
+                                catch (_a) {
+                                    // Ignore focus error
+                                }
+                            }, 100);
+                        }
+                    }
+                    else {
+                        this.closeHost();
+                    }
+                }
+                new obsidian.Notice(`${t("saveModal.saveSuccess")}: ${cleanName}`);
+                if (this.searchInput) {
+                    this.searchInput.value = "";
+                }
+                this.selectedIndex = 0;
+                WindowLayoutsModal.renderAllInstances();
+            }
+            catch (err) {
+                new obsidian.Notice((err === null || err === void 0 ? void 0 : err.message) || String(err));
+            }
+        });
+    }
+    renderLayouts() {
+        var _a, _b, _c, _d;
+        if (!this.listEl)
+            return;
+        this.listEl.empty();
+        this.renderedLayoutEntries = [];
+        const rawQuery = ((_a = this.searchInput) === null || _a === void 0 ? void 0 : _a.value.trim()) || "";
+        const query = rawQuery.toLowerCase();
+        const allSpaces = ((_c = (_b = this.plugin) === null || _b === void 0 ? void 0 : _b.manager) === null || _c === void 0 ? void 0 : _c.getSavedLayouts()) || [];
+        const settings = ((_d = this.plugin) === null || _d === void 0 ? void 0 : _d.settings) || {};
+        const showArchived = settings.showArchived === true;
+        const groupBySection = settings.groupBySection !== false;
+        // 搜尋與封存過濾
+        const searchFiltered = allSpaces.filter((layout) => {
+            if (!showArchived && layout.archived === true)
+                return false;
+            if (!query)
+                return true;
+            const matchName = layout.name.toLowerCase().includes(query);
+            const matchSec = (layout.sections || []).some((s) => s.toLowerCase().includes(query));
+            return matchName || matchSec;
+        });
+        this.filteredLayouts = searchFiltered;
+        if (this.filteredLayouts.length > 0) {
+            if (this.selectedIndex < 0 || this.selectedIndex >= this.filteredLayouts.length) {
+                this.selectedIndex = 0;
+            }
+        }
+        else {
+            this.selectedIndex = -1;
+        }
+        this.updateSearchUI();
+        if (this.filteredLayouts.length === 0) {
+            if (rawQuery) {
+                const createItem = this.listEl.createDiv("suggestion-item window-layout-item is-selected");
+                const content = createItem.createDiv("suggestion-content qsp-content");
+                const title = content.createDiv("suggestion-title qsp-title");
+                title.createSpan({ text: rawQuery });
+                const aux = createItem.createDiv("suggestion-aux qsp-aux");
+                aux.createEl("span", {
+                    text: t("manageModal.enterToCreate") || "Enter to create",
+                    cls: "suggestion-flair",
+                });
+                createItem.onclick = (e) => {
+                    void this.createAndSaveLayout(rawQuery, !e.shiftKey);
+                };
+            }
+            else {
+                this.listEl.createEl("p", {
+                    text: t("manageModal.noLayoutsMessage"),
+                    cls: "setting-item-description",
+                });
+            }
+            return;
+        }
+        // 平舖清單 (Flat View 或搜尋狀態下)
+        if (!groupBySection || rawQuery) {
+            const activeSpaces = this.filteredLayouts.filter((l) => !l.archived);
+            const archivedSpaces = this.filteredLayouts.filter((l) => l.archived === true);
+            activeSpaces.forEach((layout) => {
+                this.renderLayoutItem(this.listEl, layout);
+            });
+            if (showArchived) {
+                archivedSpaces.forEach((layout) => {
+                    this.renderLayoutItem(this.listEl, layout);
+                });
+            }
+            this.updateSelectedItemHighlight();
+            return;
+        }
+        // 分組清單 (Grouped View)
+        const knownSectionsOrder = Array.from(settings.sectionsOrder || []);
+        const presentSectionsSet = new Set();
+        this.filteredLayouts.forEach((space) => {
+            (space.sections || []).forEach((sec) => presentSectionsSet.add(sec));
+        });
+        presentSectionsSet.forEach((sec) => {
+            if (!knownSectionsOrder.includes(sec)) {
+                knownSectionsOrder.push(sec);
+            }
+        });
+        knownSectionsOrder.forEach((secName) => {
+            const matchingSpaces = this.filteredLayouts.filter((s) => (s.sections || []).includes(secName));
+            const activeInSec = matchingSpaces.filter((s) => !s.archived);
+            const archivedInSec = showArchived ? matchingSpaces.filter((s) => s.archived === true) : [];
+            const totalCount = activeInSec.length + archivedInSec.length;
+            if (totalCount === 0)
+                return;
+            this.renderSectionHeader(this.listEl, secName, totalCount, knownSectionsOrder, true);
+            const isCollapsed = WindowLayoutsModal.collapsedSections.has(secName);
+            if (!isCollapsed) {
+                const secContainer = this.listEl.createDiv("space-section-container");
+                activeInSec.forEach((layout) => {
+                    this.renderLayoutItem(secContainer, layout);
+                });
+                archivedInSec.forEach((layout) => {
+                    this.renderLayoutItem(secContainer, layout);
+                });
+            }
+        });
+        // 未分類 (Uncategorized)
+        const uncategorizedSpaces = this.filteredLayouts.filter((s) => !s.sections || s.sections.length === 0);
+        const activeUncat = uncategorizedSpaces.filter((s) => !s.archived);
+        const archivedUncat = showArchived ? uncategorizedSpaces.filter((s) => s.archived === true) : [];
+        const totalUncat = activeUncat.length + archivedUncat.length;
+        if (totalUncat > 0) {
+            const uncatTitle = t("manageModal.uncategorized") || "Uncategorized";
+            this.renderSectionHeader(this.listEl, uncatTitle, totalUncat, null, false);
+            const isCollapsed = WindowLayoutsModal.collapsedSections.has(uncatTitle);
+            if (!isCollapsed) {
+                const secContainer = this.listEl.createDiv("space-section-container");
+                activeUncat.forEach((layout) => {
+                    this.renderLayoutItem(secContainer, layout);
+                });
+                archivedUncat.forEach((layout) => {
+                    this.renderLayoutItem(secContainer, layout);
+                });
+            }
+        }
+        this.updateSelectedItemHighlight();
+    }
+    renderSectionHeader(parentEl, secName, count, allSectionsOrder, isReorderable = true) {
+        const headerEl = parentEl.createDiv("space-section-header");
+        headerEl.style.display = "flex";
+        headerEl.style.alignItems = "center";
+        headerEl.style.justifyContent = "space-between";
+        headerEl.style.padding = "8px 4px 6px 4px";
+        headerEl.style.marginTop = "4px";
+        headerEl.style.marginBottom = "4px";
+        headerEl.style.background = "transparent";
+        headerEl.style.borderBottom = "1px solid var(--background-modifier-border)";
+        headerEl.style.userSelect = "none";
+        headerEl.style.cursor = "pointer";
+        if (isReorderable && allSectionsOrder) {
+            headerEl.setAttribute("draggable", "true");
+            headerEl.ondragstart = (e) => {
+                var _a;
+                (_a = e.dataTransfer) === null || _a === void 0 ? void 0 : _a.setData("text/plain", secName);
+                headerEl.style.opacity = "0.5";
+            };
+            headerEl.ondragend = () => {
+                headerEl.style.opacity = "1";
+            };
+            headerEl.ondragover = (e) => {
+                e.preventDefault();
+            };
+            headerEl.ondrop = (e) => __awaiter(this, void 0, void 0, function* () {
+                var _a;
+                e.preventDefault();
+                const draggedSec = (_a = e.dataTransfer) === null || _a === void 0 ? void 0 : _a.getData("text/plain");
+                if (draggedSec && draggedSec !== secName && allSectionsOrder.includes(draggedSec)) {
+                    const fromIdx = allSectionsOrder.indexOf(draggedSec);
+                    const toIdx = allSectionsOrder.indexOf(secName);
+                    if (fromIdx !== -1 && toIdx !== -1) {
+                        const newOrder = [...allSectionsOrder];
+                        newOrder.splice(fromIdx, 1);
+                        newOrder.splice(toIdx, 0, draggedSec);
+                        yield this.plugin.manager.reorderSections(newOrder);
+                    }
+                }
+            });
+        }
+        const isCollapsed = WindowLayoutsModal.collapsedSections.has(secName);
+        // 左側：Section 名稱、計數與更名按鈕
+        const leftEl = headerEl.createDiv("space-section-header-left");
+        leftEl.style.display = "flex";
+        leftEl.style.alignItems = "center";
+        leftEl.style.gap = "6px";
+        const titleSpan = leftEl.createSpan({ text: secName, cls: "space-section-title" });
+        titleSpan.style.fontWeight = "600";
+        titleSpan.style.fontSize = "13px";
+        titleSpan.style.color = "var(--text-normal)";
+        const badgeSpan = leftEl.createSpan({ text: `(${count})`, cls: "space-section-count" });
+        badgeSpan.style.fontSize = "11px";
+        badgeSpan.style.color = "var(--text-muted)";
+        badgeSpan.style.opacity = "0.8";
+        const triggerInlineRename = () => {
+            const input = document.createElement("input");
+            input.type = "text";
+            input.value = secName;
+            input.style.fontSize = "13px";
+            input.style.fontWeight = "600";
+            input.style.padding = "1px 4px";
+            input.style.maxWidth = "150px";
+            titleSpan.replaceWith(input);
+            input.focus();
+            const commitRename = () => __awaiter(this, void 0, void 0, function* () {
+                const newName = input.value.trim();
+                if (newName && newName !== secName) {
+                    yield this.plugin.manager.renameSection(secName, newName);
+                }
+                else {
+                    WindowLayoutsModal.renderAllInstances();
+                }
+            });
+            input.onblur = () => { void commitRename(); };
+            input.onkeydown = (ke) => {
+                if (ke.key === "Enter") {
+                    ke.preventDefault();
+                    input.blur();
+                }
+                else if (ke.key === "Escape") {
+                    WindowLayoutsModal.renderAllInstances();
+                }
+            };
+        };
+        if (isReorderable) {
+            // 雙擊整列群組標頭觸發更名 (Double click group header to rename)
+            headerEl.ondblclick = (e) => {
+                e.stopPropagation();
+                triggerInlineRename();
+            };
+            // 右鍵選單觸發更名
+            headerEl.oncontextmenu = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const menu = new obsidian.Menu();
+                menu.addItem((item) => {
+                    item
+                        .setTitle(t("manageModal.renameSection") || "Rename Section")
+                        .setIcon("pencil")
+                        .onClick(() => triggerInlineRename());
+                });
+                menu.showAtMouseEvent(e);
+            };
+        }
+        // 右側：展開 / 收合箭頭 (最右端，無高亮背景輕量化)
+        const rightEl = headerEl.createDiv("space-section-header-right");
+        rightEl.style.display = "flex";
+        rightEl.style.alignItems = "center";
+        const arrowIcon = rightEl.createSpan({ cls: "clickable-icon space-section-arrow" });
+        arrowIcon.style.color = "var(--text-muted)";
+        arrowIcon.style.padding = "2px";
+        obsidian.setIcon(arrowIcon, isCollapsed ? "chevron-right" : "chevron-down");
+        headerEl.onclick = (e) => {
+            if (e.detail > 1)
+                return; // 雙擊時不觸發單擊的展開/收合
+            const target = e.target;
+            if (target.tagName === "INPUT")
+                return;
+            if (WindowLayoutsModal.collapsedSections.has(secName)) {
+                WindowLayoutsModal.collapsedSections.delete(secName);
+            }
+            else {
+                WindowLayoutsModal.collapsedSections.add(secName);
+            }
+            this.renderLayouts();
+        };
+    }
+    renderLayoutItem(containerEl, layout) {
+        var _a, _b;
+        const layoutEl = containerEl.createDiv("suggestion-item window-layout-item");
+        const itemIndex = this.renderedLayoutEntries.length;
+        this.renderedLayoutEntries.push({ layout, element: layoutEl });
+        const isSelected = itemIndex === this.selectedIndex;
+        layoutEl.setAttribute("role", "option");
+        layoutEl.setAttribute("aria-selected", String(isSelected));
+        if (isSelected)
+            layoutEl.addClass("is-selected");
+        if (layout.archived === true) {
+            layoutEl.addClass("is-archived");
+            layoutEl.style.opacity = "0.55";
+            layoutEl.style.color = "var(--text-muted)";
+        }
+        this.setFilesTooltipForLayout(layoutEl, layout);
+        let holdTimer = null;
+        let isLongPress = false;
+        const isActionButtonTarget = (target) => { var _a; return Boolean((_a = target === null || target === void 0 ? void 0 : target.closest) === null || _a === void 0 ? void 0 : _a.call(target, "button")); };
+        const cancelHold = () => {
+            if (holdTimer) {
+                clearTimeout(holdTimer);
+                holdTimer = null;
+            }
+        };
+        layoutEl.addEventListener("click", (e) => {
+            if (isActionButtonTarget(e.target))
+                return;
+            this.selectedIndex = itemIndex;
+            this.updateSelectedItemHighlight();
+        });
+        const itemContentEl = layoutEl.createDiv("suggestion-content qsp-content");
+        const titleEl = itemContentEl.createDiv({
+            cls: "suggestion-title qsp-title",
+        });
+        titleEl.createSpan({ text: layout.name });
+        if (layout.archived === true) {
+            const archivedBadge = titleEl.createSpan({
+                cls: "layout-archived-badge",
+            });
+            archivedBadge.style.marginLeft = "6px";
+            archivedBadge.style.opacity = "0.75";
+            archivedBadge.setText("📦");
+            obsidian.setTooltip(archivedBadge, t("manageModal.archivedGroup") || "Archived");
+        }
+        if (layout.autoSave) {
+            const autoSaveBadge = titleEl.createSpan({
+                cls: "layout-auto-save-badge",
+            });
+            obsidian.setIcon(autoSaveBadge, "refresh-cw");
+            obsidian.setTooltip(autoSaveBadge, t("manageModal.autoSaveEnabled"));
+        }
+        const noteEl = itemContentEl.createDiv("suggestion-note qsp-note");
+        const i18n = getI18n();
+        const pathEl = noteEl.createDiv("qsp-path");
+        pathEl.createEl("span", {
+            text: `${t("manageModal.updatedDate")}: ${i18n.formatDate(new Date(layout.updatedAt || layout.timestamp || layout.createdAt || Date.now()))}`,
+            cls: "layout-date",
+        });
+        pathEl.createEl("span", {
+            text: `${t("manageModal.fileCount")}: ${((_a = layout.metadata) === null || _a === void 0 ? void 0 : _a.fileCount) || 0}`,
+            cls: "layout-files",
+        });
+        const openWin = typeof ((_b = this.plugin.manager) === null || _b === void 0 ? void 0 : _b.getOpenWindowForLayout) === "function"
+            ? this.plugin.manager.getOpenWindowForLayout(layout)
+            : null;
+        if (openWin) {
+            pathEl.createEl("span", {
+                text: `🟢 ${t("manageModal.windowOpenBadge") || "視窗開啟中"}`,
+                cls: "layout-open-status",
+            });
+        }
+        const actionsEl = layoutEl.createDiv("suggestion-aux qsp-aux layout-actions");
+        const restoreButton = actionsEl.createEl("button", {
+            text: t("common.restore"),
+            cls: "layout-restore-btn mod-cta",
+        });
+        obsidian.setTooltip(restoreButton, t("restoreModal.restoreHint"));
+        restoreButton.addEventListener("mousedown", (e) => {
+            if (e.button !== 0)
+                return;
+            isLongPress = false;
+            holdTimer = setTimeout(() => {
+                isLongPress = true;
+                void this.restoreLayout(layout, false);
+            }, 450);
+        });
+        restoreButton.addEventListener("mouseup", cancelHold);
+        restoreButton.addEventListener("mouseleave", cancelHold);
+        restoreButton.onclick = (e) => {
+            e.stopPropagation();
+            if (isLongPress)
+                return;
+            const forceNewWindow = !e.shiftKey;
+            void this.restoreLayout(layout, forceNewWindow);
+        };
+        const moreButton = actionsEl.createEl("button", {
+            cls: "clickable-icon layout-more-btn",
+        });
+        obsidian.setIcon(moreButton, "chevron-down");
+        obsidian.setTooltip(moreButton, t("manageModal.actions"));
+        moreButton.onclick = (e) => {
+            e.stopPropagation();
+            this.showLayoutItemMenu(e, layout);
+        };
+    }
+    restoreLayout(layout, forceNewWindow = false) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                this.closeHost();
+                yield this.plugin.manager.restoreLayout(layout, {
+                    // forceNewWindow 只控制 restore 的目標是否新建；仍需傳入來源視窗，
+                    // 讓 manager 能保留該 popout 原本的 layout 名稱與狀態列。
+                    targetWindow: this.targetWindow,
+                    forceNewWindow,
+                    forceReload: !forceNewWindow,
+                });
+            }
+            catch (error) {
+                new obsidian.Notice(`${t("errors.failedToRestore")}: ${(error === null || error === void 0 ? void 0 : error.message) || error}`);
+            }
+        });
+    }
+    scrollSelectedIntoView() {
+        var _a;
+        const entry = this.renderedLayoutEntries[this.selectedIndex];
+        if (entry && entry.element && typeof entry.element.scrollIntoView === "function") {
+            entry.element.scrollIntoView({ block: "nearest" });
+        }
+        else {
+            const selected = (_a = this.listEl) === null || _a === void 0 ? void 0 : _a.querySelector(".window-layout-item.is-selected");
+            if (selected && typeof selected.scrollIntoView === "function") {
+                selected.scrollIntoView({ block: "nearest" });
+            }
+        }
+    }
+    showRenameDialog(layout) {
+        const modal = new obsidian.Modal(this.app);
+        modal.setTitle(t("manageModal.renameButton"));
+        modal.onOpen = () => {
+            let input;
+            const setting = new obsidian.Setting(modal.contentEl)
+                .setName(t("saveModal.nameLabel"))
+                .addText((text) => {
+                input = text.inputEl;
+                input.value = layout.name;
+                input.focus();
+                input.select();
+                input.addEventListener("keydown", (e) => {
+                    if (e.key === "Enter") {
+                        e.preventDefault();
+                        void submit();
+                    }
+                });
+            });
+            setting.settingEl.addClass("window-spaces-setting-full-width");
+            const buttonContainer = modal.contentEl.createDiv();
+            buttonContainer.style.textAlign = "right";
+            buttonContainer.style.marginTop = "20px";
+            const cancelButton = buttonContainer.createEl("button", {
+                text: t("common.cancel"),
+            });
+            cancelButton.onclick = () => modal.close();
+            const saveButton = buttonContainer.createEl("button", {
+                text: t("common.save"),
+                cls: "mod-cta",
+            });
+            saveButton.style.marginLeft = "10px";
+            const submit = () => __awaiter(this, void 0, void 0, function* () {
+                const newName = input.value.trim();
+                if (!newName) {
+                    new obsidian.Notice(t("saveModal.emptyNameError"));
+                    input.focus();
+                    return;
+                }
+                const duplicate = this.plugin.settings.spaces.some((item) => item.id !== layout.id && item.name === newName);
+                if (duplicate) {
+                    new obsidian.Notice(t("saveModal.duplicateNameError"));
+                    input.focus();
+                    return;
+                }
+                layout.name = newName;
+                yield this.plugin.saveSettings();
+                modal.close();
+                WindowLayoutsModal.renderAllInstances();
+                new obsidian.Notice(t("notifications.layoutRenamed"));
+            });
+            saveButton.onclick = submit;
+        };
+        modal.onClose = () => modal.contentEl.empty();
+        modal.open();
+    }
+    showDeleteDialog(layout) {
+        this.showConfirmDialog(`${t("manageModal.confirmDeleteMessage")}\n\n${layout.name}`, t("manageModal.confirmDeleteTitle")).then((confirmed) => __awaiter(this, void 0, void 0, function* () {
+            if (!confirmed)
+                return;
+            try {
+                yield this.plugin.manager.deleteLayout(layout.id);
+                WindowLayoutsModal.renderAllInstances();
+            }
+            catch (error) {
+                new obsidian.Notice(`${t("errors.failedToDelete")}: ${(error === null || error === void 0 ? void 0 : error.message) || error}`);
+            }
+        }));
+    }
+    showConfirmDialog(message, title = t("common.confirm")) {
+        return new Promise((resolve) => {
+            const modal = new obsidian.Modal(this.app);
+            modal.setTitle(title);
+            modal.onOpen = () => {
+                modal.contentEl.createEl("p", { text: message });
+                const buttonContainer = modal.contentEl.createDiv();
+                buttonContainer.style.textAlign = "right";
+                buttonContainer.style.marginTop = "20px";
+                const cancelButton = buttonContainer.createEl("button", {
+                    text: t("common.cancel"),
+                });
+                cancelButton.onclick = () => {
+                    resolve(false);
+                    modal.close();
+                };
+                const confirmButton = buttonContainer.createEl("button", {
+                    text: t("common.confirm"),
+                    cls: "mod-warning",
+                });
+                confirmButton.style.marginLeft = "10px";
+                confirmButton.onclick = () => {
+                    resolve(true);
+                    modal.close();
+                };
+            };
+            modal.onClose = () => modal.contentEl.empty();
+            modal.open();
+        });
+    }
+    setFilesTooltipForLayout(element, layout) {
+        const leaves = this.plugin.manager.getSavedViewStates(layout);
+        const files = [];
+        leaves.forEach((leaf) => {
+            const filePath = this.plugin.manager.getFilePathFromLeafState(leaf);
+            if (filePath) {
+                const fileName = filePath.split("/").pop() || filePath;
+                if (!files.includes(fileName)) {
+                    files.push(fileName);
+                }
+            }
+        });
+        if (files.length > 0) {
+            const displayFiles = files.slice(0, 15);
+            let tooltipText = `${t("restoreModal.includedFiles")} (${files.length}):\n` +
+                displayFiles.map((f) => `• ${f}`).join("\n");
+            if (files.length > 15) {
+                tooltipText += `\n... (+${files.length - 15})`;
+            }
+            obsidian.setTooltip(element, tooltipText);
+        }
+    }
+    showSortMenu(event) {
+        const menu = new obsidian.Menu();
+        const currentSort = this.plugin.settings.sortBy || "updated-desc";
+        const addSortItem = (id, label, icon) => {
+            menu.addItem((item) => {
+                item
+                    .setTitle(label)
+                    .setIcon(icon)
+                    .setChecked(currentSort === id)
+                    .onClick(() => __awaiter(this, void 0, void 0, function* () {
+                    this.plugin.settings.sortBy = id;
+                    yield this.plugin.saveSettings();
+                    WindowLayoutsModal.renderAllInstances();
+                }));
+            });
+        };
+        addSortItem("updated-desc", t("manageModal.sortUpdatedDesc"), "history");
+        addSortItem("updated-asc", t("manageModal.sortUpdatedAsc"), "history");
+        addSortItem("created-desc", t("manageModal.sortCreatedDesc"), "calendar-days");
+        addSortItem("created-asc", t("manageModal.sortCreatedAsc"), "calendar");
+        addSortItem("name-asc", t("manageModal.sortNameAsc"), "sort-asc");
+        addSortItem("name-desc", t("manageModal.sortNameDesc"), "sort-desc");
+        menu.showAtMouseEvent(event);
+    }
+    showPanelMenu(event) {
+        const menu = new obsidian.Menu();
+        const openPanel = (location) => {
+            this.closeHost();
+            void this.plugin.openWindowLayoutsPanel(location);
+        };
+        menu.addItem((item) => {
+            item.setTitle(t("common.panelLeft")).setIcon("panel-left").onClick(() => openPanel("left"));
+        });
+        menu.addItem((item) => {
+            item.setTitle(t("common.panelRight")).setIcon("panel-right").onClick(() => openPanel("right"));
+        });
+        menu.addItem((item) => {
+            item.setTitle(t("common.panelTab")).setIcon("layout").onClick(() => openPanel("tab"));
+        });
+        menu.showAtMouseEvent(event);
+    }
+    showLayoutItemMenu(event, layout) {
+        const menu = new obsidian.Menu();
+        // 1. Auto-save (自動保存狀態切換)
+        menu.addItem((item) => {
+            item
+                .setTitle(layout.autoSave
+                ? t("manageModal.autoSaveEnabled")
+                : t("manageModal.autoSaveDisabled"))
+                .setIcon("refresh-cw")
+                .setChecked(!!layout.autoSave)
+                .onClick(() => __awaiter(this, void 0, void 0, function* () {
+                layout.autoSave = !layout.autoSave;
+                yield this.plugin.saveSettings();
+                new obsidian.Notice(layout.autoSave
+                    ? `${layout.name}: ${t("manageModal.autoSaveEnabled")}`
+                    : `${layout.name}: ${t("manageModal.autoSaveDisabled")}`);
+                WindowLayoutsModal.renderAllInstances();
+            }));
+        });
+        menu.addSeparator();
+        // 2. Rename (重新命名)
+        menu.addItem((item) => {
+            item
+                .setTitle(t("common.rename"))
+                .setIcon("pencil")
+                .onClick(() => {
+                this.showRenameDialog(layout);
+            });
+        });
+        // 3. Edit (編輯佈局與設定：開啟 Save Layout Modal)
+        menu.addItem((item) => {
+            item
+                .setTitle(t("common.edit"))
+                .setIcon("edit-3")
+                .onClick(() => {
+                this.closeHost();
+                this.plugin.openSaveLayoutModal(layout);
+            });
+        });
+        // 3.5 Archive / Unarchive (封存 / 取消封存)
+        menu.addItem((item) => {
+            const isArchived = layout.archived === true;
+            item
+                .setTitle(isArchived ? (t("manageModal.unarchiveSpace") || "Unarchive Space") : (t("manageModal.archiveSpace") || "Archive Space"))
+                .setIcon("box")
+                .onClick(() => {
+                void this.plugin.manager.toggleArchiveSpace(layout.id);
+            });
+        });
+        menu.addSeparator();
+        // 4. Delete (刪除)
+        menu.addItem((item) => {
+            item
+                .setTitle(t("common.delete"))
+                .setIcon("trash-2")
+                .setWarning(true)
+                .onClick(() => {
+                this.showDeleteDialog(layout);
+            });
+        });
+        menu.showAtMouseEvent(event);
+    }
+    onClose() {
+        WindowLayoutsModal.activeInstances.delete(this);
+        this.removeKeydownListener();
+        this.contentEl.empty();
+    }
+    removeKeydownListener() {
+        var _a, _b;
+        if (this.keydownListener) {
+            const target = this.keydownTarget || ((_a = this.panelRootEl) === null || _a === void 0 ? void 0 : _a.ownerDocument) || ((_b = this.modalEl) === null || _b === void 0 ? void 0 : _b.ownerDocument) || document;
+            target.removeEventListener("keydown", this.keydownListener, true);
+            this.keydownListener = undefined;
+            this.keydownTarget = undefined;
+        }
+    }
+    removePanelPointerTracking() {
+        if (this.panelRootEl && this.panelPointerEnterListener) {
+            this.panelRootEl.removeEventListener("pointerenter", this.panelPointerEnterListener);
+        }
+        if (this.panelRootEl && this.panelPointerLeaveListener) {
+            this.panelRootEl.removeEventListener("pointerleave", this.panelPointerLeaveListener);
+        }
+        this.panelPointerEnterListener = undefined;
+        this.panelPointerLeaveListener = undefined;
+        this.panelPointerInside = false;
+    }
+}
+WindowLayoutsModal.activeInstances = new Set();
+WindowLayoutsModal.collapsedSections = new Set();
+
 class WindowLayoutManager {
     constructor(plugin) {
         this.layoutWindows = new WeakMap();
         this.popoutWindows = new Set();
         this.layoutNames = new Map();
         this.layoutLabels = new Map();
+        this.activeRestorePromise = null;
         this.autoSaveTimers = new Map();
         this.lastValidSnapshots = new Map();
         this.plugin = plugin;
@@ -699,8 +1912,10 @@ class WindowLayoutManager {
             return;
         this.popoutWindows.add(targetWin);
         this.refreshLayoutStatusBar(targetWin);
-        // window-open 觸發時 Popout DOM 可能仍在建立中，再補一次確保狀態列出現。
+        // window-open 觸發時 Popout DOM 可能仍在建立中，再補兩次確保狀態列 100% 出現。
         targetWin.setTimeout(() => this.refreshLayoutStatusBar(targetWin), 0);
+        targetWin.setTimeout(() => this.refreshLayoutStatusBar(targetWin), 100);
+        targetWin.setTimeout(() => this.refreshLayoutStatusBar(targetWin), 300);
     }
     /** 插件重新載入時，補註冊已經存在的 Popout。 */
     registerExistingPopoutWindows() {
@@ -737,15 +1952,14 @@ class WindowLayoutManager {
     setLayoutLabelForWindow(targetWin, layoutName) {
         if (!targetWin || !(layoutName === null || layoutName === void 0 ? void 0 : layoutName.trim()))
             return;
-        const targetDocument = targetWin.document;
-        const body = targetDocument === null || targetDocument === void 0 ? void 0 : targetDocument.body;
-        if (!body || !this.isPopoutDocument(targetDocument))
-            return;
         this.registerPopoutWindow(targetWin);
         this.layoutNames.set(targetWin, layoutName);
-        body.setAttribute("data-layout-name", layoutName);
-        // 清理舊版浮動 label，避免更新插件後殘留在 Popout 右上角。
-        body.querySelectorAll(".window-spaces-layout-label").forEach((element) => element.remove());
+        const targetDocument = targetWin.document;
+        const body = targetDocument === null || targetDocument === void 0 ? void 0 : targetDocument.body;
+        if (body) {
+            body.setAttribute("data-layout-name", layoutName);
+            body.querySelectorAll(".window-spaces-layout-label").forEach((element) => element.remove());
+        }
         this.refreshLayoutStatusBar(targetWin);
     }
     getLayoutNameForWindow(targetWin) {
@@ -755,7 +1969,9 @@ class WindowLayoutManager {
         const nameFromMap = this.layoutNames.get(targetWin);
         if (nameFromMap)
             return nameFromMap;
-        const nameFromDOM = (_b = (_a = targetWin.document) === null || _a === void 0 ? void 0 : _a.body) === null || _b === void 0 ? void 0 : _b.getAttribute("data-layout-name");
+        const nameFromDOM = typeof ((_b = (_a = targetWin.document) === null || _a === void 0 ? void 0 : _a.body) === null || _b === void 0 ? void 0 : _b.getAttribute) === "function"
+            ? targetWin.document.body.getAttribute("data-layout-name")
+            : null;
         if (nameFromDOM) {
             this.layoutNames.set(targetWin, nameFromDOM);
             return nameFromDOM;
@@ -839,11 +2055,11 @@ class WindowLayoutManager {
             return button;
         };
         nameElement.textContent = layoutName;
-        const currentLayout = this.plugin.settings.layouts.find((l) => l.name === layoutName);
+        const currentLayout = this.plugin.settings.spaces.find((l) => l.name === layoutName);
         const isAutoSave = !!(currentLayout === null || currentLayout === void 0 ? void 0 : currentLayout.autoSave);
         ensureActionButton("window-spaces-layout-save", "save", t("commands.saveLayout"), () => void this.saveLayoutFromWindow(targetWin));
         const autoSaveBtn = ensureActionButton("window-spaces-layout-auto-save", "refresh-cw", isAutoSave ? t("manageModal.autoSaveEnabled") : t("manageModal.autoSaveDisabled"), () => __awaiter(this, void 0, void 0, function* () {
-            const targetLayout = this.plugin.settings.layouts.find((l) => l.name === layoutName);
+            const targetLayout = this.plugin.settings.spaces.find((l) => l.name === layoutName);
             if (targetLayout) {
                 targetLayout.autoSave = !targetLayout.autoSave;
                 yield this.plugin.saveSettings();
@@ -895,7 +2111,7 @@ class WindowLayoutManager {
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 const layoutName = this.layoutNames.get(targetWin) || "";
-                const existing = this.plugin.settings.layouts.find((l) => l.name === layoutName);
+                const existing = this.plugin.settings.spaces.find((l) => l.name === layoutName);
                 const layout = yield this.captureCurrentLayout({ name: layoutName }, targetWin);
                 if (existing) {
                     layout.autoSave = existing.autoSave;
@@ -913,7 +2129,7 @@ class WindowLayoutManager {
      */
     checkAndDebouncedAutoSaveAll() {
         this.layoutNames.forEach((layoutName, targetWin) => {
-            const existing = this.plugin.settings.layouts.find((l) => l.name === layoutName);
+            const existing = this.plugin.settings.spaces.find((l) => l.name === layoutName);
             if (existing && existing.autoSave === true) {
                 // 1. 視窗存活期間，嘗試備份當前合法的 Layout 快照
                 void this.captureCurrentLayout({ name: layoutName }, targetWin)
@@ -947,8 +2163,8 @@ class WindowLayoutManager {
             const layoutName = this.layoutNames.get(targetWin);
             if (!layoutName)
                 return;
-            const existing = this.plugin.settings.layouts.find((l) => l.name === layoutName);
-            if (!existing || existing.autoSave !== true)
+            const existing = this.plugin.settings.spaces.find((l) => l.name === layoutName);
+            if (!existing || !existing.autoSave)
                 return;
             try {
                 let captured = null;
@@ -959,6 +2175,7 @@ class WindowLayoutManager {
                         captured = liveCaptured;
                         captured.autoSave = true;
                         captured.id = existing.id;
+                        captured.includeGeometry = existing.includeGeometry;
                         this.lastValidSnapshots.set(targetWin, captured);
                     }
                 }
@@ -979,14 +2196,15 @@ class WindowLayoutManager {
                 captured.updatedAt = now;
                 captured.timestamp = now;
                 // 4. 安全靜默覆寫更新設定檔
-                const index = this.plugin.settings.layouts.findIndex((l) => l.id === existing.id);
+                const index = this.plugin.settings.spaces.findIndex((l) => l.id === existing.id);
                 if (index !== -1) {
-                    this.plugin.settings.layouts[index] = captured;
+                    this.plugin.settings.spaces[index] = captured;
                 }
                 else {
-                    this.plugin.settings.layouts.push(captured);
+                    this.plugin.settings.spaces.push(captured);
                 }
                 yield this.plugin.saveSettings();
+                WindowLayoutsModal.renderAllInstances();
             }
             catch (e) {
                 console.warn(`[Window Spaces] Auto-save on close/change failed for "${layoutName}":`, e);
@@ -1014,9 +2232,89 @@ class WindowLayoutManager {
         return !!body && (body.classList.contains("is-popout-window") ||
             body.classList.contains("mod-popout"));
     }
+    /**
+     * 檢查指定 Layout 是否目前已在某個存活的 Popout 視窗中開啟。
+     */
+    getOpenWindowForLayout(layout) {
+        var _a;
+        if (!layout)
+            return null;
+        // 1. 先查記憶體對映的 layoutWindows
+        const mappedWin = this.layoutWindows.get(layout);
+        if (mappedWin && !mappedWin.closed && this.isPopoutDocument(mappedWin.document)) {
+            if (this.getLeavesForWindow(mappedWin).length > 0) {
+                return mappedWin;
+            }
+        }
+        // 2. 遍歷目前所有存活的 Popout 視窗，依名稱與標籤比對
+        const liveWindows = new Set();
+        if (typeof ((_a = this.app.workspace) === null || _a === void 0 ? void 0 : _a.iterateAllLeaves) === "function") {
+            this.app.workspace.iterateAllLeaves((leaf) => {
+                const win = this.getWindowForLeaf(leaf);
+                if (win && !win.closed && this.isPopoutDocument(win.document)) {
+                    liveWindows.add(win);
+                }
+            });
+        }
+        for (const win of Array.from(liveWindows)) {
+            const label = this.getLayoutNameForWindow(win);
+            if (label && label === layout.name) {
+                return win;
+            }
+        }
+        // 3. 多級比對：比對檔案與 Leaves (必須有高精確度 matchScore > 0，嚴禁盲目 fallback 單一視窗)
+        const savedLeaves = this.getSavedViewStates(layout);
+        if (savedLeaves.length > 0) {
+            const matchedWin = this.findWindowForSavedLeaves(savedLeaves, undefined, null, new Set(), true);
+            if (matchedWin && !matchedWin.closed && this.isPopoutDocument(matchedWin.document)) {
+                return matchedWin;
+            }
+        }
+        return null;
+    }
     getWindowForLayout(layout) {
-        return this.layoutWindows.get(layout) ||
+        return this.getOpenWindowForLayout(layout) ||
+            this.layoutWindows.get(layout) ||
             this.findWindowForSavedLeaves(this.getSavedViewStates(layout));
+    }
+    /**
+     * 聚焦 (Focus) 指定 Popout 視窗並啟用首個 Leaf
+     */
+    focusTargetWindow(targetWin) {
+        if (!targetWin || targetWin.closed)
+            return;
+        if (typeof targetWin.focus === "function") {
+            try {
+                targetWin.focus();
+            }
+            catch (_a) {
+                // Ignore focus error
+            }
+            targetWin.setTimeout(() => {
+                try {
+                    targetWin.focus();
+                    const freshLeaves = this.getLeavesForWindow(targetWin);
+                    if (freshLeaves.length > 0) {
+                        this.app.workspace.setActiveLeaf(freshLeaves[0], { focus: true });
+                    }
+                }
+                catch (_a) {
+                    // Ignore focus error
+                }
+            }, 50);
+            targetWin.setTimeout(() => {
+                try {
+                    targetWin.focus();
+                    const freshLeaves = this.getLeavesForWindow(targetWin);
+                    if (freshLeaves.length > 0) {
+                        this.app.workspace.setActiveLeaf(freshLeaves[0], { focus: true });
+                    }
+                }
+                catch (_a) {
+                    // Ignore focus error
+                }
+            }, 200);
+        }
     }
     /**
      * 獲取目前活動視窗 (activeWindow) 中真正的 activeLeaf
@@ -1093,7 +2391,7 @@ class WindowLayoutManager {
      * 捕獲當前活動視窗的佈局
      */
     captureCurrentLayout(options = {}, targetWindow) {
-        var _a, _b, _c, _d, _e, _f, _g, _h;
+        var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l;
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 const fullLayout = this.app.workspace.getLayout();
@@ -1198,6 +2496,10 @@ class WindowLayoutManager {
                         firstLeafId: leaves.length > 0 ? leaves[0].id : undefined,
                     },
                 };
+                const existingLayout = (_l = (_k = (_j = this.plugin) === null || _j === void 0 ? void 0 : _j.settings) === null || _k === void 0 ? void 0 : _k.spaces) === null || _l === void 0 ? void 0 : _l.find((l) => l.name === capturedLayout.name);
+                if (existingLayout && existingLayout.includeGeometry !== undefined) {
+                    capturedLayout.includeGeometry = existingLayout.includeGeometry;
+                }
                 // 儲存對話框開啟後 activeWindow 可能已經切回主視窗，
                 // 因此保存 capture 當下的 DOM Window，供 saveLayout 使用。
                 this.layoutWindows.set(capturedLayout, currentWin);
@@ -1213,12 +2515,44 @@ class WindowLayoutManager {
      * 恢復指定的佈局 (忠實還原 Tabs, Horizontal/Vertical Splits 與檔案狀態)
      */
     restoreLayout(layout, options = {}) {
+        return __awaiter(this, void 0, void 0, function* () {
+            // A layout can be visible in both the persistent panel and a popout
+            // dialog. Coalesce overlapping restore events so one click cannot create
+            // two popout windows (one of them appearing blank during reconstruction).
+            if (this.activeRestorePromise)
+                return this.activeRestorePromise;
+            const restorePromise = this.restoreLayoutInternal(layout, options);
+            this.activeRestorePromise = restorePromise;
+            try {
+                yield restorePromise;
+            }
+            finally {
+                if (this.activeRestorePromise === restorePromise) {
+                    this.activeRestorePromise = null;
+                }
+            }
+        });
+    }
+    restoreLayoutInternal(layout, options = {}) {
         var _a, _b, _c, _d, _e;
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 // 驗證佈局數據
                 if (!this.validateLayout(layout)) {
                     throw new Error(t("errors.invalidData"));
+                }
+                // 0. 若該 Layout 已經在某個 Popout 視窗中開啟，且非強制重載 (forceReload)，直接聚焦該視窗即可
+                if (!options.forceReload) {
+                    const existingWin = this.getOpenWindowForLayout(layout);
+                    if (existingWin && !existingWin.closed && this.isPopoutDocument(existingWin.document)) {
+                        this.focusTargetWindow(existingWin);
+                        this.setLayoutLabelForWindow(existingWin, layout.name);
+                        this.refreshLayoutLabels();
+                        if (options.showNotifications !== false && this.plugin.settings.showNotifications !== false) {
+                            new obsidian.Notice(tWithParams("notifications.switchedToOpenWindow", { name: layout.name }));
+                        }
+                        return;
+                    }
                 }
                 // changeLayout 可能重建任一既有 WorkspaceWindow。所有 restore 都先
                 // 保存 live popout；普通 Enter restore 不保留將被取代的目標名稱。
@@ -1279,7 +2613,7 @@ class WindowLayoutManager {
                 // floating 當成陣列，也不能直接用 leaf/split 覆蓋 window。
                 if (targetIndex >= 0 && ((_c = layout.workspace) === null || _c === void 0 ? void 0 : _c.layout)) {
                     const currentFloatingWindow = floatingWindows[targetIndex];
-                    const restoredWindow = this.prepareFloatingWindowForRestore(layout.workspace.layout, currentFloatingWindow);
+                    const restoredWindow = this.prepareFloatingWindowForRestore(layout.workspace.layout, currentFloatingWindow, layout.includeGeometry);
                     if (((_d = currentLayout.floating) === null || _d === void 0 ? void 0 : _d.type) === "floating" && Array.isArray(currentLayout.floating.children)) {
                         currentLayout.floating.children = currentLayout.floating.children.map((child, idx) => (idx === targetIndex ? restoredWindow : child));
                     }
@@ -1289,21 +2623,41 @@ class WindowLayoutManager {
                     yield this.app.workspace.changeLayout(currentLayout);
                 }
                 yield new Promise((resolve) => setTimeout(resolve, 150));
-                // 4. 取得目標 Popout 視窗的 DOM Window 並安全開啟所有檔案。
-                // changeLayout 可能會重建 leaf，因此若原 ID 不再存在，改用還原後
-                // 同一視窗中匹配最多保存 leaf 的方式辨識目標視窗。
-                // changeLayout 會清除並重新建立 WorkspaceWindow，舊的 targetWin
-                // 可能已經被關閉；但 forceNewWindow 時來源視窗可能仍包含相同的
-                // leaf ID，不能只依 saved leaf ID 找視窗，否則會把檔案開回來源視窗。
-                const preferredTargetWin = targetWin;
-                targetWin = this.findWindowForSavedLeaves(savedLeaves, options.forceNewWindow ? options.targetWindow : undefined, preferredTargetWin) || targetWin;
+                // 4. 取得目標 Popout 視窗最新活體 DOM Window 並安全開啟所有檔案
+                const livePopouts = this.getLivePopoutWindows();
+                let liveTargetWin = null;
+                if (options.forceNewWindow) {
+                    if (options.targetWindow) {
+                        const nonSourceWins = livePopouts.filter((w) => w !== options.targetWindow);
+                        if (nonSourceWins.length > 0) {
+                            liveTargetWin = nonSourceWins[nonSourceWins.length - 1];
+                        }
+                    }
+                    else {
+                        liveTargetWin = livePopouts[livePopouts.length - 1] || targetWin;
+                    }
+                }
+                else if (targetIndex >= 0 && targetIndex < livePopouts.length) {
+                    liveTargetWin = livePopouts[targetIndex];
+                }
+                targetWin = liveTargetWin || this.findWindowForSavedLeaves(savedLeaves, options.targetWindow, targetWin) || targetWin;
                 let missingFiles = [];
                 if (options.validateFiles !== false && savedLeaves.length > 0) {
                     missingFiles = yield this.restoreFileStatesForWindow(targetWin, savedLeaves, (_e = layout.workspace) === null || _e === void 0 ? void 0 : _e.activeFile);
                 }
                 // 5. 調整視窗尺寸與座標，並聚焦視窗
                 if (targetWin) {
-                    this.restoreWindowGeometry(targetWin, layout.windowState);
+                    this.layoutWindows.set(layout, targetWin);
+                    this.restoreWindowGeometry(targetWin, layout.windowState, layout.includeGeometry);
+                    const winLeaves = this.getLeavesForWindow(targetWin);
+                    if (winLeaves.length > 0) {
+                        try {
+                            this.app.workspace.setActiveLeaf(winLeaves[0], { focus: true });
+                        }
+                        catch (_f) {
+                            // Ignore focus error
+                        }
+                    }
                     if (typeof targetWin.focus === "function") {
                         try {
                             targetWin.focus();
@@ -1311,11 +2665,36 @@ class WindowLayoutManager {
                         catch (e) {
                             console.warn("Failed to focus target window:", e);
                         }
+                        targetWin.setTimeout(() => {
+                            try {
+                                targetWin.focus();
+                                const freshLeaves = this.getLeavesForWindow(targetWin);
+                                if (freshLeaves.length > 0) {
+                                    this.app.workspace.setActiveLeaf(freshLeaves[0], { focus: true });
+                                }
+                            }
+                            catch (_a) {
+                                // Ignore focus error
+                            }
+                        }, 100);
+                        targetWin.setTimeout(() => {
+                            try {
+                                targetWin.focus();
+                                const freshLeaves = this.getLeavesForWindow(targetWin);
+                                if (freshLeaves.length > 0) {
+                                    this.app.workspace.setActiveLeaf(freshLeaves[0], { focus: true });
+                                }
+                            }
+                            catch (_a) {
+                                // Ignore focus error
+                            }
+                        }, 300);
                     }
                 }
                 this.setLayoutLabelForWindow(targetWin, layout.name);
                 this.restorePreservedWindowLabels(preservedWindowLayouts, targetWin);
                 this.refreshLayoutLabels();
+                WindowLayoutsModal.renderAllInstances();
                 if (options.showNotifications !== false) {
                     if (missingFiles.length > 0) {
                         const missingList = missingFiles.slice(0, 3).join(", ") + (missingFiles.length > 3 ? "..." : "");
@@ -1336,66 +2715,67 @@ class WindowLayoutManager {
      * 獲取所有保存的佈局 (按建立時間降序排列，最新儲存的在最上面)
      */
     getSavedLayouts() {
-        const settings = this.plugin.settings;
-        const layouts = settings.layouts || [];
-        const sortBy = settings.sortBy || "updated-desc";
-        return [...layouts].sort((a, b) => {
-            const aCreated = a.createdAt || a.timestamp || 0;
-            const bCreated = b.createdAt || b.timestamp || 0;
-            const aUpdated = a.updatedAt || a.timestamp || aCreated;
-            const bUpdated = b.updatedAt || b.timestamp || bCreated;
-            switch (sortBy) {
+        const settings = this.plugin.settings || {};
+        const spaces = settings.spaces || [];
+        return [...spaces].sort((a, b) => {
+            const mode = settings.sortBy || "updated-desc";
+            const getTimestamp = (l, field) => { var _a, _b; return (_b = (_a = l[field]) !== null && _a !== void 0 ? _a : l.timestamp) !== null && _b !== void 0 ? _b : 0; };
+            switch (mode) {
                 case "updated-desc":
-                    return bUpdated - aUpdated;
+                    return getTimestamp(b, "updatedAt") - getTimestamp(a, "updatedAt");
                 case "updated-asc":
-                    return aUpdated - bUpdated;
+                    return getTimestamp(a, "updatedAt") - getTimestamp(b, "updatedAt");
                 case "created-desc":
-                    return bCreated - aCreated;
+                    return getTimestamp(b, "createdAt") - getTimestamp(a, "createdAt");
                 case "created-asc":
-                    return aCreated - bCreated;
+                    return getTimestamp(a, "createdAt") - getTimestamp(b, "createdAt");
                 case "name-asc":
-                    return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" });
+                    return (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base" });
                 case "name-desc":
-                    return b.name.localeCompare(a.name, undefined, { numeric: true, sensitivity: "base" });
+                    return (b.name || "").localeCompare(a.name || "", undefined, { sensitivity: "base" });
                 default:
-                    return bUpdated - aUpdated;
+                    return getTimestamp(b, "updatedAt") - getTimestamp(a, "updatedAt");
             }
         });
     }
     /**
-     * 保存佈局到存儲
+     * 保存新佈局或覆蓋既有佈局
      */
     saveLayout(layout) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 const settings = this.plugin.settings;
-                if (!settings.layouts) {
-                    settings.layouts = [];
+                if (!settings.spaces) {
+                    settings.spaces = [];
                 }
                 const now = Date.now();
-                const existingIndex = settings.layouts.findIndex((l) => l.name === layout.name);
+                const existingIndex = settings.spaces.findIndex((l) => l.name === layout.name);
                 const isOverwrite = existingIndex >= 0;
                 if (isOverwrite) {
-                    const existing = settings.layouts[existingIndex];
+                    const existing = settings.spaces[existingIndex];
                     layout.id = existing.id;
                     layout.createdAt = existing.createdAt || existing.timestamp || now;
                     layout.updatedAt = now;
                     layout.timestamp = now;
-                    settings.layouts[existingIndex] = layout;
+                    if (layout.includeGeometry === undefined && existing.includeGeometry !== undefined) {
+                        layout.includeGeometry = existing.includeGeometry;
+                    }
+                    settings.spaces[existingIndex] = layout;
                 }
                 else {
                     // 全新建立 (由 A 複製/改名另存為 B 時，重設 B 的 createdAt 為當時時間)
                     layout.createdAt = now;
                     layout.updatedAt = now;
                     layout.timestamp = now;
-                    settings.layouts.push(layout);
+                    settings.spaces.push(layout);
                 }
                 // 限制佈局數量
                 if (settings.maxLayouts &&
-                    settings.layouts.length > settings.maxLayouts) {
-                    settings.layouts = settings.layouts.slice(-settings.maxLayouts);
+                    settings.spaces.length > settings.maxLayouts) {
+                    settings.spaces = settings.spaces.slice(-settings.maxLayouts);
                 }
                 yield this.plugin.saveSettings();
+                WindowLayoutsModal.renderAllInstances();
                 const sourceWindow = this.getWindowForLayout(layout);
                 this.setLayoutLabelForWindow(sourceWindow, layout.name);
                 if (this.plugin.settings.showNotifications !== false) {
@@ -1418,11 +2798,12 @@ class WindowLayoutManager {
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 const settings = this.plugin.settings;
-                const index = settings.layouts.findIndex((l) => l.id === layoutId);
+                const index = settings.spaces.findIndex((l) => l.id === layoutId);
                 if (index >= 0) {
-                    const deletedLayout = settings.layouts[index];
-                    settings.layouts.splice(index, 1);
+                    const deletedLayout = settings.spaces[index];
+                    settings.spaces.splice(index, 1);
                     yield this.plugin.saveSettings();
+                    WindowLayoutsModal.renderAllInstances();
                     if (this.plugin.settings.showNotifications !== false) {
                         new obsidian.Notice(`${t("notifications.layoutDeleted")}: ${deletedLayout.name}`);
                     }
@@ -1433,6 +2814,87 @@ class WindowLayoutManager {
                 throw new Error(t("errors.failedToDelete"));
             }
         });
+    }
+    /**
+     * 重命名 Section 名稱並同步更新所有帶有該標籤的 Space 與 sectionsOrder
+     */
+    renameSection(oldName, newName) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const cleanOld = oldName.trim();
+            const cleanNew = newName.trim();
+            if (!cleanOld || !cleanNew || cleanOld === cleanNew)
+                return;
+            const settings = this.plugin.settings;
+            if (!settings.sectionsOrder)
+                settings.sectionsOrder = [];
+            // 1. 更新 sectionsOrder
+            const orderIndex = settings.sectionsOrder.indexOf(cleanOld);
+            if (orderIndex !== -1) {
+                settings.sectionsOrder[orderIndex] = cleanNew;
+            }
+            // 2. 批量更新所有 Space 中的 sections 陣列
+            (settings.spaces || []).forEach((space) => {
+                if (space.sections && Array.isArray(space.sections)) {
+                    const secIndex = space.sections.indexOf(cleanOld);
+                    if (secIndex !== -1) {
+                        space.sections[secIndex] = cleanNew;
+                        // 去重
+                        space.sections = Array.from(new Set(space.sections));
+                    }
+                }
+            });
+            yield this.plugin.saveSettings();
+            WindowLayoutsModal.renderAllInstances();
+        });
+    }
+    /**
+     * 切換指定 Space 的封存狀態
+     */
+    toggleArchiveSpace(spaceId, archiveStatus) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const settings = this.plugin.settings;
+            const space = (settings.spaces || []).find((s) => s.id === spaceId);
+            if (!space)
+                return;
+            const newStatus = archiveStatus !== undefined ? archiveStatus : !space.archived;
+            space.archived = newStatus;
+            yield this.plugin.saveSettings();
+            WindowLayoutsModal.renderAllInstances();
+            if (this.plugin.settings.showNotifications !== false) {
+                let noticeText = newStatus ? "Space archived" : "Space unarchived";
+                try {
+                    noticeText = newStatus ? t("manageModal.archiveSuccess") : t("manageModal.unarchiveSuccess");
+                }
+                catch (_a) {
+                    // Fallback if i18n not initialized
+                }
+                new obsidian.Notice(`${noticeText}: ${space.name}`);
+            }
+        });
+    }
+    /**
+     * 更新 Section 排序順序
+     */
+    reorderSections(newOrder) {
+        return __awaiter(this, void 0, void 0, function* () {
+            this.plugin.settings.sectionsOrder = newOrder;
+            yield this.plugin.saveSettings();
+            WindowLayoutsModal.renderAllInstances();
+        });
+    }
+    /**
+     * 獲取所有目前開啟中的活體 Popout DOM Window (按 Workspace 順序)
+     */
+    getLivePopoutWindows() {
+        const wins = [];
+        this.app.workspace.iterateAllLeaves((leaf) => {
+            var _a, _b;
+            const win = (_b = (_a = leaf.containerEl) === null || _a === void 0 ? void 0 : _a.ownerDocument) === null || _b === void 0 ? void 0 : _b.defaultView;
+            if (win && this.isPopoutDocument(win.document) && !wins.includes(win)) {
+                wins.push(win);
+            }
+        });
+        return wins;
     }
     /**
      * 獲取當前活發對應的 DOM Window (包含當前命令發起所在 Popout 視窗)
@@ -1662,15 +3124,47 @@ class WindowLayoutManager {
      * 以目前 WorkspaceWindow 的 id/容器為基礎，只替換其 children。
      * Obsidian 1.12 的 layout schema 是 floating -> window -> split/tabs/leaf。
      */
-    prepareFloatingWindowForRestore(savedLayout, currentWindow) {
+    prepareFloatingWindowForRestore(savedLayout, currentWindow, includeGeometry = true) {
         const saved = JSON.parse(JSON.stringify(savedLayout));
         if ((currentWindow === null || currentWindow === void 0 ? void 0 : currentWindow.type) === "window") {
             if (saved.type === "window") {
-                return Object.assign(Object.assign(Object.assign({}, currentWindow), saved), { id: currentWindow.id, children: Array.isArray(saved.children)
+                const merged = Object.assign(Object.assign(Object.assign({}, currentWindow), saved), { id: currentWindow.id, children: Array.isArray(saved.children)
                         ? saved.children.map((child) => this.normalizeFloatingLayout(child))
                         : [] });
+                if (includeGeometry === false) {
+                    delete merged.x;
+                    delete merged.y;
+                    delete merged.width;
+                    delete merged.height;
+                    delete merged.dimension;
+                    delete merged.zoom;
+                    delete merged.isMaximized;
+                    delete merged.isFullScreen;
+                }
+                return merged;
             }
-            return Object.assign(Object.assign({}, currentWindow), { children: [this.normalizeFloatingLayout(saved)] });
+            const res = Object.assign(Object.assign({}, currentWindow), { children: [this.normalizeFloatingLayout(saved)] });
+            if (includeGeometry === false) {
+                delete res.x;
+                delete res.y;
+                delete res.width;
+                delete res.height;
+                delete res.dimension;
+                delete res.zoom;
+                delete res.isMaximized;
+                delete res.isFullScreen;
+            }
+            return res;
+        }
+        if (includeGeometry === false && (saved === null || saved === void 0 ? void 0 : saved.type) === "window") {
+            delete saved.x;
+            delete saved.y;
+            delete saved.width;
+            delete saved.height;
+            delete saved.dimension;
+            delete saved.zoom;
+            delete saved.isMaximized;
+            delete saved.isFullScreen;
         }
         return saved.type === "window" ? saved : this.normalizeFloatingLayout(saved);
     }
@@ -1932,9 +3426,13 @@ class WindowLayoutManager {
             if (progressNotice) {
                 progressNotice.hide();
             }
-            if (targetActiveLeaf) {
+            const leafToFocus = targetActiveLeaf || windowLeaves[0] || null;
+            if (leafToFocus) {
                 try {
-                    this.app.workspace.setActiveLeaf(targetActiveLeaf, { focus: true });
+                    this.app.workspace.setActiveLeaf(leafToFocus, { focus: true });
+                    if ((leafToFocus === null || leafToFocus === void 0 ? void 0 : leafToFocus.containerEl) && typeof leafToFocus.containerEl.focus === "function") {
+                        leafToFocus.containerEl.focus();
+                    }
                 }
                 catch (e) {
                     console.warn("Failed to set active leaf:", e);
@@ -1960,7 +3458,7 @@ class WindowLayoutManager {
         return ((_b = (_a = leaf === null || leaf === void 0 ? void 0 : leaf.containerEl) === null || _a === void 0 ? void 0 : _a.ownerDocument) === null || _b === void 0 ? void 0 : _b.defaultView) || null;
     }
     /** 根據保存的 leaf 集合辨識還原後的目標視窗。 */
-    findWindowForSavedLeaves(leaves, excludedWindow, preferredWindow, claimedWindows = new Set()) {
+    findWindowForSavedLeaves(leaves, excludedWindow, preferredWindow, claimedWindows = new Set(), requirePositiveScore = false) {
         if (leaves.length === 0)
             return null;
         const savedIds = new Set(leaves.map((leaf) => leaf.id));
@@ -1999,6 +3497,9 @@ class WindowLayoutManager {
         }
         if (bestWindow)
             return bestWindow;
+        // 當要求正分數 (positive score) 時，若未匹配到任何 leaf/file (score 0)，禁止盲目 fallback 回傳唯一視窗
+        if (requirePositiveScore)
+            return null;
         // 首次 restore 時若 Obsidian 已重建 leaf ID，但目前只有一個 popout，
         // 該視窗就是唯一合法目標。
         return windows.size === 1 ? Array.from(windows.keys())[0] : null;
@@ -2016,13 +3517,12 @@ class WindowLayoutManager {
             if (!currentWindow)
                 return;
             this.setLayoutLabelForWindow(currentWindow, snapshot.layoutName);
-            this.restoreWindowGeometry(currentWindow, snapshot.windowState);
             claimedWindows.add(currentWindow);
         });
     }
     /** 在 changeLayout 重建 popout 後恢復實際視窗尺寸與座標。 */
-    restoreWindowGeometry(targetWin, windowState) {
-        if (!windowState)
+    restoreWindowGeometry(targetWin, windowState, includeGeometry = true) {
+        if (!windowState || includeGeometry === false)
             return;
         const size = windowState.size;
         if (size &&
@@ -2089,12 +3589,12 @@ class SaveLayoutModal extends obsidian.Modal {
         this.onSubmit = onSubmit;
     }
     onOpen() {
-        var _a;
-        this.modalEl.addClass("window-layouts-modal");
+        var _a, _b, _c, _d, _e, _f, _g;
         this.setTitle(t("saveModal.title"));
         const { contentEl } = this;
         contentEl.empty();
-        contentEl.addClass("window-spaces-modal");
+        this.modalEl.addClass("window-layouts-modal");
+        let selectedSections = Array.from(this.layout.sections || []);
         // 名稱輸入與動態同名提示
         let nameInput;
         const nameSetting = new obsidian.Setting(contentEl)
@@ -2107,7 +3607,7 @@ class SaveLayoutModal extends obsidian.Modal {
             text.inputEl.addEventListener("keydown", (e) => {
                 if (e.key === "Enter") {
                     e.preventDefault();
-                    void this.submitForm(nameInput, includeGeometry, autoSave);
+                    void this.submitForm(nameInput, includeGeometry, autoSave, selectedSections, archived);
                 }
             });
         });
@@ -2123,7 +3623,10 @@ class SaveLayoutModal extends obsidian.Modal {
         // 佈局資訊顯示
         const i18n = getI18n();
         const infoEl = contentEl.createDiv();
-        infoEl.createEl("h3", { text: t("saveModal.infoSection") });
+        infoEl.createEl("div", {
+            text: t("saveModal.infoSection"),
+            cls: "setting-item-name",
+        }).style.marginBottom = "4px";
         const infoList = infoEl.createEl("ul");
         infoList.createEl("li", {
             text: `${t("manageModal.fileCount")}: ${this.layout.metadata.fileCount}`,
@@ -2135,12 +3638,15 @@ class SaveLayoutModal extends obsidian.Modal {
             text: `${t("saveModal.windowSize")}: ${this.layout.windowState.size.width} x ${this.layout.windowState.size.height}`,
         });
         // 選項
-        let includeGeometry = this.layout.windowState.position !== undefined ||
-            (this.layout.windowState.size && this.layout.windowState.size.width > 0);
+        let includeGeometry = (_b = this.layout.includeGeometry) !== null && _b !== void 0 ? _b : (this.layout.windowState.position !== undefined ||
+            (this.layout.windowState.size && this.layout.windowState.size.width > 0));
+        let geometryToggleComponent = null;
+        let archived = (_c = this.layout.archived) !== null && _c !== void 0 ? _c : false;
         new obsidian.Setting(contentEl)
             .setName(t("saveModal.includeGeometry"))
             .setDesc(t("saveModal.includeGeometryDesc"))
             .addToggle((toggle) => {
+            geometryToggleComponent = toggle;
             toggle.setValue(includeGeometry);
             toggle.onChange((value) => {
                 includeGeometry = value;
@@ -2155,6 +3661,89 @@ class SaveLayoutModal extends obsidian.Modal {
                 autoSave = value;
             });
         });
+        new obsidian.Setting(contentEl)
+            .setName(t("manageModal.archiveSpace") || "Archive Space")
+            .addToggle((toggle) => {
+            toggle.setValue(archived);
+            toggle.onChange((value) => {
+                archived = value;
+            });
+        });
+        // Section 分組標籤選單與 Tag-Pills 輸入框
+        selectedSections = Array.from(this.layout.sections || []);
+        // 獲取目前全域已存在的所有 Sections
+        const allSpaces = ((_e = (_d = this.plugin) === null || _d === void 0 ? void 0 : _d.manager) === null || _e === void 0 ? void 0 : _e.getSavedLayouts()) || [];
+        const existingSectionsSet = new Set();
+        (((_g = (_f = this.plugin) === null || _f === void 0 ? void 0 : _f.settings) === null || _g === void 0 ? void 0 : _g.sectionsOrder) || []).forEach((s) => existingSectionsSet.add(s));
+        allSpaces.forEach((s) => (s.sections || []).forEach((sec) => existingSectionsSet.add(sec)));
+        const existingSections = Array.from(existingSectionsSet);
+        // 1. 上方 Setting 列：左側 Sections 標籤，右側 新標籤輸入欄 (對齊 Space Name 樣式與大小)
+        const sectionsSetting = new obsidian.Setting(contentEl)
+            .setName(t("manageModal.sectionsLabel") || "Sections")
+            .addText((text) => {
+            text.setPlaceholder(t("manageModal.sectionsPlaceholder") || "Add section...");
+            text.inputEl.addEventListener("keydown", (e) => {
+                if (e.key === "Enter" || e.key === ",") {
+                    e.preventDefault();
+                    const val = text.inputEl.value.trim().replace(/^,+|,+$/g, "");
+                    if (val && !selectedSections.includes(val)) {
+                        selectedSections.push(val);
+                        text.inputEl.value = "";
+                        renderPills();
+                    }
+                }
+            });
+        });
+        sectionsSetting.settingEl.addClass("window-spaces-setting-full-width");
+        // 2. 底下：Section 列表選擇器 (Pills Container)
+        const pillsContainer = contentEl.createDiv("space-sections-pills");
+        pillsContainer.style.display = "flex";
+        pillsContainer.style.flexWrap = "wrap";
+        pillsContainer.style.gap = "6px";
+        pillsContainer.style.marginTop = "-4px";
+        pillsContainer.style.marginBottom = "16px";
+        pillsContainer.style.paddingLeft = "2px";
+        const renderPills = () => {
+            pillsContainer.empty();
+            selectedSections.forEach((sec) => {
+                const pill = pillsContainer.createDiv("space-section-pill");
+                pill.style.background = "var(--interactive-accent)";
+                pill.style.color = "var(--text-on-accent)";
+                pill.style.padding = "2px 8px";
+                pill.style.borderRadius = "12px";
+                pill.style.fontSize = "12px";
+                pill.style.display = "inline-flex";
+                pill.style.alignItems = "center";
+                pill.style.gap = "4px";
+                pill.style.cursor = "pointer";
+                pill.createSpan({ text: sec });
+                const closeSpan = pill.createSpan({ text: "✖" });
+                closeSpan.style.opacity = "0.7";
+                closeSpan.onclick = (e) => {
+                    e.stopPropagation();
+                    selectedSections = selectedSections.filter((s) => s !== sec);
+                    renderPills();
+                };
+            });
+            // 呈現在 settings 中但未勾選的既有標籤
+            existingSections.forEach((sec) => {
+                if (selectedSections.includes(sec))
+                    return;
+                const unselectedPill = pillsContainer.createDiv("space-section-pill-unselected");
+                unselectedPill.style.background = "var(--background-secondary)";
+                unselectedPill.style.color = "var(--text-muted)";
+                unselectedPill.style.padding = "2px 8px";
+                unselectedPill.style.borderRadius = "12px";
+                unselectedPill.style.fontSize = "12px";
+                unselectedPill.style.cursor = "pointer";
+                unselectedPill.setText(`+ ${sec}`);
+                unselectedPill.onclick = () => {
+                    selectedSections.push(sec);
+                    renderPills();
+                };
+            });
+        };
+        renderPills();
         const checkDuplicateName = () => {
             var _a, _b;
             const currentName = (nameInput === null || nameInput === void 0 ? void 0 : nameInput.value.trim()) || "";
@@ -2170,6 +3759,14 @@ class SaveLayoutModal extends obsidian.Modal {
                     autoSave = !!match.autoSave;
                     autoSaveToggleComponent.setValue(autoSave);
                 }
+                if (geometryToggleComponent && match.includeGeometry !== undefined) {
+                    includeGeometry = !!match.includeGeometry;
+                    geometryToggleComponent.setValue(includeGeometry);
+                }
+                if (match.sections && Array.isArray(match.sections) && selectedSections.length === 0) {
+                    selectedSections = Array.from(match.sections);
+                    renderPills();
+                }
             }
             else {
                 noticeContainer.setText("");
@@ -2178,9 +3775,10 @@ class SaveLayoutModal extends obsidian.Modal {
         nameInput.addEventListener("input", checkDuplicateName);
         checkDuplicateName();
         // 按鈕
-        const buttonContainer = contentEl.createDiv();
+        const buttonContainer = contentEl.createDiv("modal-button-container");
         buttonContainer.style.textAlign = "right";
         buttonContainer.style.marginTop = "20px";
+        buttonContainer.style.marginBottom = "12px";
         const cancelButton = buttonContainer.createEl("button", {
             text: t("common.cancel"),
         });
@@ -2191,11 +3789,11 @@ class SaveLayoutModal extends obsidian.Modal {
         });
         saveButton.style.marginLeft = "10px";
         saveButton.onclick = () => {
-            void this.submitForm(nameInput, includeGeometry, autoSave);
+            void this.submitForm(nameInput, includeGeometry, autoSave, selectedSections, archived);
         };
         setTimeout(() => nameInput === null || nameInput === void 0 ? void 0 : nameInput.focus(), 50);
     }
-    submitForm(nameInput, includeGeometry, autoSave) {
+    submitForm(nameInput, includeGeometry, autoSave, selectedSections, archived) {
         return __awaiter(this, void 0, void 0, function* () {
             const name = nameInput.value.trim();
             if (!name) {
@@ -2206,6 +3804,9 @@ class SaveLayoutModal extends obsidian.Modal {
             // 更新佈局數據
             this.layout.name = name;
             this.layout.autoSave = autoSave;
+            this.layout.includeGeometry = includeGeometry;
+            this.layout.sections = selectedSections;
+            this.layout.archived = archived;
             if (!includeGeometry) {
                 this.layout.windowState.position = undefined;
             }
@@ -2226,505 +3827,6 @@ class SaveLayoutModal extends obsidian.Modal {
         const i18n = getI18n();
         const dateStr = i18n.formatDate(now);
         return `${t("saveModal.title")} ${dateStr}`;
-    }
-}
-
-/**
- * 統一的 Window Layouts 視窗：搜尋、恢復與管理都在同一個入口完成。
- */
-class WindowLayoutsModal extends obsidian.Modal {
-    constructor(app, plugin, targetWindow) {
-        super(app);
-        this.filteredLayouts = [];
-        this.selectedIndex = 0;
-        this.plugin = plugin;
-        this.targetWindow = targetWindow;
-    }
-    onOpen() {
-        var _a, _b;
-        this.modalEl.addClass("window-layouts-modal");
-        // Modal 實際所在的 document 是鍵盤 Enter 操作最可靠的來源視窗。
-        // Command Palette / activeLeaf 可能仍指向另一個 popout。
-        const modalWindow = (_a = this.modalEl.ownerDocument) === null || _a === void 0 ? void 0 : _a.defaultView;
-        const modalBody = (_b = modalWindow === null || modalWindow === void 0 ? void 0 : modalWindow.document) === null || _b === void 0 ? void 0 : _b.body;
-        if (modalWindow &&
-            modalBody &&
-            (modalBody.classList.contains("is-popout-window") ||
-                modalBody.classList.contains("mod-popout"))) {
-            this.targetWindow = modalWindow;
-        }
-        this.setTitle(t("common.windowLayouts"));
-        // 隱藏原生的 modal-close-button，避免觸發 Obsidian 原生 close()
-        const nativeCloseBtn = this.containerEl.querySelector(".modal-close-button");
-        if (nativeCloseBtn) {
-            nativeCloseBtn.style.display = "none";
-        }
-        // 在 modal-title 內建立專屬的齒輪 (⚙️) 排序與選項按鈕
-        const titleHeader = this.containerEl.querySelector(".modal-title");
-        if (titleHeader) {
-            titleHeader.style.display = "flex";
-            titleHeader.style.alignItems = "center";
-            titleHeader.style.justifyContent = "space-between";
-            titleHeader.style.width = "100%";
-            let gearBtn = titleHeader.querySelector(".window-layouts-gear-btn");
-            if (!gearBtn) {
-                gearBtn = titleHeader.createEl("div", {
-                    cls: "clickable-icon window-layouts-gear-btn",
-                });
-                obsidian.setIcon(gearBtn, "gear");
-                obsidian.setTooltip(gearBtn, t("manageModal.sortDateDesc"));
-                gearBtn.style.cursor = "pointer";
-                gearBtn.style.marginLeft = "auto";
-                gearBtn.onclick = (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.showSortMenu(e);
-                };
-            }
-        }
-        // 註冊 Obsidian Scope 鍵盤導覽
-        this.scope.register([], "ArrowDown", (evt) => {
-            this.handleArrowKey(1);
-            evt.preventDefault();
-            return false;
-        });
-        this.scope.register([], "ArrowUp", (evt) => {
-            this.handleArrowKey(-1);
-            evt.preventDefault();
-            return false;
-        });
-        // 捕獲階段全域 Keydown 監聽（無論焦點在標題、空白處還是任何元素上均 100% 生效）
-        const targetDoc = this.modalEl.ownerDocument || document;
-        this.keydownListener = (event) => {
-            if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-                event.preventDefault();
-                event.stopPropagation();
-                this.handleArrowKey(event.key === "ArrowDown" ? 1 : -1);
-            }
-            else if (event.key === "Enter") {
-                const activeEl = targetDoc.activeElement;
-                if (activeEl && activeEl.tagName === "BUTTON") {
-                    return;
-                }
-                event.preventDefault();
-                event.stopPropagation();
-                const targetIndex = this.selectedIndex >= 0 ? this.selectedIndex : 0;
-                const selectedLayout = this.filteredLayouts[targetIndex];
-                if (selectedLayout)
-                    void this.restoreLayout(selectedLayout, !event.shiftKey);
-            }
-        };
-        targetDoc.addEventListener("keydown", this.keydownListener, true);
-        const { contentEl } = this;
-        contentEl.empty();
-        contentEl.addClass("window-spaces-modal");
-        const toolbar = contentEl.createDiv("window-layouts-toolbar");
-        this.searchInput = toolbar.createEl("input");
-        this.searchInput.type = "search";
-        this.searchInput.placeholder = t("manageModal.searchPlaceholder");
-        this.searchInput.setAttribute("aria-label", t("manageModal.searchPlaceholder"));
-        this.searchInput.addEventListener("input", () => {
-            this.selectedIndex = 0;
-            this.renderLayouts();
-        });
-        const newWinButton = toolbar.createEl("button", {
-            text: `+ ${t("common.newWindow")}`,
-            cls: "mod-cta qsp-action-btn",
-        });
-        obsidian.setTooltip(newWinButton, t("common.newWindow"));
-        newWinButton.onclick = () => {
-            this.close();
-            this.plugin.manager.openNewPopoutWindow();
-        };
-        this.listEl = contentEl.createDiv("window-layouts-list");
-        this.listEl.setAttribute("role", "listbox");
-        this.renderLayouts();
-        const instructionsEl = contentEl.createDiv("prompt-instructions window-layouts-instructions");
-        const navInst = instructionsEl.createDiv("prompt-instruction");
-        navInst.createEl("span", { text: "↑ ↓", cls: "prompt-instruction-command" });
-        navInst.createEl("span", { text: t("instructions.navigate") });
-        const useInst = instructionsEl.createDiv("prompt-instruction");
-        useInst.createEl("span", { text: "Shift ↵", cls: "prompt-instruction-command" });
-        useInst.createEl("span", { text: t("instructions.use") });
-        const newWinInst = instructionsEl.createDiv("prompt-instruction");
-        newWinInst.createEl("span", { text: "↵", cls: "prompt-instruction-command" });
-        newWinInst.createEl("span", { text: t("instructions.useNewWindow") });
-        const dismissInst = instructionsEl.createDiv("prompt-instruction");
-        dismissInst.createEl("span", { text: "esc", cls: "prompt-instruction-command" });
-        dismissInst.createEl("span", { text: t("instructions.dismiss") });
-        window.setTimeout(() => { var _a; return (_a = this.searchInput) === null || _a === void 0 ? void 0 : _a.focus(); }, 50);
-    }
-    handleArrowKey(direction) {
-        if (this.filteredLayouts.length === 0)
-            return;
-        if (this.selectedIndex < 0) {
-            this.selectedIndex = direction > 0 ? 0 : this.filteredLayouts.length - 1;
-        }
-        else {
-            this.selectedIndex =
-                (this.selectedIndex + direction + this.filteredLayouts.length) % this.filteredLayouts.length;
-        }
-        this.renderLayouts();
-        this.scrollSelectedIntoView();
-    }
-    renderLayouts() {
-        var _a;
-        if (!this.listEl)
-            return;
-        this.listEl.empty();
-        const query = ((_a = this.searchInput) === null || _a === void 0 ? void 0 : _a.value.trim().toLowerCase()) || "";
-        this.filteredLayouts = this.plugin.manager
-            .getSavedLayouts()
-            .filter((layout) => !query || layout.name.toLowerCase().includes(query));
-        if (this.filteredLayouts.length > 0) {
-            if (this.selectedIndex < 0 || this.selectedIndex >= this.filteredLayouts.length) {
-                this.selectedIndex = 0;
-            }
-        }
-        else {
-            this.selectedIndex = -1;
-        }
-        if (this.filteredLayouts.length === 0) {
-            this.listEl.createEl("p", {
-                text: t("manageModal.noLayoutsMessage"),
-                cls: "setting-item-description",
-            });
-            return;
-        }
-        this.filteredLayouts.forEach((layout, index) => {
-            this.renderLayoutItem(layout, index);
-        });
-    }
-    renderLayoutItem(layout, index) {
-        var _a;
-        const layoutEl = this.listEl.createDiv("suggestion-item window-layout-item");
-        layoutEl.setAttribute("role", "option");
-        layoutEl.setAttribute("aria-selected", String(index === this.selectedIndex));
-        if (index === this.selectedIndex)
-            layoutEl.addClass("is-selected");
-        this.setFilesTooltipForLayout(layoutEl, layout);
-        let holdTimer = null;
-        let isLongPress = false;
-        const isActionButtonTarget = (target) => { var _a; return Boolean((_a = target === null || target === void 0 ? void 0 : target.closest) === null || _a === void 0 ? void 0 : _a.call(target, "button")); };
-        const cancelHold = () => {
-            if (holdTimer) {
-                clearTimeout(holdTimer);
-                holdTimer = null;
-            }
-        };
-        // Long press works across the whole layout item. Action buttons keep their
-        // own behavior and are intentionally excluded from the parent timer.
-        layoutEl.addEventListener("mousedown", (e) => {
-            if (e.button !== 0 || isActionButtonTarget(e.target))
-                return;
-            isLongPress = false;
-            holdTimer = setTimeout(() => {
-                isLongPress = true;
-                void this.restoreLayout(layout, false);
-            }, 450);
-        });
-        layoutEl.addEventListener("mouseup", cancelHold);
-        layoutEl.addEventListener("mouseleave", cancelHold);
-        layoutEl.addEventListener("click", (e) => {
-            if (isActionButtonTarget(e.target))
-                return;
-            if (isLongPress) {
-                isLongPress = false;
-                return;
-            }
-            const forceNewWindow = !e.shiftKey;
-            void this.restoreLayout(layout, forceNewWindow);
-        });
-        const itemContentEl = layoutEl.createDiv("suggestion-content qsp-content");
-        const titleEl = itemContentEl.createDiv({
-            cls: "suggestion-title qsp-title",
-        });
-        titleEl.createSpan({ text: layout.name });
-        if (layout.autoSave) {
-            const autoSaveBadge = titleEl.createSpan({
-                cls: "layout-auto-save-badge",
-            });
-            obsidian.setIcon(autoSaveBadge, "refresh-cw");
-            obsidian.setTooltip(autoSaveBadge, t("manageModal.autoSaveEnabled"));
-        }
-        const noteEl = itemContentEl.createDiv("suggestion-note qsp-note");
-        const i18n = getI18n();
-        const pathEl = noteEl.createDiv("qsp-path");
-        pathEl.createEl("span", {
-            text: `${t("manageModal.updatedDate")}: ${i18n.formatDate(new Date(layout.updatedAt || layout.timestamp || layout.createdAt || Date.now()))}`,
-            cls: "layout-date",
-        });
-        pathEl.createEl("span", {
-            text: `${t("manageModal.fileCount")}: ${((_a = layout.metadata) === null || _a === void 0 ? void 0 : _a.fileCount) || 0}`,
-            cls: "layout-files",
-        });
-        const actionsEl = layoutEl.createDiv("suggestion-aux qsp-aux layout-actions");
-        const restoreButton = actionsEl.createEl("button", {
-            text: t("common.restore"),
-        });
-        obsidian.setTooltip(restoreButton, t("restoreModal.restoreHint"));
-        restoreButton.addEventListener("mousedown", (e) => {
-            if (e.button !== 0)
-                return;
-            isLongPress = false;
-            holdTimer = setTimeout(() => {
-                isLongPress = true;
-                void this.restoreLayout(layout, false);
-            }, 450);
-        });
-        restoreButton.addEventListener("mouseup", cancelHold);
-        restoreButton.addEventListener("mouseleave", cancelHold);
-        restoreButton.onclick = (e) => {
-            e.stopPropagation();
-            if (isLongPress)
-                return;
-            const forceNewWindow = !e.shiftKey;
-            void this.restoreLayout(layout, forceNewWindow);
-        };
-        const moreButton = actionsEl.createEl("button", {
-            cls: "clickable-icon layout-more-btn",
-        });
-        obsidian.setIcon(moreButton, "chevron-down");
-        obsidian.setTooltip(moreButton, t("manageModal.actions"));
-        moreButton.onclick = (e) => {
-            e.stopPropagation();
-            this.showLayoutItemMenu(e, layout);
-        };
-    }
-    restoreLayout(layout, forceNewWindow = false) {
-        return __awaiter(this, void 0, void 0, function* () {
-            try {
-                this.close();
-                yield this.plugin.manager.restoreLayout(layout, {
-                    // forceNewWindow 只控制 restore 的目標是否新建；仍需傳入來源視窗，
-                    // 讓 manager 能保留該 popout 原本的 layout 名稱與狀態列。
-                    targetWindow: this.targetWindow,
-                    forceNewWindow,
-                });
-            }
-            catch (error) {
-                new obsidian.Notice(`${t("errors.failedToRestore")}: ${(error === null || error === void 0 ? void 0 : error.message) || error}`);
-            }
-        });
-    }
-    scrollSelectedIntoView() {
-        const selected = this.listEl.querySelector(".window-layout-item.is-selected");
-        selected === null || selected === void 0 ? void 0 : selected.scrollIntoView({ block: "nearest" });
-    }
-    showRenameDialog(layout) {
-        const modal = new obsidian.Modal(this.app);
-        modal.setTitle(t("manageModal.renameButton"));
-        modal.onOpen = () => {
-            let input;
-            const setting = new obsidian.Setting(modal.contentEl)
-                .setName(t("saveModal.nameLabel"))
-                .addText((text) => {
-                input = text.inputEl;
-                input.value = layout.name;
-                input.focus();
-                input.select();
-                input.addEventListener("keydown", (e) => {
-                    if (e.key === "Enter") {
-                        e.preventDefault();
-                        void submit();
-                    }
-                });
-            });
-            setting.settingEl.addClass("window-spaces-setting-full-width");
-            const buttonContainer = modal.contentEl.createDiv();
-            buttonContainer.style.textAlign = "right";
-            buttonContainer.style.marginTop = "20px";
-            const cancelButton = buttonContainer.createEl("button", {
-                text: t("common.cancel"),
-            });
-            cancelButton.onclick = () => modal.close();
-            const saveButton = buttonContainer.createEl("button", {
-                text: t("common.save"),
-                cls: "mod-cta",
-            });
-            saveButton.style.marginLeft = "10px";
-            const submit = () => __awaiter(this, void 0, void 0, function* () {
-                const newName = input.value.trim();
-                if (!newName) {
-                    new obsidian.Notice(t("saveModal.emptyNameError"));
-                    input.focus();
-                    return;
-                }
-                const duplicate = this.plugin.settings.layouts.some((item) => item.id !== layout.id && item.name === newName);
-                if (duplicate) {
-                    new obsidian.Notice(t("saveModal.duplicateNameError"));
-                    input.focus();
-                    return;
-                }
-                layout.name = newName;
-                yield this.plugin.saveSettings();
-                modal.close();
-                this.renderLayouts();
-                new obsidian.Notice(t("notifications.layoutRenamed"));
-            });
-            saveButton.onclick = submit;
-        };
-        modal.onClose = () => modal.contentEl.empty();
-        modal.open();
-    }
-    showDeleteDialog(layout) {
-        this.showConfirmDialog(`${t("manageModal.confirmDeleteMessage")}\n\n${layout.name}`, t("manageModal.confirmDeleteTitle")).then((confirmed) => __awaiter(this, void 0, void 0, function* () {
-            if (!confirmed)
-                return;
-            try {
-                yield this.plugin.manager.deleteLayout(layout.id);
-                this.renderLayouts();
-            }
-            catch (error) {
-                new obsidian.Notice(`${t("errors.failedToDelete")}: ${(error === null || error === void 0 ? void 0 : error.message) || error}`);
-            }
-        }));
-    }
-    showConfirmDialog(message, title = t("common.confirm")) {
-        return new Promise((resolve) => {
-            const modal = new obsidian.Modal(this.app);
-            modal.setTitle(title);
-            modal.onOpen = () => {
-                modal.contentEl.createEl("p", { text: message });
-                const buttonContainer = modal.contentEl.createDiv();
-                buttonContainer.style.textAlign = "right";
-                buttonContainer.style.marginTop = "20px";
-                const cancelButton = buttonContainer.createEl("button", {
-                    text: t("common.cancel"),
-                });
-                cancelButton.onclick = () => {
-                    resolve(false);
-                    modal.close();
-                };
-                const confirmButton = buttonContainer.createEl("button", {
-                    text: t("common.confirm"),
-                    cls: "mod-warning",
-                });
-                confirmButton.style.marginLeft = "10px";
-                confirmButton.onclick = () => {
-                    resolve(true);
-                    modal.close();
-                };
-            };
-            modal.onClose = () => modal.contentEl.empty();
-            modal.open();
-        });
-    }
-    setFilesTooltipForLayout(element, layout) {
-        const leaves = this.plugin.manager.getSavedViewStates(layout);
-        const files = [];
-        leaves.forEach((leaf) => {
-            const filePath = this.plugin.manager.getFilePathFromLeafState(leaf);
-            if (filePath) {
-                const fileName = filePath.split("/").pop() || filePath;
-                if (!files.includes(fileName)) {
-                    files.push(fileName);
-                }
-            }
-        });
-        if (files.length > 0) {
-            const displayFiles = files.slice(0, 15);
-            let tooltipText = `${t("restoreModal.includedFiles")} (${files.length}):\n` +
-                displayFiles.map((f) => `• ${f}`).join("\n");
-            if (files.length > 15) {
-                tooltipText += `\n... (+${files.length - 15})`;
-            }
-            obsidian.setTooltip(element, tooltipText);
-        }
-    }
-    showSortMenu(event) {
-        const menu = new obsidian.Menu();
-        const currentSort = this.plugin.settings.sortBy || "updated-desc";
-        const addSortItem = (id, label, icon) => {
-            menu.addItem((item) => {
-                item
-                    .setTitle(label)
-                    .setIcon(icon)
-                    .setChecked(currentSort === id)
-                    .onClick(() => __awaiter(this, void 0, void 0, function* () {
-                    this.plugin.settings.sortBy = id;
-                    yield this.plugin.saveSettings();
-                    this.selectedIndex = 0;
-                    this.renderLayouts();
-                }));
-            });
-        };
-        addSortItem("updated-desc", t("manageModal.sortUpdatedDesc"), "history");
-        addSortItem("updated-asc", t("manageModal.sortUpdatedAsc"), "history");
-        addSortItem("created-desc", t("manageModal.sortCreatedDesc"), "calendar-days");
-        addSortItem("created-asc", t("manageModal.sortCreatedAsc"), "calendar");
-        addSortItem("name-asc", t("manageModal.sortNameAsc"), "sort-asc");
-        addSortItem("name-desc", t("manageModal.sortNameDesc"), "sort-desc");
-        const targetEl = event.currentTarget || this.modalEl;
-        const rect = targetEl.getBoundingClientRect();
-        menu.showAtPosition({
-            x: Math.max(10, rect.right - 145),
-            y: rect.bottom + 6,
-        });
-    }
-    showLayoutItemMenu(event, layout) {
-        const menu = new obsidian.Menu();
-        // 1. Auto-save (自動保存狀態切換)
-        menu.addItem((item) => {
-            item
-                .setTitle(layout.autoSave
-                ? t("manageModal.autoSaveEnabled")
-                : t("manageModal.autoSaveDisabled"))
-                .setIcon("refresh-cw")
-                .setChecked(!!layout.autoSave)
-                .onClick(() => __awaiter(this, void 0, void 0, function* () {
-                layout.autoSave = !layout.autoSave;
-                yield this.plugin.saveSettings();
-                new obsidian.Notice(layout.autoSave
-                    ? `${layout.name}: ${t("manageModal.autoSaveEnabled")}`
-                    : `${layout.name}: ${t("manageModal.autoSaveDisabled")}`);
-                this.renderLayouts();
-            }));
-        });
-        menu.addSeparator();
-        // 2. Rename (重新命名)
-        menu.addItem((item) => {
-            item
-                .setTitle(t("common.rename"))
-                .setIcon("pencil")
-                .onClick(() => {
-                this.showRenameDialog(layout);
-            });
-        });
-        // 3. Edit (編輯佈局與設定：開啟 Save Layout Modal)
-        menu.addItem((item) => {
-            item
-                .setTitle(t("common.edit"))
-                .setIcon("edit-3")
-                .onClick(() => {
-                this.close();
-                this.plugin.openSaveLayoutModal(layout);
-            });
-        });
-        menu.addSeparator();
-        // 4. Delete (刪除)
-        menu.addItem((item) => {
-            item
-                .setTitle(t("common.delete"))
-                .setIcon("trash-2")
-                .setWarning(true)
-                .onClick(() => {
-                this.showDeleteDialog(layout);
-            });
-        });
-        const targetEl = event.currentTarget || this.modalEl;
-        const rect = targetEl.getBoundingClientRect();
-        menu.showAtPosition({
-            x: Math.max(10, rect.right - 120),
-            y: rect.bottom + 4,
-        });
-    }
-    onClose() {
-        if (this.keydownListener) {
-            const targetDoc = this.modalEl.ownerDocument || document;
-            targetDoc.removeEventListener("keydown", this.keydownListener, true);
-        }
-        this.contentEl.empty();
     }
 }
 
@@ -2885,7 +3987,7 @@ class WindowSpacesSettingTab extends obsidian.PluginSettingTab {
                 .onClick(() => __awaiter(this, void 0, void 0, function* () {
                 const confirmed = yield this.showConfirmDialog(t("settings.resetConfirmMessage"), t("settings.resetConfirmTitle"));
                 if (confirmed) {
-                    this.plugin.settings.layouts = [];
+                    this.plugin.settings.spaces = [];
                     yield this.plugin.saveSettings();
                     this.display(); // 重新顯示設定頁面
                     new obsidian.Notice(t("settings.resetSuccess"));
@@ -2954,6 +4056,7 @@ class WindowSpacesSettingTab extends obsidian.PluginSettingTab {
                 if (newName && newName !== layout.name) {
                     layout.name = newName;
                     yield this.plugin.saveSettings();
+                    WindowLayoutsModal.renderAllInstances();
                     this.display();
                     new obsidian.Notice(t("notifications.layoutRenamed"));
                 }
@@ -3011,8 +4114,48 @@ class WindowSpacesSettingTab extends obsidian.PluginSettingTab {
     }
 }
 
+const WINDOW_LAYOUTS_VIEW_TYPE = "window-spaces-layouts";
+/**
+ * Persistent version of the Window Layouts picker.
+ *
+ * The content is rendered by WindowLayoutsModal so both entry points keep the
+ * same restore semantics. Unlike a modal, this view deliberately remains
+ * mounted after a layout is restored.
+ */
+class WindowLayoutsView extends obsidian.ItemView {
+    constructor(leaf, plugin) {
+        super(leaf);
+        this.plugin = plugin;
+        this.navigation = false;
+    }
+    getViewType() {
+        return WINDOW_LAYOUTS_VIEW_TYPE;
+    }
+    getDisplayText() {
+        return t("common.windowLayouts");
+    }
+    getIcon() {
+        return "layout";
+    }
+    onOpen() {
+        return __awaiter(this, void 0, void 0, function* () {
+            this.contentController = new WindowLayoutsModal(this.app, this.plugin);
+            // The panel header is intentionally location-neutral. Obsidian applies
+            // the same native nav-header treatment in editor tabs and sidebars.
+            this.contentController.mountInContainer(this.contentEl);
+        });
+    }
+    onClose() {
+        var _a;
+        return __awaiter(this, void 0, void 0, function* () {
+            (_a = this.contentController) === null || _a === void 0 ? void 0 : _a.unmountFromContainer();
+            this.contentController = undefined;
+        });
+    }
+}
+
 const DEFAULT_SETTINGS = {
-    layouts: [],
+    spaces: [],
     autoSave: false,
     showNotifications: true,
     maxLayouts: 20,
@@ -3021,6 +4164,9 @@ const DEFAULT_SETTINGS = {
     layoutStatusBarDefaultApplied: false,
     showWindowLayoutsRibbonIcon: true,
     sortBy: "updated-desc",
+    sectionsOrder: [],
+    groupBySection: true,
+    showArchived: false,
 };
 class WindowSpacesPlugin extends obsidian.Plugin {
     constructor() {
@@ -3038,6 +4184,8 @@ class WindowSpacesPlugin extends obsidian.Plugin {
             // 初始化管理器
             this.manager = new WindowLayoutManager(this);
             this.manager.registerExistingPopoutWindows();
+            // 註冊可固定在側欄或主工作區分頁的 Window Layouts view
+            this.registerView(WINDOW_LAYOUTS_VIEW_TYPE, (leaf) => new WindowLayoutsView(leaf, this));
             // 註冊命令
             this.registerCommands();
             // 刷新與添加 Ribbon 按鈕
@@ -3078,6 +4226,10 @@ class WindowSpacesPlugin extends obsidian.Plugin {
     loadSettings() {
         return __awaiter(this, void 0, void 0, function* () {
             const savedSettings = yield this.loadData();
+            if (savedSettings && savedSettings.layouts && !savedSettings.spaces) {
+                savedSettings.spaces = savedSettings.layouts;
+                delete savedSettings.layouts;
+            }
             this.settings = Object.assign({}, DEFAULT_SETTINGS, savedSettings);
             // 將舊版「預設關閉」的狀態列設定遷移為新版預設開啟；之後尊重使用者的手動選擇。
             if (this.settings.layoutStatusBarDefaultApplied !== true) {
@@ -3119,6 +4271,24 @@ class WindowSpacesPlugin extends obsidian.Plugin {
             icon: "layout",
             callback: () => this.openWindowLayoutsModal(),
         });
+        this.addCommand({
+            id: "open-window-layouts-panel",
+            name: t("commands.openLayoutsPanel"),
+            icon: "layout",
+            callback: () => void this.openWindowLayoutsPanel("tab"),
+        });
+        this.addCommand({
+            id: "open-window-layouts-panel-left",
+            name: t("commands.openLayoutsPanelLeft"),
+            icon: "panel-left",
+            callback: () => void this.openWindowLayoutsPanel("left"),
+        });
+        this.addCommand({
+            id: "open-window-layouts-panel-right",
+            name: t("commands.openLayoutsPanelRight"),
+            icon: "panel-right",
+            callback: () => void this.openWindowLayoutsPanel("right"),
+        });
     }
     openSaveLayoutModal(layout) {
         const modal = new SaveLayoutModal(this.app, this, layout, (savedLayout) => __awaiter(this, void 0, void 0, function* () {
@@ -3146,14 +4316,50 @@ class WindowSpacesPlugin extends obsidian.Plugin {
         const win = targetWindow || (this.manager ? this.manager.getActiveWindow() : undefined);
         new WindowLayoutsModal(this.app, this, win).open();
     }
+    openWindowLayoutsPanel(location = "tab") {
+        return __awaiter(this, void 0, void 0, function* () {
+            const workspace = this.app.workspace;
+            let leaf;
+            if (location === "left") {
+                leaf = workspace.getLeftLeaf(false);
+            }
+            else if (location === "right") {
+                leaf = workspace.getRightLeaf(false);
+            }
+            else {
+                // Commands can be invoked while a popout is focused. Select a main
+                // workspace leaf first so getLeaf("tab") cannot create the view in a
+                // popout window by accident.
+                let mainLeaf = null;
+                workspace.iterateAllLeaves((candidate) => {
+                    var _a, _b, _c, _d;
+                    const body = (_b = (_a = candidate.containerEl) === null || _a === void 0 ? void 0 : _a.ownerDocument) === null || _b === void 0 ? void 0 : _b.body;
+                    const isPopout = ((_c = body === null || body === void 0 ? void 0 : body.classList) === null || _c === void 0 ? void 0 : _c.contains("is-popout-window")) ||
+                        ((_d = body === null || body === void 0 ? void 0 : body.classList) === null || _d === void 0 ? void 0 : _d.contains("mod-popout"));
+                    if (!mainLeaf && !isPopout)
+                        mainLeaf = candidate;
+                });
+                if (mainLeaf)
+                    workspace.setActiveLeaf(mainLeaf, { focus: false });
+                leaf = workspace.getLeaf("tab");
+            }
+            if (!leaf) {
+                throw new Error("Unable to create a Window Layouts panel");
+            }
+            yield leaf.setViewState({ type: WINDOW_LAYOUTS_VIEW_TYPE, state: {} });
+            yield workspace.revealLeaf(leaf);
+        });
+    }
     setupEventListeners() {
         // 監聽視窗開關
         this.registerEvent(this.app.workspace.on("window-open", (_workspaceWindow, popoutWindow) => {
             this.manager.registerPopoutWindow(popoutWindow);
+            WindowLayoutsModal.renderAllInstances();
             console.log("New window opened");
         }));
         this.registerEvent(this.app.workspace.on("window-close", (_workspaceWindow, popoutWindow) => {
             this.manager.unregisterPopoutWindow(popoutWindow);
+            WindowLayoutsModal.renderAllInstances();
             console.log("Popout window closed");
         }));
         // 監聽 Workspace 分頁與佈局變化（用於特定 Layout 的 5 秒 Debounced 自動儲存）
@@ -3180,7 +4386,7 @@ class WindowSpacesPlugin extends obsidian.Plugin {
             }
         });
         // 添加工具提示
-        statusBarItem.setAttribute("aria-label", "Window Spaces - Click to restore layout, Shift+Click to save layout");
+        statusBarItem.setAttribute("aria-label", "Window Spaces - Click to restore space, Shift+Click to save space");
     }
 }
 

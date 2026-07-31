@@ -6,7 +6,8 @@ import {
   SaveLayoutOptions,
   RestoreLayoutOptions,
 } from "./types";
-import { t, getI18n } from "./i18n";
+import { t, tWithParams, getI18n } from "./i18n";
+import { WindowLayoutsModal } from "./modals/restoreModal";
 
 interface LayoutLabelElements {
   statusBar: HTMLElement | null;
@@ -26,6 +27,7 @@ export class WindowLayoutManager {
   private popoutWindows = new Set<Window>();
   private layoutNames = new Map<Window, string>();
   private layoutLabels = new Map<Window, LayoutLabelElements>();
+  private activeRestorePromise: Promise<void> | null = null;
 
   constructor(plugin: any) {
     this.plugin = plugin;
@@ -39,8 +41,10 @@ export class WindowLayoutManager {
     this.popoutWindows.add(targetWin);
     this.refreshLayoutStatusBar(targetWin);
 
-    // window-open 觸發時 Popout DOM 可能仍在建立中，再補一次確保狀態列出現。
+    // window-open 觸發時 Popout DOM 可能仍在建立中，再補兩次確保狀態列 100% 出現。
     targetWin.setTimeout(() => this.refreshLayoutStatusBar(targetWin), 0);
+    targetWin.setTimeout(() => this.refreshLayoutStatusBar(targetWin), 100);
+    targetWin.setTimeout(() => this.refreshLayoutStatusBar(targetWin), 300);
   }
 
   /** 插件重新載入時，補註冊已經存在的 Popout。 */
@@ -79,16 +83,15 @@ export class WindowLayoutManager {
   setLayoutLabelForWindow(targetWin: Window | null, layoutName: string): void {
     if (!targetWin || !layoutName?.trim()) return;
 
-    const targetDocument = targetWin.document;
-    const body = targetDocument?.body;
-    if (!body || !this.isPopoutDocument(targetDocument)) return;
-
     this.registerPopoutWindow(targetWin);
     this.layoutNames.set(targetWin, layoutName);
-    body.setAttribute("data-layout-name", layoutName);
 
-    // 清理舊版浮動 label，避免更新插件後殘留在 Popout 右上角。
-    body.querySelectorAll(".window-spaces-layout-label").forEach((element) => element.remove());
+    const targetDocument = targetWin.document;
+    const body = targetDocument?.body;
+    if (body) {
+      body.setAttribute("data-layout-name", layoutName);
+      body.querySelectorAll(".window-spaces-layout-label").forEach((element) => element.remove());
+    }
 
     this.refreshLayoutStatusBar(targetWin);
   }
@@ -98,7 +101,9 @@ export class WindowLayoutManager {
     const nameFromMap = this.layoutNames.get(targetWin);
     if (nameFromMap) return nameFromMap;
 
-    const nameFromDOM = targetWin.document?.body?.getAttribute("data-layout-name");
+    const nameFromDOM = typeof targetWin.document?.body?.getAttribute === "function"
+      ? targetWin.document.body.getAttribute("data-layout-name")
+      : null;
     if (nameFromDOM) {
       this.layoutNames.set(targetWin, nameFromDOM);
       return nameFromDOM;
@@ -214,7 +219,7 @@ export class WindowLayoutManager {
 
     nameElement.textContent = layoutName;
 
-    const currentLayout = this.plugin.settings.layouts.find((l: WindowLayout) => l.name === layoutName);
+    const currentLayout = this.plugin.settings.spaces.find((l: WindowLayout) => l.name === layoutName);
     const isAutoSave = !!currentLayout?.autoSave;
 
     ensureActionButton(
@@ -229,7 +234,7 @@ export class WindowLayoutManager {
       "refresh-cw",
       isAutoSave ? t("manageModal.autoSaveEnabled") : t("manageModal.autoSaveDisabled"),
       async () => {
-        const targetLayout = this.plugin.settings.layouts.find((l: WindowLayout) => l.name === layoutName);
+        const targetLayout = this.plugin.settings.spaces.find((l: WindowLayout) => l.name === layoutName);
         if (targetLayout) {
           targetLayout.autoSave = !targetLayout.autoSave;
           await this.plugin.saveSettings();
@@ -287,7 +292,7 @@ export class WindowLayoutManager {
   private async saveLayoutFromWindow(targetWin: Window): Promise<void> {
     try {
       const layoutName = this.layoutNames.get(targetWin) || "";
-      const existing = this.plugin.settings.layouts.find((l: WindowLayout) => l.name === layoutName);
+      const existing = this.plugin.settings.spaces.find((l: WindowLayout) => l.name === layoutName);
 
       const layout = await this.captureCurrentLayout(
         { name: layoutName },
@@ -313,7 +318,7 @@ export class WindowLayoutManager {
    */
   checkAndDebouncedAutoSaveAll(): void {
     this.layoutNames.forEach((layoutName, targetWin) => {
-      const existing = this.plugin.settings.layouts.find((l: WindowLayout) => l.name === layoutName);
+      const existing = this.plugin.settings.spaces.find((l: WindowLayout) => l.name === layoutName);
       if (existing && existing.autoSave === true) {
         // 1. 視窗存活期間，嘗試備份當前合法的 Layout 快照
         void this.captureCurrentLayout({ name: layoutName }, targetWin)
@@ -348,8 +353,8 @@ export class WindowLayoutManager {
     const layoutName = this.layoutNames.get(targetWin);
     if (!layoutName) return;
 
-    const existing = this.plugin.settings.layouts.find((l: WindowLayout) => l.name === layoutName);
-    if (!existing || existing.autoSave !== true) return;
+    const existing = this.plugin.settings.spaces.find((l: WindowLayout) => l.name === layoutName);
+    if (!existing || !existing.autoSave) return;
 
     try {
       let captured: WindowLayout | null = null;
@@ -361,6 +366,7 @@ export class WindowLayoutManager {
           captured = liveCaptured;
           captured.autoSave = true;
           captured.id = existing.id;
+          captured.includeGeometry = existing.includeGeometry;
           this.lastValidSnapshots.set(targetWin, captured);
         }
       } catch (e) {
@@ -384,13 +390,14 @@ export class WindowLayoutManager {
       captured.timestamp = now;
 
       // 4. 安全靜默覆寫更新設定檔
-      const index = this.plugin.settings.layouts.findIndex((l: WindowLayout) => l.id === existing.id);
+      const index = this.plugin.settings.spaces.findIndex((l: WindowLayout) => l.id === existing.id);
       if (index !== -1) {
-        this.plugin.settings.layouts[index] = captured;
+        this.plugin.settings.spaces[index] = captured;
       } else {
-        this.plugin.settings.layouts.push(captured);
+        this.plugin.settings.spaces.push(captured);
       }
       await this.plugin.saveSettings();
+      WindowLayoutsModal.renderAllInstances();
     } catch (e) {
       console.warn(`[Window Spaces] Auto-save on close/change failed for "${layoutName}":`, e);
     }
@@ -423,9 +430,93 @@ export class WindowLayoutManager {
     );
   }
 
+  /**
+   * 檢查指定 Layout 是否目前已在某個存活的 Popout 視窗中開啟。
+   */
+  getOpenWindowForLayout(layout: WindowLayout): Window | null {
+    if (!layout) return null;
+
+    // 1. 先查記憶體對映的 layoutWindows
+    const mappedWin = this.layoutWindows.get(layout);
+    if (mappedWin && !mappedWin.closed && this.isPopoutDocument(mappedWin.document)) {
+      if (this.getLeavesForWindow(mappedWin).length > 0) {
+        return mappedWin;
+      }
+    }
+
+    // 2. 遍歷目前所有存活的 Popout 視窗，依名稱與標籤比對
+    const liveWindows = new Set<Window>();
+    if (typeof (this.app.workspace as any)?.iterateAllLeaves === "function") {
+      (this.app.workspace as any).iterateAllLeaves((leaf: WorkspaceLeaf) => {
+        const win = this.getWindowForLeaf(leaf);
+        if (win && !win.closed && this.isPopoutDocument(win.document)) {
+          liveWindows.add(win);
+        }
+      });
+    }
+
+    for (const win of Array.from(liveWindows)) {
+      const label = this.getLayoutNameForWindow(win);
+      if (label && label === layout.name) {
+        return win;
+      }
+    }
+
+    // 3. 多級比對：比對檔案與 Leaves (必須有高精確度 matchScore > 0，嚴禁盲目 fallback 單一視窗)
+    const savedLeaves = this.getSavedViewStates(layout);
+    if (savedLeaves.length > 0) {
+      const matchedWin = this.findWindowForSavedLeaves(savedLeaves, undefined, null, new Set(), true);
+      if (matchedWin && !matchedWin.closed && this.isPopoutDocument(matchedWin.document)) {
+        return matchedWin;
+      }
+    }
+
+    return null;
+  }
+
   private getWindowForLayout(layout: WindowLayout): Window | null {
-    return this.layoutWindows.get(layout) ||
+    return this.getOpenWindowForLayout(layout) ||
+      this.layoutWindows.get(layout) ||
       this.findWindowForSavedLeaves(this.getSavedViewStates(layout));
+  }
+
+  /**
+   * 聚焦 (Focus) 指定 Popout 視窗並啟用首個 Leaf
+   */
+  focusTargetWindow(targetWin: Window): void {
+    if (!targetWin || targetWin.closed) return;
+
+    if (typeof targetWin.focus === "function") {
+      try {
+        targetWin.focus();
+      } catch {
+        // Ignore focus error
+      }
+
+      targetWin.setTimeout(() => {
+        try {
+          targetWin.focus();
+          const freshLeaves = this.getLeavesForWindow(targetWin);
+          if (freshLeaves.length > 0) {
+            this.app.workspace.setActiveLeaf(freshLeaves[0], { focus: true });
+          }
+        } catch {
+          // Ignore focus error
+        }
+      }, 50);
+
+      targetWin.setTimeout(() => {
+        try {
+          targetWin.focus();
+          const freshLeaves = this.getLeavesForWindow(targetWin);
+          if (freshLeaves.length > 0) {
+            this.app.workspace.setActiveLeaf(freshLeaves[0], { focus: true });
+          }
+        } catch {
+          // Ignore focus error
+        }
+      }, 200);
+    }
   }
 
   /**
@@ -618,6 +709,13 @@ export class WindowLayoutManager {
         },
       };
 
+      const existingLayout = this.plugin?.settings?.spaces?.find(
+        (l: WindowLayout) => l.name === capturedLayout.name
+      );
+      if (existingLayout && existingLayout.includeGeometry !== undefined) {
+        capturedLayout.includeGeometry = existingLayout.includeGeometry;
+      }
+
       // 儲存對話框開啟後 activeWindow 可能已經切回主視窗，
       // 因此保存 capture 當下的 DOM Window，供 saveLayout 使用。
       this.layoutWindows.set(capturedLayout, currentWin);
@@ -635,10 +733,45 @@ export class WindowLayoutManager {
     layout: WindowLayout,
     options: RestoreLayoutOptions = {}
   ): Promise<void> {
+    // A layout can be visible in both the persistent panel and a popout
+    // dialog. Coalesce overlapping restore events so one click cannot create
+    // two popout windows (one of them appearing blank during reconstruction).
+    if (this.activeRestorePromise) return this.activeRestorePromise;
+
+    const restorePromise = this.restoreLayoutInternal(layout, options);
+    this.activeRestorePromise = restorePromise;
+    try {
+      await restorePromise;
+    } finally {
+      if (this.activeRestorePromise === restorePromise) {
+        this.activeRestorePromise = null;
+      }
+    }
+  }
+
+  private async restoreLayoutInternal(
+    layout: WindowLayout,
+    options: RestoreLayoutOptions = {}
+  ): Promise<void> {
     try {
       // 驗證佈局數據
       if (!this.validateLayout(layout)) {
         throw new Error(t("errors.invalidData"));
+      }
+
+      // 0. 若該 Layout 已經在某個 Popout 視窗中開啟，且非強制重載 (forceReload)，直接聚焦該視窗即可
+      if (!options.forceReload) {
+        const existingWin = this.getOpenWindowForLayout(layout);
+        if (existingWin && !existingWin.closed && this.isPopoutDocument(existingWin.document)) {
+          this.focusTargetWindow(existingWin);
+          this.setLayoutLabelForWindow(existingWin, layout.name);
+          this.refreshLayoutLabels();
+
+          if (options.showNotifications !== false && this.plugin.settings.showNotifications !== false) {
+            new Notice(tWithParams("notifications.switchedToOpenWindow", { name: layout.name }));
+          }
+          return;
+        }
       }
 
       // changeLayout 可能重建任一既有 WorkspaceWindow。所有 restore 都先
@@ -713,7 +846,8 @@ export class WindowLayoutManager {
         const currentFloatingWindow = floatingWindows[targetIndex];
         const restoredWindow = this.prepareFloatingWindowForRestore(
           layout.workspace.layout,
-          currentFloatingWindow
+          currentFloatingWindow,
+          layout.includeGeometry
         );
         if (currentLayout.floating?.type === "floating" && Array.isArray(currentLayout.floating.children)) {
           currentLayout.floating.children = currentLayout.floating.children.map(
@@ -727,17 +861,27 @@ export class WindowLayoutManager {
 
       await new Promise((resolve) => setTimeout(resolve, 150));
 
-      // 4. 取得目標 Popout 視窗的 DOM Window 並安全開啟所有檔案。
-      // changeLayout 可能會重建 leaf，因此若原 ID 不再存在，改用還原後
-      // 同一視窗中匹配最多保存 leaf 的方式辨識目標視窗。
-      // changeLayout 會清除並重新建立 WorkspaceWindow，舊的 targetWin
-      // 可能已經被關閉；但 forceNewWindow 時來源視窗可能仍包含相同的
-      // leaf ID，不能只依 saved leaf ID 找視窗，否則會把檔案開回來源視窗。
-      const preferredTargetWin = targetWin;
-      targetWin = this.findWindowForSavedLeaves(
+      // 4. 取得目標 Popout 視窗最新活體 DOM Window 並安全開啟所有檔案
+      const livePopouts = this.getLivePopoutWindows();
+      let liveTargetWin: Window | null = null;
+
+      if (options.forceNewWindow) {
+        if (options.targetWindow) {
+          const nonSourceWins = livePopouts.filter((w) => w !== options.targetWindow);
+          if (nonSourceWins.length > 0) {
+            liveTargetWin = nonSourceWins[nonSourceWins.length - 1];
+          }
+        } else {
+          liveTargetWin = livePopouts[livePopouts.length - 1] || targetWin;
+        }
+      } else if (targetIndex >= 0 && targetIndex < livePopouts.length) {
+        liveTargetWin = livePopouts[targetIndex];
+      }
+
+      targetWin = liveTargetWin || this.findWindowForSavedLeaves(
         savedLeaves,
-        options.forceNewWindow ? options.targetWindow : undefined,
-        preferredTargetWin
+        options.targetWindow,
+        targetWin
       ) || targetWin;
 
       let missingFiles: string[] = [];
@@ -751,19 +895,53 @@ export class WindowLayoutManager {
 
       // 5. 調整視窗尺寸與座標，並聚焦視窗
       if (targetWin) {
-        this.restoreWindowGeometry(targetWin, layout.windowState);
+        this.layoutWindows.set(layout, targetWin);
+        this.restoreWindowGeometry(targetWin, layout.windowState, layout.includeGeometry);
+
+        const winLeaves = this.getLeavesForWindow(targetWin);
+        if (winLeaves.length > 0) {
+          try {
+            this.app.workspace.setActiveLeaf(winLeaves[0], { focus: true });
+          } catch {
+            // Ignore focus error
+          }
+        }
+
         if (typeof targetWin.focus === "function") {
           try {
             targetWin.focus();
           } catch (e) {
             console.warn("Failed to focus target window:", e);
           }
+          targetWin.setTimeout(() => {
+            try {
+              targetWin.focus();
+              const freshLeaves = this.getLeavesForWindow(targetWin);
+              if (freshLeaves.length > 0) {
+                this.app.workspace.setActiveLeaf(freshLeaves[0], { focus: true });
+              }
+            } catch {
+              // Ignore focus error
+            }
+          }, 100);
+          targetWin.setTimeout(() => {
+            try {
+              targetWin.focus();
+              const freshLeaves = this.getLeavesForWindow(targetWin);
+              if (freshLeaves.length > 0) {
+                this.app.workspace.setActiveLeaf(freshLeaves[0], { focus: true });
+              }
+            } catch {
+              // Ignore focus error
+            }
+          }, 300);
         }
       }
 
       this.setLayoutLabelForWindow(targetWin, layout.name);
       this.restorePreservedWindowLabels(preservedWindowLayouts, targetWin);
       this.refreshLayoutLabels();
+      WindowLayoutsModal.renderAllInstances();
 
       if (options.showNotifications !== false) {
         if (missingFiles.length > 0) {
@@ -783,75 +961,77 @@ export class WindowLayoutManager {
    * 獲取所有保存的佈局 (按建立時間降序排列，最新儲存的在最上面)
    */
   getSavedLayouts(): WindowLayout[] {
-    const settings = this.plugin.settings;
-    const layouts = settings.layouts || [];
-    const sortBy = settings.sortBy || "updated-desc";
+    const settings = this.plugin.settings || {};
+    const spaces = settings.spaces || [];
 
-    return [...layouts].sort((a, b) => {
-      const aCreated = a.createdAt || a.timestamp || 0;
-      const bCreated = b.createdAt || b.timestamp || 0;
-      const aUpdated = a.updatedAt || a.timestamp || aCreated;
-      const bUpdated = b.updatedAt || b.timestamp || bCreated;
+    return [...spaces].sort((a, b) => {
+      const mode = settings.sortBy || "updated-desc";
+      const getTimestamp = (l: WindowLayout, field: "updatedAt" | "createdAt") =>
+        l[field] ?? l.timestamp ?? 0;
 
-      switch (sortBy) {
+      switch (mode) {
         case "updated-desc":
-          return bUpdated - aUpdated;
+          return getTimestamp(b, "updatedAt") - getTimestamp(a, "updatedAt");
         case "updated-asc":
-          return aUpdated - bUpdated;
+          return getTimestamp(a, "updatedAt") - getTimestamp(b, "updatedAt");
         case "created-desc":
-          return bCreated - aCreated;
+          return getTimestamp(b, "createdAt") - getTimestamp(a, "createdAt");
         case "created-asc":
-          return aCreated - bCreated;
+          return getTimestamp(a, "createdAt") - getTimestamp(b, "createdAt");
         case "name-asc":
-          return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" });
+          return (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base" });
         case "name-desc":
-          return b.name.localeCompare(a.name, undefined, { numeric: true, sensitivity: "base" });
+          return (b.name || "").localeCompare(a.name || "", undefined, { sensitivity: "base" });
         default:
-          return bUpdated - aUpdated;
+          return getTimestamp(b, "updatedAt") - getTimestamp(a, "updatedAt");
       }
     });
   }
 
   /**
-   * 保存佈局到存儲
+   * 保存新佈局或覆蓋既有佈局
    */
   async saveLayout(layout: WindowLayout): Promise<void> {
     try {
       const settings = this.plugin.settings;
-      if (!settings.layouts) {
-        settings.layouts = [];
+      if (!settings.spaces) {
+        settings.spaces = [];
       }
 
       const now = Date.now();
-      const existingIndex = settings.layouts.findIndex(
+      const existingIndex = settings.spaces.findIndex(
         (l) => l.name === layout.name
       );
       const isOverwrite = existingIndex >= 0;
 
       if (isOverwrite) {
-        const existing = settings.layouts[existingIndex];
+        const existing = settings.spaces[existingIndex];
         layout.id = existing.id;
         layout.createdAt = existing.createdAt || existing.timestamp || now;
         layout.updatedAt = now;
         layout.timestamp = now;
-        settings.layouts[existingIndex] = layout;
+        if (layout.includeGeometry === undefined && existing.includeGeometry !== undefined) {
+          layout.includeGeometry = existing.includeGeometry;
+        }
+        settings.spaces[existingIndex] = layout;
       } else {
         // 全新建立 (由 A 複製/改名另存為 B 時，重設 B 的 createdAt 為當時時間)
         layout.createdAt = now;
         layout.updatedAt = now;
         layout.timestamp = now;
-        settings.layouts.push(layout);
+        settings.spaces.push(layout);
       }
 
       // 限制佈局數量
       if (
         settings.maxLayouts &&
-        settings.layouts.length > settings.maxLayouts
+        settings.spaces.length > settings.maxLayouts
       ) {
-        settings.layouts = settings.layouts.slice(-settings.maxLayouts);
+        settings.spaces = settings.spaces.slice(-settings.maxLayouts);
       }
 
       await this.plugin.saveSettings();
+      WindowLayoutsModal.renderAllInstances();
 
       const sourceWindow = this.getWindowForLayout(layout);
       this.setLayoutLabelForWindow(sourceWindow, layout.name);
@@ -874,12 +1054,13 @@ export class WindowLayoutManager {
   async deleteLayout(layoutId: string): Promise<void> {
     try {
       const settings = this.plugin.settings;
-      const index = settings.layouts.findIndex((l) => l.id === layoutId);
+      const index = settings.spaces.findIndex((l) => l.id === layoutId);
 
       if (index >= 0) {
-        const deletedLayout = settings.layouts[index];
-        settings.layouts.splice(index, 1);
+        const deletedLayout = settings.spaces[index];
+        settings.spaces.splice(index, 1);
         await this.plugin.saveSettings();
+        WindowLayoutsModal.renderAllInstances();
 
         if (this.plugin.settings.showNotifications !== false) {
           new Notice(
@@ -891,6 +1072,87 @@ export class WindowLayoutManager {
       console.error("Failed to delete layout:", error);
       throw new Error(t("errors.failedToDelete"));
     }
+  }
+
+  /**
+   * 重命名 Section 名稱並同步更新所有帶有該標籤的 Space 與 sectionsOrder
+   */
+  async renameSection(oldName: string, newName: string): Promise<void> {
+    const cleanOld = oldName.trim();
+    const cleanNew = newName.trim();
+    if (!cleanOld || !cleanNew || cleanOld === cleanNew) return;
+
+    const settings = this.plugin.settings;
+    if (!settings.sectionsOrder) settings.sectionsOrder = [];
+
+    // 1. 更新 sectionsOrder
+    const orderIndex = settings.sectionsOrder.indexOf(cleanOld);
+    if (orderIndex !== -1) {
+      settings.sectionsOrder[orderIndex] = cleanNew;
+    }
+
+    // 2. 批量更新所有 Space 中的 sections 陣列
+    (settings.spaces || []).forEach((space: WindowLayout) => {
+      if (space.sections && Array.isArray(space.sections)) {
+        const secIndex = space.sections.indexOf(cleanOld);
+        if (secIndex !== -1) {
+          space.sections[secIndex] = cleanNew;
+          // 去重
+          space.sections = Array.from(new Set(space.sections));
+        }
+      }
+    });
+
+    await this.plugin.saveSettings();
+    WindowLayoutsModal.renderAllInstances();
+  }
+
+  /**
+   * 切換指定 Space 的封存狀態
+   */
+  async toggleArchiveSpace(spaceId: string, archiveStatus?: boolean): Promise<void> {
+    const settings = this.plugin.settings;
+    const space = (settings.spaces || []).find((s) => s.id === spaceId);
+    if (!space) return;
+
+    const newStatus = archiveStatus !== undefined ? archiveStatus : !space.archived;
+    space.archived = newStatus;
+
+    await this.plugin.saveSettings();
+    WindowLayoutsModal.renderAllInstances();
+
+    if (this.plugin.settings.showNotifications !== false) {
+      let noticeText = newStatus ? "Space archived" : "Space unarchived";
+      try {
+        noticeText = newStatus ? t("manageModal.archiveSuccess") : t("manageModal.unarchiveSuccess");
+      } catch {
+        // Fallback if i18n not initialized
+      }
+      new Notice(`${noticeText}: ${space.name}`);
+    }
+  }
+
+  /**
+   * 更新 Section 排序順序
+   */
+  async reorderSections(newOrder: string[]): Promise<void> {
+    this.plugin.settings.sectionsOrder = newOrder;
+    await this.plugin.saveSettings();
+    WindowLayoutsModal.renderAllInstances();
+  }
+
+  /**
+   * 獲取所有目前開啟中的活體 Popout DOM Window (按 Workspace 順序)
+   */
+  getLivePopoutWindows(): Window[] {
+    const wins: Window[] = [];
+    (this.app.workspace as any).iterateAllLeaves((leaf: WorkspaceLeaf) => {
+      const win = (leaf as any).containerEl?.ownerDocument?.defaultView as Window | undefined;
+      if (win && this.isPopoutDocument(win.document) && !wins.includes(win)) {
+        wins.push(win);
+      }
+    });
+    return wins;
   }
 
   /**
@@ -1154,12 +1416,16 @@ export class WindowLayoutManager {
    * 以目前 WorkspaceWindow 的 id/容器為基礎，只替換其 children。
    * Obsidian 1.12 的 layout schema 是 floating -> window -> split/tabs/leaf。
    */
-  private prepareFloatingWindowForRestore(savedLayout: any, currentWindow: any): any {
+  private prepareFloatingWindowForRestore(
+    savedLayout: any,
+    currentWindow: any,
+    includeGeometry = true
+  ): any {
     const saved = JSON.parse(JSON.stringify(savedLayout));
 
     if (currentWindow?.type === "window") {
       if (saved.type === "window") {
-        return {
+        const merged = {
           ...currentWindow,
           ...saved,
           id: currentWindow.id,
@@ -1167,12 +1433,49 @@ export class WindowLayoutManager {
             ? saved.children.map((child: any) => this.normalizeFloatingLayout(child))
             : [],
         };
+
+        if (includeGeometry === false) {
+          delete merged.x;
+          delete merged.y;
+          delete merged.width;
+          delete merged.height;
+          delete merged.dimension;
+          delete merged.zoom;
+          delete merged.isMaximized;
+          delete merged.isFullScreen;
+        }
+
+        return merged;
       }
 
-      return {
+      const res = {
         ...currentWindow,
         children: [this.normalizeFloatingLayout(saved)],
       };
+
+      if (includeGeometry === false) {
+        delete res.x;
+        delete res.y;
+        delete res.width;
+        delete res.height;
+        delete res.dimension;
+        delete res.zoom;
+        delete res.isMaximized;
+        delete res.isFullScreen;
+      }
+
+      return res;
+    }
+
+    if (includeGeometry === false && saved?.type === "window") {
+      delete saved.x;
+      delete saved.y;
+      delete saved.width;
+      delete saved.height;
+      delete saved.dimension;
+      delete saved.zoom;
+      delete saved.isMaximized;
+      delete saved.isFullScreen;
     }
 
     return saved.type === "window" ? saved : this.normalizeFloatingLayout(saved);
@@ -1462,9 +1765,13 @@ export class WindowLayoutManager {
       progressNotice.hide();
     }
 
-    if (targetActiveLeaf) {
+    const leafToFocus = targetActiveLeaf || windowLeaves[0] || null;
+    if (leafToFocus) {
       try {
-        this.app.workspace.setActiveLeaf(targetActiveLeaf, { focus: true });
+        this.app.workspace.setActiveLeaf(leafToFocus, { focus: true });
+        if ((leafToFocus as any)?.containerEl && typeof (leafToFocus as any).containerEl.focus === "function") {
+          (leafToFocus as any).containerEl.focus();
+        }
       } catch (e) {
         console.warn("Failed to set active leaf:", e);
       }
@@ -1493,7 +1800,8 @@ export class WindowLayoutManager {
     leaves: ViewState[],
     excludedWindow?: Window,
     preferredWindow?: Window | null,
-    claimedWindows: Set<Window> = new Set()
+    claimedWindows: Set<Window> = new Set(),
+    requirePositiveScore = false
   ): Window | null {
     if (leaves.length === 0) return null;
 
@@ -1540,6 +1848,9 @@ export class WindowLayoutManager {
 
     if (bestWindow) return bestWindow;
 
+    // 當要求正分數 (positive score) 時，若未匹配到任何 leaf/file (score 0)，禁止盲目 fallback 回傳唯一視窗
+    if (requirePositiveScore) return null;
+
     // 首次 restore 時若 Obsidian 已重建 leaf ID，但目前只有一個 popout，
     // 該視窗就是唯一合法目標。
     return windows.size === 1 ? Array.from(windows.keys())[0] : null;
@@ -1565,7 +1876,6 @@ export class WindowLayoutManager {
       );
       if (!currentWindow) return;
       this.setLayoutLabelForWindow(currentWindow, snapshot.layoutName);
-      this.restoreWindowGeometry(currentWindow, snapshot.windowState);
       claimedWindows.add(currentWindow);
     });
   }
@@ -1573,9 +1883,10 @@ export class WindowLayoutManager {
   /** 在 changeLayout 重建 popout 後恢復實際視窗尺寸與座標。 */
   private restoreWindowGeometry(
     targetWin: Window,
-    windowState: WindowState | null | undefined
+    windowState: WindowState | null | undefined,
+    includeGeometry = true
   ): void {
-    if (!windowState) return;
+    if (!windowState || includeGeometry === false) return;
 
     const size = windowState.size;
     if (

@@ -8,6 +8,9 @@ export interface WindowLayout {
   workspace: WorkspaceState;
   metadata: LayoutMetadata;
   autoSave?: boolean;
+  includeGeometry?: boolean;
+  sections?: string[];
+  archived?: boolean;
   // 用於識別視窗的資訊
   windowInfo?: {
     windowId?: string;
@@ -44,7 +47,7 @@ export interface LayoutMetadata {
 }
 
 export interface WindowSettings {
-  layouts: WindowLayout[];
+  spaces: WindowLayout[];
   autoSave: boolean;
   showNotifications: boolean;
   maxLayouts: number;
@@ -54,6 +57,9 @@ export interface WindowSettings {
   layoutStatusBarDefaultApplied?: boolean;
   showWindowLayoutsRibbonIcon: boolean;
   sortBy?: "updated-desc" | "updated-asc" | "created-desc" | "created-asc" | "name-asc" | "name-desc";
+  sectionsOrder?: string[];
+  groupBySection?: boolean;
+  showArchived?: boolean;
 }
 
 export interface SaveLayoutOptions {
@@ -68,4 +74,5 @@ export interface RestoreLayoutOptions {
   showNotifications?: boolean;
   targetWindow?: Window;
   forceNewWindow?: boolean;
+  forceReload?: boolean;
 }

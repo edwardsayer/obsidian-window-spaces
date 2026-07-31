@@ -46,7 +46,7 @@ describe("Layout Sorting & Timestamp Copy Logic (sorting.test.ts)", () => {
     mockPlugin = {
       app: mockApp,
       settings: {
-        layouts: JSON.parse(JSON.stringify(sampleLayouts)),
+        spaces: JSON.parse(JSON.stringify(sampleLayouts)),
         sortBy: "updated-desc",
       },
       saveSettings: async () => {},
@@ -108,7 +108,7 @@ describe("Layout Sorting & Timestamp Copy Logic (sorting.test.ts)", () => {
     await manager.saveLayout(copiedLayout);
     const afterSave = Date.now();
 
-    const savedB = mockPlugin.settings.layouts.find((l: any) => l.name === "Copied B");
+    const savedB = mockPlugin.settings.spaces.find((l: any) => l.name === "Copied B");
     expect(savedB).toBeDefined();
     expect(savedB.createdAt).toBeGreaterThanOrEqual(beforeSave);
     expect(savedB.createdAt).toBeLessThanOrEqual(afterSave);

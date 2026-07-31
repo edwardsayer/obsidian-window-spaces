@@ -40,6 +40,6 @@ describe("Internationalization & Dynamic Locale Detection (i18n.test.ts)", () =>
   test("should replace parameters correctly in tWithParams", () => {
     window.localStorage.setItem("language", "en");
     const result = i18n.tWithParams("saveModal.overwriteNotice", { name: "MyLayout" });
-    expect(result).toBe("Will overwrite existing layout");
+    expect(result).toBe("Will overwrite existing space");
   });
 });
