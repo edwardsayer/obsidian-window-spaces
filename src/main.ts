@@ -1,4 +1,4 @@
-import { Modal, Plugin, Notice } from "obsidian";
+import { Modal, Plugin, Notice, WorkspaceLeaf } from "obsidian";
 import { WindowLayout, WindowSettings } from "./types";
 import { WindowLayoutManager } from "./manager";
 import { SaveLayoutModal } from "./modals/saveModal";
@@ -134,7 +134,7 @@ export default class WindowSpacesPlugin extends Plugin {
       },
     });
 
-    // 開啟統一的視窗佈局對話框
+    // 開啟 Window Spaces 彈出視窗 (與 ribbon icon 相同的入口)
     this.addCommand({
       id: "open-window-layouts",
       name: t("commands.openLayouts"),
@@ -194,10 +194,9 @@ export default class WindowSpacesPlugin extends Plugin {
   ): void {
     try {
       const win = targetWindow || (this.manager ? this.manager.getActiveWindow() : undefined);
-      // Use a plain native Modal as the host. The same Window Spaces
-      // controller already mounts reliably in ItemView panels; mounting it
-      // here avoids the failing custom Modal.open()/onOpen lifecycle seen in
-      // Obsidian 1.13 while preserving the shared picker and restore logic.
+      // Use a plain native Modal as the host. The shared Window Spaces
+      // controller mounts here reliably, while popup-only CSS keeps its
+      // toolbar visually separate from the native close X.
       const hostModal = new Modal(this.app);
       const controller = new WindowLayoutsModal(this.app, this, win);
 
@@ -205,10 +204,15 @@ export default class WindowSpacesPlugin extends Plugin {
       hostModal.onOpen = () => {
         try {
           hostModal.modalEl.addClass("window-layouts-modal");
+          hostModal.modalEl.addClass("window-layouts-popout-modal");
           controller.mountInModalContainer(
             hostModal.contentEl,
             () => hostModal.close()
           );
+          const titleHeader = hostModal.containerEl.querySelector<HTMLElement>(".modal-title");
+          if (titleHeader) {
+            controller.mountHeaderActions(titleHeader);
+          }
         } catch (error: any) {
           console.error("[WindowSpaces] Error mounting Window Spaces picker:", error);
           hostModal.contentEl.empty();
@@ -231,6 +235,15 @@ export default class WindowSpacesPlugin extends Plugin {
     location: WindowLayoutsPanelLocation = "tab"
   ): Promise<void> {
     const workspace = this.app.workspace as any;
+
+    // 若指定位置已有 Window Spaces panel，直接啟用既有的 panel，
+    // 避免重複開啟。
+    const existingPanelLeaf = this.findPanelLeafAtLocation(location);
+    if (existingPanelLeaf) {
+      await workspace.revealLeaf(existingPanelLeaf);
+      return;
+    }
+
     let leaf;
 
     if (location === "left") {
@@ -258,6 +271,34 @@ export default class WindowSpacesPlugin extends Plugin {
 
     await leaf.setViewState({ type: WINDOW_LAYOUTS_VIEW_TYPE, state: {} });
     await workspace.revealLeaf(leaf);
+  }
+
+  /** 在指定位置尋找已開啟的 Window Spaces panel leaf。 */
+  private findPanelLeafAtLocation(
+    location: WindowLayoutsPanelLocation
+  ): WorkspaceLeaf | null {
+    const workspace = this.app.workspace as any;
+    let found: WorkspaceLeaf | null = null;
+
+    workspace.iterateAllLeaves((leaf: any) => {
+      if (found) return;
+      if (!leaf || typeof leaf.getRoot !== "function") return;
+      if (leaf.view?.getViewType?.() !== WINDOW_LAYOUTS_VIEW_TYPE) return;
+
+      const root = leaf.getRoot();
+      const matches =
+        location === "left"
+          ? root === workspace.leftSplit
+          : location === "right"
+            ? root === workspace.rightSplit
+            : location === "tab"
+              ? root === workspace.rootSplit
+              : false;
+
+      if (matches) found = leaf;
+    });
+
+    return found;
   }
 
   private setupEventListeners() {

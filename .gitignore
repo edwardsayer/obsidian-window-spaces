@@ -147,7 +147,7 @@ main.js.map
 *.map
 
 # AI & IDE directories
-agents
+agents/
 .agents/
 .claude/
 .gemini/
@@ -157,7 +157,6 @@ agents
 
 # Local-only files & archived development documents
 AGENTS.md
-doc/done/
 
 # Visual Studio files
 *.suo

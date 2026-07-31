@@ -778,10 +778,14 @@ export class WindowLayoutManager {
         throw new Error(t("errors.invalidData"));
       }
 
-      // 0. 只有「目前視窗還原」才在 Layout 已開啟時直接聚焦既有視窗。
-      // 一般 Enter / click 會傳入 forceNewWindow，必須繼續走新 Popout 流程，
-      // 否則已開啟的 Layout 會被 Smart Focus 提前攔截，永遠不會開新視窗。
-      if (!options.forceReload && !options.forceNewWindow) {
+      // 0. 若此 space 已在某個存活的 Popout 視窗中開啟，直接聚焦該視窗，
+      // 避免重複 restore 相同的 space。
+      // - forceReload (Shift 套用至目前視窗) 是明確的覆寫動作，仍繼續走既有流程。
+      // - clone 流程 (forceNewWindow 但無 focusExistingWindow) 刻意要開新視窗。
+      if (
+        !options.forceReload &&
+        (!options.forceNewWindow || options.focusExistingWindow === true)
+      ) {
         const existingWin = this.getOpenWindowForLayout(layout);
         if (existingWin && !existingWin.closed && this.isPopoutDocument(existingWin.document)) {
           this.focusTargetWindow(existingWin);

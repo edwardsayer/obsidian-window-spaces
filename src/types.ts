@@ -75,4 +75,9 @@ export interface RestoreLayoutOptions {
   targetWindow?: Window;
   forceNewWindow?: boolean;
   forceReload?: boolean;
+  /**
+   * 當此 space 已在某個存活 Popout 視窗中開啟時，直接聚焦該視窗，
+   * 避免重複 restore 產生重複視窗。clone 流程不會傳入此旗標。
+   */
+  focusExistingWindow?: boolean;
 }

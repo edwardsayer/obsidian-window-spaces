@@ -473,6 +473,17 @@
   margin-top: 4px;
 }
 
+/* Footer keyboard hints in the persistent panel are hidden by default and
+   only appear while the mouse hovers the panel or the panel leaf is active.
+   The 3-class selector outranks .window-layouts-modal .prompt-instructions. */
+.window-layouts-panel.window-layouts-modal .prompt-instructions {
+  display: none;
+}
+.window-layouts-panel.window-layouts-modal:hover .prompt-instructions,
+.workspace-leaf.mod-active .window-layouts-panel.window-layouts-modal .prompt-instructions {
+  display: flex;
+}
+
 /* CRITICAL: user 驗證過，不要動到!! (Verified by user, DO NOT MODIFY) */
 .window-layouts-panel .window-layouts-toolbar .qsp-action-btn {
   flex: 0 0 auto;
@@ -881,6 +892,32 @@
   align-items: center;
   justify-content: space-between;
   width: 100%;
+}
+
+/* Reserve the native close-button zone when header actions are present so
+   the panel menu button never sits underneath the X in popup windows. */
+.window-layouts-modal .modal-title:has(.window-layouts-header-actions) {
+  padding-right: 32px;
+}
+
+/* Keep the native close X and the Window Spaces actions as separate controls. */
+.window-layouts-popout-modal .modal-title:has(.window-layouts-header-actions) {
+  padding-right: 0;
+}
+
+/* Popup-only toolbar treatment. Keep the native X outside this panel so the
+   two controls read as separate UI elements even when the X is present. */
+.window-layouts-popout-modal .modal-title .window-layouts-header-actions {
+  flex: 0 0 auto;
+  margin-left: 1em;
+  margin-right: 1em;
+  padding: 2px 4px;
+  gap: 2px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m, 8px);
+  background-color: var(--background-secondary);
+  box-shadow: var(--shadow-s);
+  box-sizing: border-box;
 }
 
 /* ===== Section list headers ===== */

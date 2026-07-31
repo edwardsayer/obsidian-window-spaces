@@ -33,9 +33,9 @@ Obsidian's built-in **Workspaces** plugin is designed for **global application s
 ### ✨ Key Features
 - **Popout Window Preservation**: Captures splits, tabs, active file, view modes, and exact window dimensions/position.
 - **Smart Layout Naming**: Automatically generates intuitive names based on pinned files and active notes (`Pinned Note & Active Note`).
-- **Context-Aware Restoration**: Click normally (or press `Enter`) to spawn a new popout window; hold `Shift` (or press `Shift + Enter`) to restore directly into the current popout window.
+- **Context-Aware Restoration**: Click normally (or press `Enter`) to spawn a new popout window; hold `Shift` (or press `Shift + Enter`) to restore directly into the current popout window. Restoring a Space that is already open in a popout window focuses that window instead of duplicating it.
 - **Per-Layout Auto-Save**: Toggle 🔄 auto-save on specific layouts with a 5-second debounced background update and immediate save on window close.
-- **Unified Quick-Switch & Management Modal**: Search layouts in real-time, view hover file tooltips, sort by 6 dimensions (gear menu ⚙️), rename, edit, auto-save, or delete.
+- **Unified Quick-Switch & Management Modal**: Search layouts in real-time, view hover file tooltips, sort by 6 dimensions (gear menu ⚙️), rename, edit, auto-save, or delete. Opens as a popup window (with the same toolbar in its title bar), an editor-tab panel, or a sidebar panel.
 - **Safe Placement & Guardrails**: Prevents off-screen windows on monitor changes and guards against accidental 0-file layout overwrites.
 
 ### 🖼️ Screenshots
@@ -60,15 +60,16 @@ Obsidian's built-in **Workspaces** plugin is designed for **global application s
 
 #### 1. Save Window Layout
 - Open the command palette (`Ctrl/Cmd + P`) in any popout window.
-- Run `Window Spaces: Save current window layout`.
+- Run `Window Spaces: Save current Space`.
 - Enter a name or use the auto-generated smart name, then press `Enter`.
 
 #### 2. Open Window Layouts
-- Run `Window Spaces: Open window layouts`.
+- Run `Window Spaces: Open as popup window` to open the picker in a popup, `Open as tab panel` to open it in the main workspace area, or `Open in left/right sidebar` to dock it in a sidebar.
 - Select a layout from the unified restore and management dialog.
 - Click a layout normally, or press `Enter`, to restore it in a new popout window.
 - Hold `Shift` while clicking a layout, or press `Shift + Enter`, to restore it in the current active popout window.
-- Access dropdown options (∨) to toggle auto-save, rename, edit, or delete saved layouts.
+- If the Space is already open in a popout window, restoring it again focuses that window instead of creating a duplicate.
+- Access dropdown options (∨) to toggle auto-save, rename, edit, or delete saved layouts, and use the panel menu to move the picker to another location.
 - See the [Use Cases & Workflows](#use-cases--workflows) section below for project, research, Canvas, Tasks, writing, meeting, and development workspace examples.
 
 ### 🚀 Use Cases & Workflows
@@ -87,7 +88,7 @@ Think of each saved Space as a reusable **work cabin** for a project, research t
 Once saved, a single click (or `Enter`) restores the whole cabin into a fresh popout window, or `Shift + click` (`Shift + Enter`) applies it to the current popout.
 
 ### ⌨️ Keyboard Shortcuts
-- No default command shortcuts are assigned. You can assign an optional shortcut to `Window Spaces: Open window layouts` in Obsidian's Hotkeys settings.
+- No default command shortcuts are assigned. You can assign optional shortcuts to `Window Spaces: Open as popup window` (or the tab/sidebar panel commands) in Obsidian's Hotkeys settings.
 - Within the layout list, `Enter` restores in a new popout and `Shift + Enter` restores in the current active popout.
 
 ### 💻 Compatibility

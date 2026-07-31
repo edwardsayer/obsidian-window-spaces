@@ -42,7 +42,8 @@ export class WindowLayoutsView extends ItemView {
     // command all activate the leaf natively, so arrow-key ownership follows
     // the same rule as every other Obsidian panel.
     this.contentController.mountInContainer(this.contentEl, undefined, () => {
-      return this.app.workspace.getMostRecentLeaf() === this.leaf;
+      const ws = this.app.workspace as any;
+      return ws.getMostRecentLeaf() === this.leaf || ws.activeLeaf === this.leaf;
     });
   }
 

@@ -64,11 +64,18 @@ describe("Validation & Auto-Save Guardrails (validationAndGuardrails.test.ts)", 
     expect(popoutWindow.focus).toHaveBeenCalled();
   });
 
-  test("forceNewWindow bypasses smart-focus and creates a new popout for an already-open space", async () => {
+  test("restore focuses the existing popout window for an already-open space when focusExistingWindow is set", async () => {
     const popoutBody = {
       classList: { contains: (className: string) => className === "is-popout-window" },
     };
-    const existingWindow = { document: { body: popoutBody } } as unknown as Window;
+    const existingWindow = {
+      document: { body: popoutBody },
+      focus: vi.fn(),
+      setTimeout: (callback: () => void) => {
+        callback();
+        return 0;
+      },
+    } as unknown as Window;
     const newWindow = {
       document: { body: popoutBody },
       focus: vi.fn(),
@@ -91,6 +98,59 @@ describe("Validation & Auto-Save Guardrails (validationAndGuardrails.test.ts)", 
       windowState: { size: { width: 800, height: 600 } },
       workspace: {
         layout: { type: "leaf", id: "leaf-force-new", state: { type: "empty", state: {} } },
+        leaves: [],
+      },
+      metadata: { fileCount: 0, tabCount: 0, splitCount: 0 },
+    };
+
+    vi.spyOn(manager as any, "getOpenWindowForLayout").mockReturnValue(existingWindow);
+    vi.spyOn(manager as any, "capturePreservedWindowLayouts").mockReturnValue([]);
+    vi.spyOn(manager as any, "getSavedViewStates").mockReturnValue([]);
+    vi.spyOn(manager, "getLivePopoutWindows").mockReturnValue([newWindow]);
+    vi.spyOn(manager as any, "getLeavesForWindow").mockReturnValue([]);
+    vi.spyOn(manager as any, "restoreWindowGeometry").mockImplementation(() => {});
+    vi.spyOn(manager as any, "restorePreservedWindowLabels").mockImplementation(() => {});
+    vi.spyOn(manager as any, "setLayoutLabelForWindow").mockImplementation(() => {});
+    vi.spyOn(manager as any, "refreshLayoutLabels").mockImplementation(() => {});
+    const focusSpy = vi.spyOn(manager, "focusTargetWindow");
+
+    await manager.restoreLayout(layout, {
+      forceNewWindow: true,
+      focusExistingWindow: true,
+      showNotifications: false,
+    });
+
+    expect(focusSpy).toHaveBeenCalledWith(existingWindow);
+    expect(openPopoutLeaf).not.toHaveBeenCalled();
+  });
+
+  test("clone restore (forceNewWindow without focusExistingWindow) still creates a new popout for an already-open space", async () => {
+    const popoutBody = {
+      classList: { contains: (className: string) => className === "is-popout-window" },
+    };
+    const existingWindow = { document: { body: popoutBody } } as unknown as Window;
+    const newWindow = {
+      document: { body: popoutBody },
+      focus: vi.fn(),
+      setTimeout: (callback: () => void) => {
+        callback();
+        return 0;
+      },
+    } as unknown as Window;
+    const openPopoutLeaf = vi.fn(() => ({}));
+
+    mockPlugin.settings.showNotifications = false;
+    mockPlugin.app.workspace.getLayout = vi.fn(() => ({ floating: [] }));
+    mockPlugin.app.workspace.openPopoutLeaf = openPopoutLeaf;
+    mockPlugin.app.workspace.changeLayout = vi.fn().mockResolvedValue(undefined);
+
+    const layout: WindowLayout = {
+      id: "clone-space",
+      name: "Cloned Space",
+      timestamp: Date.now(),
+      windowState: { size: { width: 800, height: 600 } },
+      workspace: {
+        layout: { type: "leaf", id: "leaf-clone", state: { type: "empty", state: {} } },
         leaves: [],
       },
       metadata: { fileCount: 0, tabCount: 0, splitCount: 0 },

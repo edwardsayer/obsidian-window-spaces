@@ -54,17 +54,14 @@ const en = {
         newWindow: "New Window",
         edit: "Edit",
         windowLayouts: "Window Spaces",
-        openAsPanel: "Open as panel",
-        panelLeft: "Open in left sidebar",
-        panelRight: "Open in right sidebar",
-        panelTab: "Open in main workspace tab",
+        openAsPanel: "Panel location",
     },
     commands: {
         saveLayout: "Save current Space",
-        openLayouts: "Open Window Spaces",
-        openLayoutsPanel: "Open Window Spaces as a panel",
-        openLayoutsPanelLeft: "Open Window Spaces in left sidebar",
-        openLayoutsPanelRight: "Open Window Spaces in right sidebar",
+        openLayouts: "Open as popup window",
+        openLayoutsPanel: "Open as tab panel",
+        openLayoutsPanelLeft: "Open in left sidebar",
+        openLayoutsPanelRight: "Open in right sidebar",
     },
     saveModal: {
         title: "Save Space",
@@ -160,17 +157,8 @@ const en = {
         showWindowLayoutsRibbonIconDesc: "Display one quick-access icon for restoring and managing Window Spaces",
         maxLayouts: "Max spaces",
         maxLayoutsDesc: "Limit the number of saved spaces (0 = unlimited)",
-        layoutStats: "Total saved spaces: {{count}}",
         autoSaveInterval: "Auto-save interval",
         minutes: "minutes",
-        layoutsSection: "Saved Window Spaces",
-        layoutsDescription: "Manage your saved Window Spaces.",
-        noLayouts: "No saved spaces found.",
-        layoutInfo: "Space: {{name}}",
-        createdOn: "Created: {{date}}",
-        includesFiles: "Includes {{count}} files",
-        deleteLayout: "Delete Space",
-        confirmDelete: "Are you sure you want to delete this space?",
         resetSettings: "Reset Settings",
         resetSettingsDescription: "Reset all settings to default values.",
         resetButton: "Reset Settings",
@@ -232,17 +220,14 @@ const zhTW = {
         newWindow: "新視窗",
         edit: "編輯",
         windowLayouts: "Window Spaces",
-        openAsPanel: "以面板開啟",
-        panelLeft: "開啟於左側欄",
-        panelRight: "開啟於右側欄",
-        panelTab: "開啟於主視窗分頁",
+        openAsPanel: "面板位置",
     },
     commands: {
         saveLayout: "儲存目前空間",
-        openLayouts: "開啟 Window Spaces",
-        openLayoutsPanel: "以面板開啟 Window Spaces",
-        openLayoutsPanelLeft: "在左側欄開啟 Window Spaces",
-        openLayoutsPanelRight: "在右側欄開啟 Window Spaces",
+        openLayouts: "開啟為彈出視窗",
+        openLayoutsPanel: "開啟為標籤面板",
+        openLayoutsPanelLeft: "開啟在左側邊欄",
+        openLayoutsPanelRight: "開啟在右側邊欄",
     },
     saveModal: {
         title: "儲存空間",
@@ -338,17 +323,8 @@ const zhTW = {
         showWindowLayoutsRibbonIconDesc: "在主視窗左側邊欄顯示恢復與管理 Window Spaces 的單一入口",
         maxLayouts: "最大空間數量",
         maxLayoutsDesc: "限制儲存的空間數量（0 代表無限制）",
-        layoutStats: "已儲存空間總數：{{count}} 個",
         autoSaveInterval: "自動儲存間隔",
         minutes: "分鐘",
-        layoutsSection: "已儲存的 Window Spaces",
-        layoutsDescription: "管理您已儲存的 Window Spaces。",
-        noLayouts: "沒有找到已儲存的空間。",
-        layoutInfo: "空間：{{name}}",
-        createdOn: "建立時間：{{date}}",
-        includesFiles: "包含 {{count}} 個檔案",
-        deleteLayout: "刪除空間",
-        confirmDelete: "您確定要刪除這個空間嗎？",
         resetSettings: "重設設定",
         resetSettingsDescription: "將所有設定重設為預設值。",
         resetButton: "重設設定",
@@ -410,17 +386,14 @@ const zhCN = {
         newWindow: "新窗口",
         edit: "编辑",
         windowLayouts: "Window Spaces",
-        openAsPanel: "作为面板打开",
-        panelLeft: "在左侧边栏打开",
-        panelRight: "在右侧边栏打开",
-        panelTab: "在主窗口标签页打开",
+        openAsPanel: "面板位置",
     },
     commands: {
         saveLayout: "保存当前空间",
-        openLayouts: "打开 Window Spaces",
-        openLayoutsPanel: "作为面板打开 Window Spaces",
-        openLayoutsPanelLeft: "在左侧边栏打开 Window Spaces",
-        openLayoutsPanelRight: "在右侧边栏打开 Window Spaces",
+        openLayouts: "作为弹出窗口打开",
+        openLayoutsPanel: "作为标签页面板打开",
+        openLayoutsPanelLeft: "在左侧边栏打开",
+        openLayoutsPanelRight: "在右侧边栏打开",
     },
     saveModal: {
         title: "保存空间",
@@ -516,17 +489,8 @@ const zhCN = {
         showWindowLayoutsRibbonIconDesc: "在主窗口左侧边栏显示恢复与管理 Window Spaces 的单一入口",
         maxLayouts: "最大空间数量",
         maxLayoutsDesc: "限制保存的空间数量（0 代表无限制）",
-        layoutStats: "已保存空间总数：{{count}} 个",
         autoSaveInterval: "自动保存间隔",
         minutes: "分钟",
-        layoutsSection: "已保存的 Window Spaces",
-        layoutsDescription: "管理您已保存的 Window Spaces。",
-        noLayouts: "没有找到已保存的空间。",
-        layoutInfo: "空间：{{name}}",
-        createdOn: "创建时间：{{date}}",
-        includesFiles: "包含 {{count}} 个文件",
-        deleteLayout: "删除空间",
-        confirmDelete: "您确定要删除这个空间吗？",
         resetSettings: "重置设置",
         resetSettingsDescription: "将所有设置重置为默认值。",
         resetButton: "重置设置",
@@ -932,12 +896,14 @@ class WindowLayoutsModal extends obsidian.Modal {
                     break;
                 }
             }
-            // A native Modal owns keyboard input while it is open. Persistent
-            // panels only own navigation while they are the active leaf (clicking
-            // the panel, its tab, or opening it via command activates the leaf) or
-            // while the focus is inside the panel.
+            // A native Modal owns keyboard input while it is open, so an open
+            // popup instance takes precedence over every persistent panel. Panels
+            // own navigation only while no popup is open AND they are the active
+            // leaf (clicking the panel, its tab, or opening it via command
+            // activates the leaf) or while the focus is inside the panel itself.
+            const anyPopupOpen = Array.from(WindowLayoutsModal.activeInstances).some((instance) => !instance.panelMode);
             const shouldHandle = this.panelMode
-                ? (focusedInstance ? focusedInstance === this : ((_a = this.isPanelActive) === null || _a === void 0 ? void 0 : _a.call(this)) === true)
+                ? focusedInstance === this || (!anyPopupOpen && ((_a = this.isPanelActive) === null || _a === void 0 ? void 0 : _a.call(this)) === true)
                 : true;
             if (!shouldHandle)
                 return;
@@ -1019,6 +985,16 @@ class WindowLayoutsModal extends obsidian.Modal {
             this.showSortMenu(e);
         };
         this.createPanelButton(actionsEl);
+    }
+    /**
+     * Mount the shared header action buttons (view options, sort, panel menu)
+     * into a native modal's title bar so popup windows expose the same three
+     * toolbar actions as the persistent panels.
+     */
+    mountHeaderActions(titleEl) {
+        if (titleEl.querySelector(".window-layouts-header-actions"))
+            return;
+        this.createHeaderActions(titleEl);
     }
     showViewOptionsMenu(event) {
         const menu = new obsidian.Menu();
@@ -1568,9 +1544,12 @@ class WindowLayoutsModal extends obsidian.Modal {
                 yield this.plugin.manager.restoreLayout(layout, {
                     // forceNewWindow 只控制 restore 的目標是否新建；仍需傳入來源視窗，
                     // 讓 manager 能保留該 popout 原本的 layout 名稱與狀態列。
+                    // focusExistingWindow：若該 space 已在某個 Popout 開啟，直接聚焦
+                    // 既有視窗，避免重複 restore 產生重複視窗 (clone 流程不傳此旗標)。
                     targetWindow: this.targetWindow,
                     forceNewWindow,
                     forceReload: !forceNewWindow,
+                    focusExistingWindow: true,
                 });
             }
             catch (error) {
@@ -1736,14 +1715,22 @@ class WindowLayoutsModal extends obsidian.Modal {
             this.closeHost();
             void this.plugin.openWindowLayoutsPanel(location);
         };
+        // 與命令面板的開啟命令共用相同名稱，確保兩處內容一致。
+        // 「彈出視窗」直接使用 ribbon/命令的 openWindowLayoutsModal 入口。
         menu.addItem((item) => {
-            item.setTitle(t("common.panelLeft")).setIcon("panel-left").onClick(() => openPanel("left"));
+            item.setTitle(t("commands.openLayoutsPanel")).setIcon("layout").onClick(() => openPanel("tab"));
         });
         menu.addItem((item) => {
-            item.setTitle(t("common.panelRight")).setIcon("panel-right").onClick(() => openPanel("right"));
+            item.setTitle(t("commands.openLayouts")).setIcon("layout").onClick(() => {
+                this.closeHost();
+                this.plugin.openWindowLayoutsModal();
+            });
         });
         menu.addItem((item) => {
-            item.setTitle(t("common.panelTab")).setIcon("layout").onClick(() => openPanel("tab"));
+            item.setTitle(t("commands.openLayoutsPanelLeft")).setIcon("panel-left").onClick(() => openPanel("left"));
+        });
+        menu.addItem((item) => {
+            item.setTitle(t("commands.openLayoutsPanelRight")).setIcon("panel-right").onClick(() => openPanel("right"));
         });
         menu.showAtMouseEvent(event);
     }
@@ -2498,10 +2485,12 @@ class WindowLayoutManager {
                 if (!this.validateLayout(layout)) {
                     throw new Error(t("errors.invalidData"));
                 }
-                // 0. 只有「目前視窗還原」才在 Layout 已開啟時直接聚焦既有視窗。
-                // 一般 Enter / click 會傳入 forceNewWindow，必須繼續走新 Popout 流程，
-                // 否則已開啟的 Layout 會被 Smart Focus 提前攔截，永遠不會開新視窗。
-                if (!options.forceReload && !options.forceNewWindow) {
+                // 0. 若此 space 已在某個存活的 Popout 視窗中開啟，直接聚焦該視窗，
+                // 避免重複 restore 相同的 space。
+                // - forceReload (Shift 套用至目前視窗) 是明確的覆寫動作，仍繼續走既有流程。
+                // - clone 流程 (forceNewWindow 但無 focusExistingWindow) 刻意要開新視窗。
+                if (!options.forceReload &&
+                    (!options.forceNewWindow || options.focusExistingWindow === true)) {
                     const existingWin = this.getOpenWindowForLayout(layout);
                     if (existingWin && !existingWin.closed && this.isPopoutDocument(existingWin.document)) {
                         this.focusTargetWindow(existingWin);
@@ -3859,77 +3848,6 @@ class WindowSpacesSettingTab extends obsidian.PluginSettingTab {
                 yield this.plugin.saveSettings();
             }));
         });
-        // 佈局管理
-        new obsidian.Setting(containerEl).setName(t("settings.layoutsSection")).setHeading();
-        const layouts = this.plugin.manager.getSavedLayouts();
-        if (layouts.length === 0) {
-            containerEl.createEl("p", {
-                text: t("settings.noLayouts"),
-                cls: "setting-item-description",
-            });
-        }
-        else {
-            // 顯示佈局統計
-            const statsEl = containerEl.createDiv();
-            statsEl.addClass("layout-stats");
-            statsEl.createEl("p", {
-                text: tWithParams("settings.layoutStats", { count: layouts.length }),
-                cls: "setting-item-description",
-            });
-            // 顯示每個佈局
-            layouts.forEach((layout) => {
-                var _a;
-                const layoutContainer = containerEl.createDiv();
-                layoutContainer.addClass("layout-setting-item");
-                // 佈局名稱和基本信息
-                const headerEl = layoutContainer.createDiv();
-                headerEl.addClass("layout-header");
-                headerEl.createEl("div", {
-                    text: layout.name,
-                    cls: "layout-name",
-                });
-                const infoEl = headerEl.createEl("div", {
-                    cls: "layout-info",
-                });
-                const fileCountText = tWithParams("settings.includesFiles", { count: ((_a = layout.metadata) === null || _a === void 0 ? void 0 : _a.fileCount) || 0 });
-                infoEl.createEl("span", {
-                    text: fileCountText,
-                    cls: "layout-file-count",
-                });
-                infoEl.createEl("span", {
-                    text: new Date(layout.timestamp).toLocaleDateString(),
-                    cls: "layout-date",
-                });
-                // 操作按鈕
-                const actionsEl = layoutContainer.createDiv();
-                actionsEl.addClass("layout-actions");
-                const restoreBtn = actionsEl.createEl("button", {
-                    text: t("common.restore"),
-                    cls: "mod-cta",
-                });
-                restoreBtn.onclick = () => __awaiter(this, void 0, void 0, function* () {
-                    try {
-                        yield this.plugin.manager.restoreLayout(layout);
-                    }
-                    catch (error) {
-                        new obsidian.Notice(`${t("errors.failedToRestore")}: ${error.message}`);
-                    }
-                });
-                const renameBtn = actionsEl.createEl("button", {
-                    text: t("common.rename"),
-                });
-                renameBtn.onclick = () => {
-                    this.showRenameDialog(layout);
-                };
-                const deleteBtn = actionsEl.createEl("button", {
-                    text: t("common.delete"),
-                    cls: "mod-warning",
-                });
-                deleteBtn.onclick = () => {
-                    this.showDeleteDialog(layout);
-                };
-            });
-        }
         // 危險操作
         new obsidian.Setting(containerEl).setName(t("settings.resetSettings")).setHeading();
         new obsidian.Setting(containerEl)
@@ -3975,62 +3893,6 @@ class WindowSpacesSettingTab extends obsidian.PluginSettingTab {
             clearTimeout(this.autoSaveTimeout);
             this.autoSaveTimeout = null;
         }
-    }
-    showRenameDialog(layout) {
-        const modal = new obsidian.Modal(this.app);
-        modal.setTitle(t("manageModal.renameButton"));
-        modal.onOpen = () => {
-            let input;
-            const setting = new obsidian.Setting(modal.contentEl).setName(t("saveModal.nameLabel")).addText((text) => {
-                input = text.inputEl;
-                input.value = layout.name;
-                input.focus();
-                input.select();
-                input.addEventListener("keydown", (e) => {
-                    if (e.key === "Enter") {
-                        e.preventDefault();
-                        void submit();
-                    }
-                });
-            });
-            setting.settingEl.addClass("window-spaces-setting-full-width");
-            const buttonContainer = modal.contentEl.createDiv("ws-dialog-actions");
-            const cancelBtn = buttonContainer.createEl("button", {
-                text: t("common.cancel"),
-            });
-            cancelBtn.onclick = () => modal.close();
-            const saveBtn = buttonContainer.createEl("button", {
-                text: t("common.save"),
-                cls: "mod-cta",
-            });
-            const submit = () => __awaiter(this, void 0, void 0, function* () {
-                const newName = input.value.trim();
-                if (newName && newName !== layout.name) {
-                    layout.name = newName;
-                    yield this.plugin.saveSettings();
-                    WindowLayoutsModal.renderAllInstances();
-                    this.display();
-                    new obsidian.Notice(t("notifications.layoutRenamed"));
-                }
-                modal.close();
-            });
-            saveBtn.onclick = submit;
-        };
-        modal.open();
-    }
-    showDeleteDialog(layout) {
-        this.showConfirmDialog(tWithParams("settings.confirmDelete", { name: layout.name }), t("manageModal.confirmDeleteTitle")).then((confirmed) => __awaiter(this, void 0, void 0, function* () {
-            if (confirmed) {
-                try {
-                    yield this.plugin.manager.deleteLayout(layout.id);
-                    this.display();
-                    new obsidian.Notice(t("notifications.layoutDeleted"));
-                }
-                catch (error) {
-                    new obsidian.Notice(`${t("errors.failedToDelete")}: ${error.message}`);
-                }
-            }
-        }));
     }
     showConfirmDialog(message, title = t("common.confirm")) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -4094,7 +3956,8 @@ class WindowLayoutsView extends obsidian.ItemView {
             // command all activate the leaf natively, so arrow-key ownership follows
             // the same rule as every other Obsidian panel.
             this.contentController.mountInContainer(this.contentEl, undefined, () => {
-                return this.app.workspace.getMostRecentLeaf() === this.leaf;
+                const ws = this.app.workspace;
+                return ws.getMostRecentLeaf() === this.leaf || ws.activeLeaf === this.leaf;
             });
         });
     }
@@ -4214,7 +4077,7 @@ class WindowSpacesPlugin extends obsidian.Plugin {
                 }
             }),
         });
-        // 開啟統一的視窗佈局對話框
+        // 開啟 Window Spaces 彈出視窗 (與 ribbon icon 相同的入口)
         this.addCommand({
             id: "open-window-layouts",
             name: t("commands.openLayouts"),
@@ -4265,17 +4128,21 @@ class WindowSpacesPlugin extends obsidian.Plugin {
     openWindowLayoutsModal(targetWindow) {
         try {
             const win = targetWindow || (this.manager ? this.manager.getActiveWindow() : undefined);
-            // Use a plain native Modal as the host. The same Window Spaces
-            // controller already mounts reliably in ItemView panels; mounting it
-            // here avoids the failing custom Modal.open()/onOpen lifecycle seen in
-            // Obsidian 1.13 while preserving the shared picker and restore logic.
+            // Use a plain native Modal as the host. The shared Window Spaces
+            // controller mounts here reliably, while popup-only CSS keeps its
+            // toolbar visually separate from the native close X.
             const hostModal = new obsidian.Modal(this.app);
             const controller = new WindowLayoutsModal(this.app, this, win);
             hostModal.setTitle(t("common.windowLayouts"));
             hostModal.onOpen = () => {
                 try {
                     hostModal.modalEl.addClass("window-layouts-modal");
+                    hostModal.modalEl.addClass("window-layouts-popout-modal");
                     controller.mountInModalContainer(hostModal.contentEl, () => hostModal.close());
+                    const titleHeader = hostModal.containerEl.querySelector(".modal-title");
+                    if (titleHeader) {
+                        controller.mountHeaderActions(titleHeader);
+                    }
                 }
                 catch (error) {
                     console.error("[WindowSpaces] Error mounting Window Spaces picker:", error);
@@ -4298,6 +4165,13 @@ class WindowSpacesPlugin extends obsidian.Plugin {
     openWindowLayoutsPanel(location = "tab") {
         return __awaiter(this, void 0, void 0, function* () {
             const workspace = this.app.workspace;
+            // 若指定位置已有 Window Spaces panel，直接啟用既有的 panel，
+            // 避免重複開啟。
+            const existingPanelLeaf = this.findPanelLeafAtLocation(location);
+            if (existingPanelLeaf) {
+                yield workspace.revealLeaf(existingPanelLeaf);
+                return;
+            }
             let leaf;
             if (location === "left") {
                 leaf = workspace.getLeftLeaf(false);
@@ -4328,6 +4202,31 @@ class WindowSpacesPlugin extends obsidian.Plugin {
             yield leaf.setViewState({ type: WINDOW_LAYOUTS_VIEW_TYPE, state: {} });
             yield workspace.revealLeaf(leaf);
         });
+    }
+    /** 在指定位置尋找已開啟的 Window Spaces panel leaf。 */
+    findPanelLeafAtLocation(location) {
+        const workspace = this.app.workspace;
+        let found = null;
+        workspace.iterateAllLeaves((leaf) => {
+            var _a, _b;
+            if (found)
+                return;
+            if (!leaf || typeof leaf.getRoot !== "function")
+                return;
+            if (((_b = (_a = leaf.view) === null || _a === void 0 ? void 0 : _a.getViewType) === null || _b === void 0 ? void 0 : _b.call(_a)) !== WINDOW_LAYOUTS_VIEW_TYPE)
+                return;
+            const root = leaf.getRoot();
+            const matches = location === "left"
+                ? root === workspace.leftSplit
+                : location === "right"
+                    ? root === workspace.rightSplit
+                    : location === "tab"
+                        ? root === workspace.rootSplit
+                        : false;
+            if (matches)
+                found = leaf;
+        });
+        return found;
     }
     setupEventListeners() {
         // 監聽視窗開關

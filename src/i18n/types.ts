@@ -22,9 +22,6 @@ export interface TranslationStrings {
     edit: string;
     windowLayouts: string;
     openAsPanel: string;
-    panelLeft: string;
-    panelRight: string;
-    panelTab: string;
   };
 
   // 命令
@@ -137,17 +134,8 @@ export interface TranslationStrings {
     showWindowLayoutsRibbonIconDesc: string;
     maxLayouts: string;
     maxLayoutsDesc: string;
-    layoutStats: string;
     autoSaveInterval: string;
     minutes: string;
-    layoutsSection: string;
-    layoutsDescription: string;
-    noLayouts: string;
-    layoutInfo: string;
-    createdOn: string;
-    includesFiles: string;
-    deleteLayout: string;
-    confirmDelete: string;
     resetSettings: string;
     resetSettingsDescription: string;
     resetButton: string;

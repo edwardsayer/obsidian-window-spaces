@@ -226,12 +226,16 @@ export class WindowLayoutsModal extends Modal {
         }
       }
 
-      // A native Modal owns keyboard input while it is open. Persistent
-      // panels only own navigation while they are the active leaf (clicking
-      // the panel, its tab, or opening it via command activates the leaf) or
-      // while the focus is inside the panel.
+      // A native Modal owns keyboard input while it is open, so an open
+      // popup instance takes precedence over every persistent panel. Panels
+      // own navigation only while no popup is open AND they are the active
+      // leaf (clicking the panel, its tab, or opening it via command
+      // activates the leaf) or while the focus is inside the panel itself.
+      const anyPopupOpen = Array.from(WindowLayoutsModal.activeInstances).some(
+        (instance) => !instance.panelMode
+      );
       const shouldHandle = this.panelMode
-        ? (focusedInstance ? focusedInstance === this : this.isPanelActive?.() === true)
+        ? focusedInstance === this || (!anyPopupOpen && this.isPanelActive?.() === true)
         : true;
       if (!shouldHandle) return;
 
@@ -320,6 +324,16 @@ export class WindowLayoutsModal extends Modal {
       this.showSortMenu(e);
     };
     this.createPanelButton(actionsEl);
+  }
+
+  /**
+   * Mount the shared header action buttons (view options, sort, panel menu)
+   * into a native modal's title bar so popup windows expose the same three
+   * toolbar actions as the persistent panels.
+   */
+  public mountHeaderActions(titleEl: HTMLElement): void {
+    if (titleEl.querySelector(".window-layouts-header-actions")) return;
+    this.createHeaderActions(titleEl);
   }
 
   public showViewOptionsMenu(event: MouseEvent): void {
@@ -922,9 +936,12 @@ export class WindowLayoutsModal extends Modal {
       await this.plugin.manager.restoreLayout(layout, {
         // forceNewWindow 只控制 restore 的目標是否新建；仍需傳入來源視窗，
         // 讓 manager 能保留該 popout 原本的 layout 名稱與狀態列。
+        // focusExistingWindow：若該 space 已在某個 Popout 開啟，直接聚焦
+        // 既有視窗，避免重複 restore 產生重複視窗 (clone 流程不傳此旗標)。
         targetWindow: this.targetWindow,
         forceNewWindow,
         forceReload: !forceNewWindow,
+        focusExistingWindow: true,
       });
     } catch (error: any) {
       new Notice(`${t("errors.failedToRestore")}: ${error?.message || error}`);
@@ -1122,14 +1139,22 @@ export class WindowLayoutsModal extends Modal {
       void this.plugin.openWindowLayoutsPanel(location);
     };
 
+    // 與命令面板的開啟命令共用相同名稱，確保兩處內容一致。
+    // 「彈出視窗」直接使用 ribbon/命令的 openWindowLayoutsModal 入口。
     menu.addItem((item) => {
-      item.setTitle(t("common.panelLeft")).setIcon("panel-left").onClick(() => openPanel("left"));
+      item.setTitle(t("commands.openLayoutsPanel")).setIcon("layout").onClick(() => openPanel("tab"));
     });
     menu.addItem((item) => {
-      item.setTitle(t("common.panelRight")).setIcon("panel-right").onClick(() => openPanel("right"));
+      item.setTitle(t("commands.openLayouts")).setIcon("layout").onClick(() => {
+        this.closeHost();
+        this.plugin.openWindowLayoutsModal();
+      });
     });
     menu.addItem((item) => {
-      item.setTitle(t("common.panelTab")).setIcon("layout").onClick(() => openPanel("tab"));
+      item.setTitle(t("commands.openLayoutsPanelLeft")).setIcon("panel-left").onClick(() => openPanel("left"));
+    });
+    menu.addItem((item) => {
+      item.setTitle(t("commands.openLayoutsPanelRight")).setIcon("panel-right").onClick(() => openPanel("right"));
     });
 
     menu.showAtMouseEvent(event);

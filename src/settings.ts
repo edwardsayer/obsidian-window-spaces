@@ -1,6 +1,5 @@
 import { App, PluginSettingTab, Setting, Notice, Modal } from "obsidian";
-import { t, tWithParams } from "./i18n";
-import { WindowLayoutsModal } from "./modals/restoreModal";
+import { t } from "./i18n";
 
 export class WindowSpacesSettingTab extends PluginSettingTab {
   private plugin: any;
@@ -88,85 +87,6 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
           });
       });
 
-    // 佈局管理
-    new Setting(containerEl).setName(t("settings.layoutsSection")).setHeading();
-
-    const layouts = this.plugin.manager.getSavedLayouts();
-
-    if (layouts.length === 0) {
-      containerEl.createEl("p", {
-        text: t("settings.noLayouts"),
-        cls: "setting-item-description",
-      });
-    } else {
-      // 顯示佈局統計
-      const statsEl = containerEl.createDiv();
-      statsEl.addClass("layout-stats");
-      statsEl.createEl("p", {
-        text: tWithParams("settings.layoutStats", { count: layouts.length }),
-        cls: "setting-item-description",
-      });
-
-      // 顯示每個佈局
-      layouts.forEach((layout: any) => {
-        const layoutContainer = containerEl.createDiv();
-        layoutContainer.addClass("layout-setting-item");
-
-        // 佈局名稱和基本信息
-        const headerEl = layoutContainer.createDiv();
-        headerEl.addClass("layout-header");
-
-        headerEl.createEl("div", {
-          text: layout.name,
-          cls: "layout-name",
-        });
-
-        const infoEl = headerEl.createEl("div", {
-          cls: "layout-info",
-        });
-        const fileCountText = tWithParams("settings.includesFiles", { count: layout.metadata?.fileCount || 0 });
-        infoEl.createEl("span", {
-          text: fileCountText,
-          cls: "layout-file-count",
-        });
-        infoEl.createEl("span", {
-          text: new Date(layout.timestamp).toLocaleDateString(),
-          cls: "layout-date",
-        });
-
-        // 操作按鈕
-        const actionsEl = layoutContainer.createDiv();
-        actionsEl.addClass("layout-actions");
-
-        const restoreBtn = actionsEl.createEl("button", {
-          text: t("common.restore"),
-          cls: "mod-cta",
-        });
-        restoreBtn.onclick = async () => {
-          try {
-            await this.plugin.manager.restoreLayout(layout);
-          } catch (error: any) {
-            new Notice(`${t("errors.failedToRestore")}: ${error.message}`);
-          }
-        };
-
-        const renameBtn = actionsEl.createEl("button", {
-          text: t("common.rename"),
-        });
-        renameBtn.onclick = () => {
-          this.showRenameDialog(layout);
-        };
-
-        const deleteBtn = actionsEl.createEl("button", {
-          text: t("common.delete"),
-          cls: "mod-warning",
-        });
-        deleteBtn.onclick = () => {
-          this.showDeleteDialog(layout);
-        };
-      });
-    }
-
     // 危險操作
     new Setting(containerEl).setName(t("settings.resetSettings")).setHeading();
 
@@ -219,71 +139,6 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
       clearTimeout(this.autoSaveTimeout);
       this.autoSaveTimeout = null;
     }
-  }
-
-  private showRenameDialog(layout: any) {
-    const modal = new Modal(this.app);
-    modal.setTitle(t("manageModal.renameButton"));
-    modal.onOpen = () => {
-      let input: HTMLInputElement;
-      const setting = new Setting(modal.contentEl).setName(t("saveModal.nameLabel")).addText((text) => {
-        input = text.inputEl;
-        input.value = layout.name;
-        input.focus();
-        input.select();
-        input.addEventListener("keydown", (e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            void submit();
-          }
-        });
-      });
-      setting.settingEl.addClass("window-spaces-setting-full-width");
-
-      const buttonContainer = modal.contentEl.createDiv("ws-dialog-actions");
-
-      const cancelBtn = buttonContainer.createEl("button", {
-        text: t("common.cancel"),
-      });
-      cancelBtn.onclick = () => modal.close();
-
-      const saveBtn = buttonContainer.createEl("button", {
-        text: t("common.save"),
-        cls: "mod-cta",
-      });
-
-      const submit = async () => {
-        const newName = input.value.trim();
-        if (newName && newName !== layout.name) {
-          layout.name = newName;
-          await this.plugin.saveSettings();
-          WindowLayoutsModal.renderAllInstances();
-          this.display();
-          new Notice(t("notifications.layoutRenamed"));
-        }
-        modal.close();
-      };
-
-      saveBtn.onclick = submit;
-    };
-    modal.open();
-  }
-
-  private showDeleteDialog(layout: any) {
-    this.showConfirmDialog(
-      tWithParams("settings.confirmDelete", { name: layout.name }),
-      t("manageModal.confirmDeleteTitle")
-    ).then(async (confirmed) => {
-      if (confirmed) {
-        try {
-          await this.plugin.manager.deleteLayout(layout.id);
-          this.display();
-          new Notice(t("notifications.layoutDeleted"));
-        } catch (error: any) {
-          new Notice(`${t("errors.failedToDelete")}: ${error.message}`);
-        }
-      }
-    });
   }
 
   private async showConfirmDialog(

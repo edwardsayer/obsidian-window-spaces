@@ -19,6 +19,7 @@ describe("WindowLayoutsModal restore target", () => {
       targetWindow: sourceWindow,
       forceNewWindow: true,
       forceReload: false,
+      focusExistingWindow: true,
     });
   });
 
@@ -35,6 +36,7 @@ describe("WindowLayoutsModal restore target", () => {
       targetWindow: sourceWindow,
       forceNewWindow: false,
       forceReload: true,
+      focusExistingWindow: true,
     });
   });
 
@@ -53,6 +55,7 @@ describe("WindowLayoutsModal restore target", () => {
       targetWindow: undefined,
       forceNewWindow: false,
       forceReload: true,
+      focusExistingWindow: true,
     });
   });
 
@@ -109,12 +112,118 @@ describe("WindowLayoutsModal restore target", () => {
       settings: { sortBy: "updated-desc" },
       saveSettings: vi.fn(),
       openWindowLayoutsPanel: vi.fn(),
+      openWindowLayoutsModal: vi.fn(),
     };
     const modal = new WindowLayoutsModal({} as any, plugin);
     const mockEvent = { preventDefault: vi.fn(), stopPropagation: vi.fn() } as any;
 
     expect(() => (modal as any).showSortMenu(mockEvent)).not.toThrow();
     expect(() => (modal as any).showPanelMenu(mockEvent)).not.toThrow();
+  });
+
+  test("mounts the three header action buttons into a popup modal title bar", () => {
+    const plugin = { manager: { getSavedLayouts: () => [] } };
+    const modal = new WindowLayoutsModal({} as any, plugin);
+
+    const createMockEl = (tag = "div") => {
+      const el = document.createElement(tag) as any;
+      el.createDiv = (cls?: string) => {
+        const child = createMockEl("div");
+        if (cls) child.className = cls;
+        el.appendChild(child);
+        return child;
+      };
+      el.createEl = (t: string, opts?: any) => {
+        const child = createMockEl(t);
+        if (opts?.cls) child.className = opts.cls;
+        el.appendChild(child);
+        return child;
+      };
+      return el;
+    };
+
+    const titleEl = createMockEl("div");
+    modal.mountHeaderActions(titleEl);
+
+    const buttons = Array.from(
+      titleEl.querySelectorAll<HTMLElement>(".window-layouts-header-actions button")
+    );
+    expect(buttons).toHaveLength(3);
+    expect(buttons[0].classList.contains("window-layouts-view-options-btn")).toBe(true);
+    expect(buttons[1].classList.contains("window-layouts-sort-btn")).toBe(true);
+    expect(buttons[2].classList.contains("window-layouts-panel-btn")).toBe(true);
+
+    // Re-mounting must not duplicate the actions row.
+    modal.mountHeaderActions(titleEl);
+    expect(titleEl.querySelectorAll(".window-layouts-header-actions")).toHaveLength(1);
+  });
+
+  test("an open popup modal owns arrow navigation while background panels yield", () => {
+    WindowLayoutsModal.activeInstances.clear();
+    const plugin = {
+      manager: {
+        getSavedLayouts: () => [{ id: "1", name: "A" }, { id: "2", name: "B" }],
+        getSavedViewStates: () => [],
+      },
+    };
+
+    const createMockEl = (tag = "div") => {
+      const el = document.createElement(tag) as any;
+      el.empty = () => { el.innerHTML = ""; };
+      el.addClass = () => {};
+      el.createDiv = () => createMockEl("div");
+      el.createEl = (t: string) => createMockEl(t);
+      el.createSpan = () => createMockEl("span");
+      el.setAttribute = () => {};
+      return el;
+    };
+
+    // Background panel whose leaf reports active while the popup overlays it.
+    const panel = new WindowLayoutsModal({} as any, plugin);
+    const panelRoot = createMockEl();
+    panel.mountInContainer(panelRoot);
+    (panel as any).isPanelActive = () => true;
+    (panel as any).handleArrowKey(1);
+
+    // Popup modal host, mounted before the panel in registration order would
+    // have made the panel swallow the keys (capture phase).
+    const popup = new WindowLayoutsModal({} as any, plugin);
+    const popupRoot = createMockEl();
+    popup.mountInModalContainer(popupRoot, () => {});
+    document.body.appendChild(popupRoot);
+    const input = document.createElement("input");
+    popupRoot.appendChild(input);
+    input.focus();
+    expect(document.activeElement).toBe(input);
+
+    // Focus inside the popup: only the popup may handle the arrow.
+    const focusedArrow = new KeyboardEvent("keydown", {
+      key: "ArrowDown",
+      bubbles: true,
+      cancelable: true,
+    });
+    window.dispatchEvent(focusedArrow);
+
+    expect((popup as any).selectedIndex).toBe(1);
+    expect((panel as any).selectedIndex).toBe(1);
+    expect(focusedArrow.defaultPrevented).toBe(true);
+
+    // Focus outside every instance: the open popup still owns the arrow.
+    input.blur();
+    const blurredArrow = new KeyboardEvent("keydown", {
+      key: "ArrowDown",
+      bubbles: true,
+      cancelable: true,
+    });
+    window.dispatchEvent(blurredArrow);
+
+    expect((popup as any).selectedIndex).toBe(0);
+    expect((panel as any).selectedIndex).toBe(1);
+    expect(blurredArrow.defaultPrevented).toBe(true);
+
+    panel.unmountFromContainer();
+    popup.unmountFromContainer();
+    document.body.removeChild(popupRoot);
   });
 
   test("maintains independent selected index and focus navigation across active panel instances", () => {
