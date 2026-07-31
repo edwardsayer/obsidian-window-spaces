@@ -1,7 +1,7 @@
 {
 	"name": "window-spaces",
-	"version": "1.0.2",
-	"description": "Save and restore window layouts for Obsidian popout windows. Seamlessly manage multi-window popout workspaces.",
+	"version": "1.0.3",
+	"description": "Save and restore window layouts for popout windows. Seamlessly manage multi-window popout workspaces.",
 	"main": "main.js",
 	"scripts": {
 		"dev": "node src/tools/dev.js",

@@ -97,7 +97,6 @@
   max-width: min(420px, 60vw);
   overflow: hidden;
   padding: 3px 10px;
-  background: var(--background-secondary);
   background: color-mix(in srgb, var(--background-secondary) 92%, transparent);
   color: var(--text-muted);
   font-size: var(--font-ui-smaller);
@@ -864,4 +863,120 @@
 .window-spaces-layout-action.is-active {
   color: var(--interactive-accent) !important;
   opacity: 1 !important;
+}
+
+/* ===== Dialog action rows (shared across modals) ===== */
+.ws-dialog-actions {
+  text-align: right;
+  margin-top: 20px;
+  margin-bottom: 12px;
+}
+.ws-dialog-actions button + button {
+  margin-left: 10px;
+}
+
+/* ===== WindowLayoutsModal title row ===== */
+.window-layouts-modal .modal-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+/* ===== Section list headers ===== */
+.space-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 4px 6px 4px;
+  margin-top: 4px;
+  margin-bottom: 4px;
+  background: transparent;
+  border-bottom: 1px solid var(--background-modifier-border);
+  user-select: none;
+  cursor: pointer;
+}
+.space-section-header.is-dragging {
+  opacity: 0.5;
+}
+.space-section-header-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.space-section-title {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-normal);
+}
+.space-section-count {
+  font-size: 11px;
+  color: var(--text-muted);
+  opacity: 0.8;
+}
+.space-section-rename-input {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 1px 4px;
+  max-width: 150px;
+}
+.space-section-header-right {
+  display: flex;
+  align-items: center;
+}
+.space-section-arrow {
+  color: var(--text-muted);
+  padding: 2px;
+}
+
+/* ===== Archived layout items ===== */
+.suggestion-item.window-layout-item.is-archived {
+  opacity: 0.55;
+  color: var(--text-muted);
+}
+.layout-archived-badge {
+  margin-left: 6px;
+  opacity: 0.75;
+}
+
+/* ===== Save modal ===== */
+.save-overwrite-notice {
+  font-size: var(--font-ui-smaller, 12px);
+  color: var(--text-accent, #70a7ff);
+  margin-top: -8px;
+  margin-bottom: 12px;
+  padding-left: 2px;
+}
+.ws-info-title {
+  margin-bottom: 4px;
+}
+.space-sections-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: -4px;
+  margin-bottom: 16px;
+  padding-left: 2px;
+}
+.space-section-pill {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+.space-section-pill-close {
+  opacity: 0.7;
+}
+.space-section-pill-unselected {
+  background: var(--background-secondary);
+  color: var(--text-muted);
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  cursor: pointer;
 }

@@ -61,10 +61,6 @@ export class WindowLayoutsModal extends Modal {
 
       const titleHeader = this.containerEl.querySelector<HTMLElement>(".modal-title");
       if (titleHeader) {
-        titleHeader.style.display = "flex";
-        titleHeader.style.alignItems = "center";
-        titleHeader.style.justifyContent = "space-between";
-        titleHeader.style.width = "100%";
         this.createHeaderActions(titleHeader);
       }
 
@@ -297,15 +293,6 @@ export class WindowLayoutsModal extends Modal {
         ? "nav-buttons-container window-layouts-header-actions"
         : "window-layouts-header-actions"
     );
-    actionsEl.style.display = "flex";
-    actionsEl.style.alignItems = "center";
-    actionsEl.style.gap = "4px";
-
-    if (isPanelHeader) {
-      actionsEl.style.marginLeft = "0";
-      actionsEl.style.justifyContent = "center";
-      actionsEl.style.width = "100%";
-    }
 
     // 1. 顯示選項按鈕 (View Options Dropdown)
     const viewOptionsButton = actionsEl.createEl("button", {
@@ -695,27 +682,17 @@ export class WindowLayoutsModal extends Modal {
     isReorderable = true
   ): void {
     const headerEl = parentEl.createDiv("space-section-header");
-    headerEl.style.display = "flex";
-    headerEl.style.alignItems = "center";
-    headerEl.style.justifyContent = "space-between";
-    headerEl.style.padding = "8px 4px 6px 4px";
-    headerEl.style.marginTop = "4px";
-    headerEl.style.marginBottom = "4px";
-    headerEl.style.background = "transparent";
-    headerEl.style.borderBottom = "1px solid var(--background-modifier-border)";
-    headerEl.style.userSelect = "none";
-    headerEl.style.cursor = "pointer";
 
     if (isReorderable && allSectionsOrder) {
       headerEl.setAttribute("draggable", "true");
 
       headerEl.ondragstart = (e: DragEvent) => {
         e.dataTransfer?.setData("text/plain", secName);
-        headerEl.style.opacity = "0.5";
+        headerEl.addClass("is-dragging");
       };
 
       headerEl.ondragend = () => {
-        headerEl.style.opacity = "1";
+        headerEl.removeClass("is-dragging");
       };
 
       headerEl.ondragover = (e: DragEvent) => {
@@ -742,28 +719,16 @@ export class WindowLayoutsModal extends Modal {
 
     // 左側：Section 名稱、計數與更名按鈕
     const leftEl = headerEl.createDiv("space-section-header-left");
-    leftEl.style.display = "flex";
-    leftEl.style.alignItems = "center";
-    leftEl.style.gap = "6px";
 
     const titleSpan = leftEl.createSpan({ text: secName, cls: "space-section-title" });
-    titleSpan.style.fontWeight = "600";
-    titleSpan.style.fontSize = "13px";
-    titleSpan.style.color = "var(--text-normal)";
 
-    const badgeSpan = leftEl.createSpan({ text: `(${count})`, cls: "space-section-count" });
-    badgeSpan.style.fontSize = "11px";
-    badgeSpan.style.color = "var(--text-muted)";
-    badgeSpan.style.opacity = "0.8";
+    leftEl.createSpan({ text: `(${count})`, cls: "space-section-count" });
 
     const triggerInlineRename = () => {
       const input = document.createElement("input");
       input.type = "text";
       input.value = secName;
-      input.style.fontSize = "13px";
-      input.style.fontWeight = "600";
-      input.style.padding = "1px 4px";
-      input.style.maxWidth = "150px";
+      input.addClass("space-section-rename-input");
 
       titleSpan.replaceWith(input);
       input.focus();
@@ -812,12 +777,8 @@ export class WindowLayoutsModal extends Modal {
 
     // 右側：展開 / 收合箭頭 (最右端，無高亮背景輕量化)
     const rightEl = headerEl.createDiv("space-section-header-right");
-    rightEl.style.display = "flex";
-    rightEl.style.alignItems = "center";
 
     const arrowIcon = rightEl.createSpan({ cls: "clickable-icon space-section-arrow" });
-    arrowIcon.style.color = "var(--text-muted)";
-    arrowIcon.style.padding = "2px";
     setIcon(arrowIcon, isCollapsed ? "chevron-right" : "chevron-down");
 
     headerEl.onclick = (e: MouseEvent) => {
@@ -845,8 +806,6 @@ export class WindowLayoutsModal extends Modal {
 
     if (layout.archived === true) {
       layoutEl.addClass("is-archived");
-      layoutEl.style.opacity = "0.55";
-      layoutEl.style.color = "var(--text-muted)";
     }
 
     this.setFilesTooltipForLayout(layoutEl, layout);
@@ -880,8 +839,6 @@ export class WindowLayoutsModal extends Modal {
       const archivedBadge = titleEl.createSpan({
         cls: "layout-archived-badge",
       });
-      archivedBadge.style.marginLeft = "6px";
-      archivedBadge.style.opacity = "0.75";
       archivedBadge.setText("📦");
       setTooltip(archivedBadge, t("manageModal.archivedGroup") || "Archived");
     }
@@ -1006,9 +963,7 @@ export class WindowLayoutsModal extends Modal {
         });
       setting.settingEl.addClass("window-spaces-setting-full-width");
 
-      const buttonContainer = modal.contentEl.createDiv();
-      buttonContainer.style.textAlign = "right";
-      buttonContainer.style.marginTop = "20px";
+      const buttonContainer = modal.contentEl.createDiv("ws-dialog-actions");
 
       const cancelButton = buttonContainer.createEl("button", {
         text: t("common.cancel"),
@@ -1019,7 +974,6 @@ export class WindowLayoutsModal extends Modal {
         text: t("common.save"),
         cls: "mod-cta",
       });
-      saveButton.style.marginLeft = "10px";
 
       const submit = async () => {
         const newName = input.value.trim();
@@ -1077,9 +1031,7 @@ export class WindowLayoutsModal extends Modal {
       modal.onOpen = () => {
         modal.contentEl.createEl("p", { text: message });
 
-        const buttonContainer = modal.contentEl.createDiv();
-        buttonContainer.style.textAlign = "right";
-        buttonContainer.style.marginTop = "20px";
+        const buttonContainer = modal.contentEl.createDiv("ws-dialog-actions");
 
         const cancelButton = buttonContainer.createEl("button", {
           text: t("common.cancel"),
@@ -1093,7 +1045,6 @@ export class WindowLayoutsModal extends Modal {
           text: t("common.confirm"),
           cls: "mod-warning",
         });
-        confirmButton.style.marginLeft = "10px";
         confirmButton.onclick = () => {
           resolve(true);
           modal.close();

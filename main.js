@@ -791,10 +791,6 @@ class WindowLayoutsModal extends obsidian.Modal {
             this.setTitle(t("common.windowLayouts"));
             const titleHeader = this.containerEl.querySelector(".modal-title");
             if (titleHeader) {
-                titleHeader.style.display = "flex";
-                titleHeader.style.alignItems = "center";
-                titleHeader.style.justifyContent = "space-between";
-                titleHeader.style.width = "100%";
                 this.createHeaderActions(titleHeader);
             }
             this.renderContent();
@@ -998,14 +994,6 @@ class WindowLayoutsModal extends obsidian.Modal {
         const actionsEl = parentEl.createDiv(isPanelHeader
             ? "nav-buttons-container window-layouts-header-actions"
             : "window-layouts-header-actions");
-        actionsEl.style.display = "flex";
-        actionsEl.style.alignItems = "center";
-        actionsEl.style.gap = "4px";
-        if (isPanelHeader) {
-            actionsEl.style.marginLeft = "0";
-            actionsEl.style.justifyContent = "center";
-            actionsEl.style.width = "100%";
-        }
         // 1. 顯示選項按鈕 (View Options Dropdown)
         const viewOptionsButton = actionsEl.createEl("button", {
             cls: "clickable-icon nav-action-button window-layouts-view-options-btn",
@@ -1370,25 +1358,15 @@ class WindowLayoutsModal extends obsidian.Modal {
     }
     renderSectionHeader(parentEl, secName, count, allSectionsOrder, isReorderable = true) {
         const headerEl = parentEl.createDiv("space-section-header");
-        headerEl.style.display = "flex";
-        headerEl.style.alignItems = "center";
-        headerEl.style.justifyContent = "space-between";
-        headerEl.style.padding = "8px 4px 6px 4px";
-        headerEl.style.marginTop = "4px";
-        headerEl.style.marginBottom = "4px";
-        headerEl.style.background = "transparent";
-        headerEl.style.borderBottom = "1px solid var(--background-modifier-border)";
-        headerEl.style.userSelect = "none";
-        headerEl.style.cursor = "pointer";
         if (isReorderable && allSectionsOrder) {
             headerEl.setAttribute("draggable", "true");
             headerEl.ondragstart = (e) => {
                 var _a;
                 (_a = e.dataTransfer) === null || _a === void 0 ? void 0 : _a.setData("text/plain", secName);
-                headerEl.style.opacity = "0.5";
+                headerEl.addClass("is-dragging");
             };
             headerEl.ondragend = () => {
-                headerEl.style.opacity = "1";
+                headerEl.removeClass("is-dragging");
             };
             headerEl.ondragover = (e) => {
                 e.preventDefault();
@@ -1412,25 +1390,13 @@ class WindowLayoutsModal extends obsidian.Modal {
         const isCollapsed = WindowLayoutsModal.collapsedSections.has(secName);
         // 左側：Section 名稱、計數與更名按鈕
         const leftEl = headerEl.createDiv("space-section-header-left");
-        leftEl.style.display = "flex";
-        leftEl.style.alignItems = "center";
-        leftEl.style.gap = "6px";
         const titleSpan = leftEl.createSpan({ text: secName, cls: "space-section-title" });
-        titleSpan.style.fontWeight = "600";
-        titleSpan.style.fontSize = "13px";
-        titleSpan.style.color = "var(--text-normal)";
-        const badgeSpan = leftEl.createSpan({ text: `(${count})`, cls: "space-section-count" });
-        badgeSpan.style.fontSize = "11px";
-        badgeSpan.style.color = "var(--text-muted)";
-        badgeSpan.style.opacity = "0.8";
+        leftEl.createSpan({ text: `(${count})`, cls: "space-section-count" });
         const triggerInlineRename = () => {
             const input = document.createElement("input");
             input.type = "text";
             input.value = secName;
-            input.style.fontSize = "13px";
-            input.style.fontWeight = "600";
-            input.style.padding = "1px 4px";
-            input.style.maxWidth = "150px";
+            input.addClass("space-section-rename-input");
             titleSpan.replaceWith(input);
             input.focus();
             const commitRename = () => __awaiter(this, void 0, void 0, function* () {
@@ -1475,11 +1441,7 @@ class WindowLayoutsModal extends obsidian.Modal {
         }
         // 右側：展開 / 收合箭頭 (最右端，無高亮背景輕量化)
         const rightEl = headerEl.createDiv("space-section-header-right");
-        rightEl.style.display = "flex";
-        rightEl.style.alignItems = "center";
         const arrowIcon = rightEl.createSpan({ cls: "clickable-icon space-section-arrow" });
-        arrowIcon.style.color = "var(--text-muted)";
-        arrowIcon.style.padding = "2px";
         obsidian.setIcon(arrowIcon, isCollapsed ? "chevron-right" : "chevron-down");
         headerEl.onclick = (e) => {
             if (e.detail > 1)
@@ -1508,8 +1470,6 @@ class WindowLayoutsModal extends obsidian.Modal {
             layoutEl.addClass("is-selected");
         if (layout.archived === true) {
             layoutEl.addClass("is-archived");
-            layoutEl.style.opacity = "0.55";
-            layoutEl.style.color = "var(--text-muted)";
         }
         this.setFilesTooltipForLayout(layoutEl, layout);
         let holdTimer = null;
@@ -1536,8 +1496,6 @@ class WindowLayoutsModal extends obsidian.Modal {
             const archivedBadge = titleEl.createSpan({
                 cls: "layout-archived-badge",
             });
-            archivedBadge.style.marginLeft = "6px";
-            archivedBadge.style.opacity = "0.75";
             archivedBadge.setText("📦");
             obsidian.setTooltip(archivedBadge, t("manageModal.archivedGroup") || "Archived");
         }
@@ -1652,9 +1610,7 @@ class WindowLayoutsModal extends obsidian.Modal {
                 });
             });
             setting.settingEl.addClass("window-spaces-setting-full-width");
-            const buttonContainer = modal.contentEl.createDiv();
-            buttonContainer.style.textAlign = "right";
-            buttonContainer.style.marginTop = "20px";
+            const buttonContainer = modal.contentEl.createDiv("ws-dialog-actions");
             const cancelButton = buttonContainer.createEl("button", {
                 text: t("common.cancel"),
             });
@@ -1663,7 +1619,6 @@ class WindowLayoutsModal extends obsidian.Modal {
                 text: t("common.save"),
                 cls: "mod-cta",
             });
-            saveButton.style.marginLeft = "10px";
             const submit = () => __awaiter(this, void 0, void 0, function* () {
                 const newName = input.value.trim();
                 if (!newName) {
@@ -1707,9 +1662,7 @@ class WindowLayoutsModal extends obsidian.Modal {
             modal.setTitle(title);
             modal.onOpen = () => {
                 modal.contentEl.createEl("p", { text: message });
-                const buttonContainer = modal.contentEl.createDiv();
-                buttonContainer.style.textAlign = "right";
-                buttonContainer.style.marginTop = "20px";
+                const buttonContainer = modal.contentEl.createDiv("ws-dialog-actions");
                 const cancelButton = buttonContainer.createEl("button", {
                     text: t("common.cancel"),
                 });
@@ -1721,7 +1674,6 @@ class WindowLayoutsModal extends obsidian.Modal {
                     text: t("common.confirm"),
                     cls: "mod-warning",
                 });
-                confirmButton.style.marginLeft = "10px";
                 confirmButton.onclick = () => {
                     resolve(true);
                     modal.close();
@@ -3646,11 +3598,6 @@ class SaveLayoutModal extends obsidian.Modal {
         });
         nameSetting.settingEl.addClass("window-spaces-setting-full-width");
         const noticeContainer = contentEl.createDiv("save-overwrite-notice");
-        noticeContainer.style.fontSize = "var(--font-ui-smaller, 12px)";
-        noticeContainer.style.color = "var(--text-accent, #70a7ff)";
-        noticeContainer.style.marginTop = "-8px";
-        noticeContainer.style.marginBottom = "12px";
-        noticeContainer.style.paddingLeft = "2px";
         let autoSave = (_a = this.layout.autoSave) !== null && _a !== void 0 ? _a : false;
         let autoSaveToggleComponent = null;
         // 佈局資訊顯示
@@ -3658,8 +3605,8 @@ class SaveLayoutModal extends obsidian.Modal {
         const infoEl = contentEl.createDiv();
         infoEl.createEl("div", {
             text: t("saveModal.infoSection"),
-            cls: "setting-item-name",
-        }).style.marginBottom = "4px";
+            cls: "setting-item-name ws-info-title",
+        });
         const infoList = infoEl.createEl("ul");
         infoList.createEl("li", {
             text: `${t("manageModal.fileCount")}: ${this.layout.metadata.fileCount}`,
@@ -3730,28 +3677,12 @@ class SaveLayoutModal extends obsidian.Modal {
         sectionsSetting.settingEl.addClass("window-spaces-setting-full-width");
         // 2. 底下：Section 列表選擇器 (Pills Container)
         const pillsContainer = contentEl.createDiv("space-sections-pills");
-        pillsContainer.style.display = "flex";
-        pillsContainer.style.flexWrap = "wrap";
-        pillsContainer.style.gap = "6px";
-        pillsContainer.style.marginTop = "-4px";
-        pillsContainer.style.marginBottom = "16px";
-        pillsContainer.style.paddingLeft = "2px";
         const renderPills = () => {
             pillsContainer.empty();
             selectedSections.forEach((sec) => {
                 const pill = pillsContainer.createDiv("space-section-pill");
-                pill.style.background = "var(--interactive-accent)";
-                pill.style.color = "var(--text-on-accent)";
-                pill.style.padding = "2px 8px";
-                pill.style.borderRadius = "12px";
-                pill.style.fontSize = "12px";
-                pill.style.display = "inline-flex";
-                pill.style.alignItems = "center";
-                pill.style.gap = "4px";
-                pill.style.cursor = "pointer";
                 pill.createSpan({ text: sec });
-                const closeSpan = pill.createSpan({ text: "✖" });
-                closeSpan.style.opacity = "0.7";
+                const closeSpan = pill.createSpan({ text: "✖", cls: "space-section-pill-close" });
                 closeSpan.onclick = (e) => {
                     e.stopPropagation();
                     selectedSections = selectedSections.filter((s) => s !== sec);
@@ -3763,12 +3694,6 @@ class SaveLayoutModal extends obsidian.Modal {
                 if (selectedSections.includes(sec))
                     return;
                 const unselectedPill = pillsContainer.createDiv("space-section-pill-unselected");
-                unselectedPill.style.background = "var(--background-secondary)";
-                unselectedPill.style.color = "var(--text-muted)";
-                unselectedPill.style.padding = "2px 8px";
-                unselectedPill.style.borderRadius = "12px";
-                unselectedPill.style.fontSize = "12px";
-                unselectedPill.style.cursor = "pointer";
                 unselectedPill.setText(`+ ${sec}`);
                 unselectedPill.onclick = () => {
                     selectedSections.push(sec);
@@ -3808,10 +3733,7 @@ class SaveLayoutModal extends obsidian.Modal {
         nameInput.addEventListener("input", checkDuplicateName);
         checkDuplicateName();
         // 按鈕
-        const buttonContainer = contentEl.createDiv("modal-button-container");
-        buttonContainer.style.textAlign = "right";
-        buttonContainer.style.marginTop = "20px";
-        buttonContainer.style.marginBottom = "12px";
+        const buttonContainer = contentEl.createDiv("ws-dialog-actions");
         const cancelButton = buttonContainer.createEl("button", {
             text: t("common.cancel"),
         });
@@ -3820,7 +3742,6 @@ class SaveLayoutModal extends obsidian.Modal {
             text: t("common.save"),
             cls: "mod-cta",
         });
-        saveButton.style.marginLeft = "10px";
         saveButton.onclick = () => {
             void this.submitForm(nameInput, includeGeometry, autoSave, selectedSections, archived);
         };
@@ -3872,9 +3793,9 @@ class WindowSpacesSettingTab extends obsidian.PluginSettingTab {
     display() {
         const { containerEl } = this;
         containerEl.empty();
-        containerEl.createEl("h2", { text: t("settings.title") });
+        new obsidian.Setting(containerEl).setName(t("settings.title")).setHeading();
         // 一般設定
-        containerEl.createEl("h3", { text: t("settings.autoSaveSection") });
+        new obsidian.Setting(containerEl).setName(t("settings.autoSaveSection")).setHeading();
         new obsidian.Setting(containerEl)
             .setName(t("settings.showNotifications"))
             .setDesc(t("settings.showNotificationsDesc"))
@@ -3901,7 +3822,7 @@ class WindowSpacesSettingTab extends obsidian.PluginSettingTab {
                 }
             }));
         });
-        containerEl.createEl("h3", { text: t("settings.layoutDisplaySection") });
+        new obsidian.Setting(containerEl).setName(t("settings.layoutDisplaySection")).setHeading();
         new obsidian.Setting(containerEl)
             .setName(t("settings.showLayoutStatusBar"))
             .setDesc(t("settings.showLayoutStatusBarDesc"))
@@ -3938,7 +3859,7 @@ class WindowSpacesSettingTab extends obsidian.PluginSettingTab {
             }));
         });
         // 佈局管理
-        containerEl.createEl("h3", { text: t("settings.layoutsSection") });
+        new obsidian.Setting(containerEl).setName(t("settings.layoutsSection")).setHeading();
         const layouts = this.plugin.manager.getSavedLayouts();
         if (layouts.length === 0) {
             containerEl.createEl("p", {
@@ -4009,7 +3930,7 @@ class WindowSpacesSettingTab extends obsidian.PluginSettingTab {
             });
         }
         // 危險操作
-        containerEl.createEl("h3", { text: t("settings.resetSettings") });
+        new obsidian.Setting(containerEl).setName(t("settings.resetSettings")).setHeading();
         new obsidian.Setting(containerEl)
             .setName(t("settings.resetSettings"))
             .setDesc(t("settings.resetSettingsDescription"))
@@ -4072,9 +3993,7 @@ class WindowSpacesSettingTab extends obsidian.PluginSettingTab {
                 });
             });
             setting.settingEl.addClass("window-spaces-setting-full-width");
-            const buttonContainer = modal.contentEl.createDiv();
-            buttonContainer.style.textAlign = "right";
-            buttonContainer.style.marginTop = "20px";
+            const buttonContainer = modal.contentEl.createDiv("ws-dialog-actions");
             const cancelBtn = buttonContainer.createEl("button", {
                 text: t("common.cancel"),
             });
@@ -4083,7 +4002,6 @@ class WindowSpacesSettingTab extends obsidian.PluginSettingTab {
                 text: t("common.save"),
                 cls: "mod-cta",
             });
-            saveBtn.style.marginLeft = "10px";
             const submit = () => __awaiter(this, void 0, void 0, function* () {
                 const newName = input.value.trim();
                 if (newName && newName !== layout.name) {
@@ -4120,9 +4038,7 @@ class WindowSpacesSettingTab extends obsidian.PluginSettingTab {
                 modal.setTitle(title);
                 modal.onOpen = () => {
                     modal.contentEl.createEl("p", { text: message });
-                    const buttonContainer = modal.contentEl.createDiv();
-                    buttonContainer.style.textAlign = "right";
-                    buttonContainer.style.marginTop = "20px";
+                    const buttonContainer = modal.contentEl.createDiv("ws-dialog-actions");
                     const cancelBtn = buttonContainer.createEl("button", {
                         text: t("common.cancel"),
                         cls: "mod-cta",
@@ -4135,7 +4051,6 @@ class WindowSpacesSettingTab extends obsidian.PluginSettingTab {
                         text: t("common.confirm"),
                         cls: "mod-warning",
                     });
-                    confirmBtn.style.marginLeft = "10px";
                     confirmBtn.onclick = () => {
                         resolve(true);
                         modal.close();

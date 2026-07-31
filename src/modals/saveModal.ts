@@ -46,11 +46,6 @@ export class SaveLayoutModal extends Modal {
     nameSetting.settingEl.addClass("window-spaces-setting-full-width");
 
     const noticeContainer = contentEl.createDiv("save-overwrite-notice");
-    noticeContainer.style.fontSize = "var(--font-ui-smaller, 12px)";
-    noticeContainer.style.color = "var(--text-accent, #70a7ff)";
-    noticeContainer.style.marginTop = "-8px";
-    noticeContainer.style.marginBottom = "12px";
-    noticeContainer.style.paddingLeft = "2px";
 
     let autoSave = this.layout.autoSave ?? false;
     let autoSaveToggleComponent: any = null;
@@ -60,8 +55,8 @@ export class SaveLayoutModal extends Modal {
     const infoEl = contentEl.createDiv();
     infoEl.createEl("div", {
       text: t("saveModal.infoSection"),
-      cls: "setting-item-name",
-    }).style.marginBottom = "4px";
+      cls: "setting-item-name ws-info-title",
+    });
 
     const infoList = infoEl.createEl("ul");
     infoList.createEl("li", {
@@ -144,30 +139,14 @@ export class SaveLayoutModal extends Modal {
 
     // 2. 底下：Section 列表選擇器 (Pills Container)
     const pillsContainer = contentEl.createDiv("space-sections-pills");
-    pillsContainer.style.display = "flex";
-    pillsContainer.style.flexWrap = "wrap";
-    pillsContainer.style.gap = "6px";
-    pillsContainer.style.marginTop = "-4px";
-    pillsContainer.style.marginBottom = "16px";
-    pillsContainer.style.paddingLeft = "2px";
 
     const renderPills = () => {
       pillsContainer.empty();
       selectedSections.forEach((sec) => {
         const pill = pillsContainer.createDiv("space-section-pill");
-        pill.style.background = "var(--interactive-accent)";
-        pill.style.color = "var(--text-on-accent)";
-        pill.style.padding = "2px 8px";
-        pill.style.borderRadius = "12px";
-        pill.style.fontSize = "12px";
-        pill.style.display = "inline-flex";
-        pill.style.alignItems = "center";
-        pill.style.gap = "4px";
-        pill.style.cursor = "pointer";
 
         pill.createSpan({ text: sec });
-        const closeSpan = pill.createSpan({ text: "✖" });
-        closeSpan.style.opacity = "0.7";
+        const closeSpan = pill.createSpan({ text: "✖", cls: "space-section-pill-close" });
         closeSpan.onclick = (e) => {
           e.stopPropagation();
           selectedSections = selectedSections.filter((s) => s !== sec);
@@ -179,12 +158,6 @@ export class SaveLayoutModal extends Modal {
       existingSections.forEach((sec) => {
         if (selectedSections.includes(sec)) return;
         const unselectedPill = pillsContainer.createDiv("space-section-pill-unselected");
-        unselectedPill.style.background = "var(--background-secondary)";
-        unselectedPill.style.color = "var(--text-muted)";
-        unselectedPill.style.padding = "2px 8px";
-        unselectedPill.style.borderRadius = "12px";
-        unselectedPill.style.fontSize = "12px";
-        unselectedPill.style.cursor = "pointer";
         unselectedPill.setText(`+ ${sec}`);
         unselectedPill.onclick = () => {
           selectedSections.push(sec);
@@ -226,10 +199,7 @@ export class SaveLayoutModal extends Modal {
     checkDuplicateName();
 
     // 按鈕
-    const buttonContainer = contentEl.createDiv("modal-button-container");
-    buttonContainer.style.textAlign = "right";
-    buttonContainer.style.marginTop = "20px";
-    buttonContainer.style.marginBottom = "12px";
+    const buttonContainer = contentEl.createDiv("ws-dialog-actions");
 
     const cancelButton = buttonContainer.createEl("button", {
       text: t("common.cancel"),
@@ -240,7 +210,6 @@ export class SaveLayoutModal extends Modal {
       text: t("common.save"),
       cls: "mod-cta",
     });
-    saveButton.style.marginLeft = "10px";
     saveButton.onclick = () => {
       void this.submitForm(nameInput, includeGeometry, autoSave, selectedSections, archived);
     };

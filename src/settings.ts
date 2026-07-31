@@ -15,10 +15,10 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
-    containerEl.createEl("h2", { text: t("settings.title") });
+    new Setting(containerEl).setName(t("settings.title")).setHeading();
 
     // 一般設定
-    containerEl.createEl("h3", { text: t("settings.autoSaveSection") });
+    new Setting(containerEl).setName(t("settings.autoSaveSection")).setHeading();
 
     new Setting(containerEl)
       .setName(t("settings.showNotifications"))
@@ -48,7 +48,7 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
         });
       });
 
-    containerEl.createEl("h3", { text: t("settings.layoutDisplaySection") });
+    new Setting(containerEl).setName(t("settings.layoutDisplaySection")).setHeading();
 
     new Setting(containerEl)
       .setName(t("settings.showLayoutStatusBar"))
@@ -89,7 +89,7 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
       });
 
     // 佈局管理
-    containerEl.createEl("h3", { text: t("settings.layoutsSection") });
+    new Setting(containerEl).setName(t("settings.layoutsSection")).setHeading();
 
     const layouts = this.plugin.manager.getSavedLayouts();
 
@@ -168,7 +168,7 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
     }
 
     // 危險操作
-    containerEl.createEl("h3", { text: t("settings.resetSettings") });
+    new Setting(containerEl).setName(t("settings.resetSettings")).setHeading();
 
     new Setting(containerEl)
       .setName(t("settings.resetSettings"))
@@ -240,9 +240,7 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
       });
       setting.settingEl.addClass("window-spaces-setting-full-width");
 
-      const buttonContainer = modal.contentEl.createDiv();
-      buttonContainer.style.textAlign = "right";
-      buttonContainer.style.marginTop = "20px";
+      const buttonContainer = modal.contentEl.createDiv("ws-dialog-actions");
 
       const cancelBtn = buttonContainer.createEl("button", {
         text: t("common.cancel"),
@@ -253,7 +251,6 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
         text: t("common.save"),
         cls: "mod-cta",
       });
-      saveBtn.style.marginLeft = "10px";
 
       const submit = async () => {
         const newName = input.value.trim();
@@ -299,9 +296,7 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
       modal.onOpen = () => {
         modal.contentEl.createEl("p", { text: message });
 
-        const buttonContainer = modal.contentEl.createDiv();
-        buttonContainer.style.textAlign = "right";
-        buttonContainer.style.marginTop = "20px";
+        const buttonContainer = modal.contentEl.createDiv("ws-dialog-actions");
 
         const cancelBtn = buttonContainer.createEl("button", {
           text: t("common.cancel"),
@@ -316,7 +311,6 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
           text: t("common.confirm"),
           cls: "mod-warning",
         });
-        confirmBtn.style.marginLeft = "10px";
         confirmBtn.onclick = () => {
           resolve(true);
           modal.close();
