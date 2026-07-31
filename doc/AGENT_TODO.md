@@ -209,30 +209,88 @@
 - [x] **目標**：配置 Vitest 測試環境並補齊 5 大核心模組之單元測試涵蓋率。
 - **實作成果**：
   - ✅ 配置 `Vitest` + `jsdom` + `obsidian` API Mock 環境。
-  - ✅ 完成 6 個測試套件，**25 個測試個案 100% 全數通過 (PASS)**：
+  - ✅ 完成 6 個測試套件，**35 個測試個案 100% 全數通過 (PASS)**：
     1. `tests/smartName.test.ts` (智慧命名 Pinned 優先、Active 次優先、格式化)
     2. `tests/sorting.test.ts` (6 大維度排序與複製另存新時間戳)
-    3. `tests/validationAndGuardrails.test.ts` (0 檔案覆寫攔截與資料結構驗證)
+    3. `tests/validationAndGuardrails.test.ts` (0 檔案覆寫攔截、智慧 Focus 比對與資料結構驗證)
     4. `tests/i18n.test.ts` (實時多源語系檢測與 fallback)
     5. `tests/layoutTree.test.ts` (Layout Tree 樹狀結構遞迴提取)
-- **專案規劃文件**：[doc/TEST_PLAN_UX014.md](file:///D:/GitDev/ObsidianWindowSpaces/doc/TEST_PLAN_UX014.md)
+    6. `tests/restoreModal.test.ts` (目標視窗還原、Enter / Shift+Enter 事件與搜尋過濾)
+- **專案規劃文件**：[doc/done/TEST_PLAN_UX014.md](file:///D:/GitDev/ObsidianWindowSpaces/doc/done/TEST_PLAN_UX014.md)
 - **完成日期**：2026-07-27
+
+### UX-022 已開啟佈局智慧切換與 Focus (Smart Focus for Open Window Layouts)
+
+- [x] **目標**：當使用者欲復原的 Layout 已經在某個浮動 Popout 視窗中開啟時，自動切換並聚焦 (Focus) 該既有視窗，避免重複建立相同的 Popout 視窗。
+- **實作方案**：
+  - **`getOpenWindowForLayout` 多層智慧辨識**：結合 `layoutWindows` 記憶體指標、`data-layout-name` DOM 屬性與 `findWindowForSavedLeaves(..., requirePositiveScore=true)` 高精確度檔案特徵比對，避免單一 Popout 視窗開立時誤將其他無關 Layout 通通判定為開啟。
+  - **視窗自動聚焦與標籤保護**：若佈局已開啟，預設 (Click / Enter) 自動觸發 `focusTargetWindow()`，將該浮動視窗移至最前景並給予鍵盤焦點，發出 Notice 提醒 (`已切換至「XXX」之已開啟視窗`)；若按住 `Shift` 則可強制將佈局重載套用至目前視窗。
+  - **Window Layouts 清單動態標籤 (🟢 視窗開啟中)**：清單項目副標題列精確為「真正運行該 Layout 的 Popout 視窗」動態顯示 `🟢 視窗開啟中` (Active) 微型標籤，讓使用者一目瞭然。
+- **主要檔案**：`src/manager.ts`、`src/modals/restoreModal.ts`、`styles.css`、`src/i18n/*`。
+- **完成日期**：2026-07-28
+
+### UX-023 跨視窗與 Sidebar Panel 即時自動廣播同步 (Real-time Panel Sync)
+
+- [x] **目標**：無論在主視窗側邊欄 (Sidebar Panel)、主視窗 Tab 或任何 Popout 視窗中開啟 Window Layouts Panel/Modal，當有新增、刪除、重命名、背景 Auto-Save 或視窗開關時，所有開啟中的 Panel 畫面均會即時自動重繪同步更新。
+- **實作方案**：
+  - **全域變更廣播機制 (`renderAllInstances`)**：在 `manager.saveLayout()`, `deleteLayout()`, `autoSaveWindowLayout()`, `restoreLayoutInternal()`, `saveSettings()` 以及 `window-open` / `window-close` 事件中，全面加入 `WindowLayoutsModal.renderAllInstances()` 觸發點。
+  - **搜尋與選取狀態保留**：重繪時完美保留使用者在搜尋框輸入的 Query 與選取狀態，流暢度與反應達 100%。
+- **主要檔案**：`src/manager.ts`、`src/main.ts`、`src/modals/restoreModal.ts`、`src/settings.ts`。
+- **完成日期**：2026-07-28
+
+### UX-024 全站用語大統一 (Window Spaces / Space 術語精簡重構)
+
+- [x] **目標**：全面統一 UI、命令、選單、標籤與通知中的外掛術語，貫徹品牌「Window Spaces」（複數/標題）與「Space / 空間」（單數/操作/按鈕）之簡潔設計。
+- **實作方案**：
+  - **複數/標題全對齊**：主面板、對話框標題、設定頁面、開啟指令全面統一為 `Window Spaces`。
+  - **單數/操作精簡化**：命令（`儲存目前空間` / `Save current Space`）、按鈕（`儲存空間` / `復原空間` / `刪除空間`）、標籤（`空間名稱` / `空間資訊`）與 Notice 全面精簡為 `Space / 空間`。
+  - **語系同步更新**：同步更新 `en.ts`、`zh-TW.ts`、`zh-CN.ts` 與 `types.ts`。
+- **主要檔案**：`src/i18n/*`、`src/main.ts`、`tests/i18n.test.ts`。
+- **完成日期**：2026-07-28
+
+### UX-025 Space list 組織性增強 (Section 標籤分類、拖曳重排、雙擊改名與封存功能)
+
+- [x] **目標**：提升 Space list 清單之組織能力，支援多重 Section 標籤、清單分組拖曳重排、Section 雙擊內聯改名、與「📦 封存 (Archived)」功能。
+- **實作方案**：
+  - **Tag-Pills 標籤編輯**：於 `Save Space` / `Edit Space` Modal 中提供 Front-matter 風格 Tag Pills 輸入框，支援點選既存標籤與動態鍵入新增。
+  - **Toolbar 👁️ 顯示選項下拉選單**：於 ⚙️ 排序選單前新增「顯示選項」按鈕，提供「依 Section 分組 / 不分組」及「顯示 / 隱藏封存空間」開關。
+  - **Edit Space 封存切換與內聯渲染**：Edit Space Modal 中新增「封存空間」開關；取消獨立的 Archived Section，顯示封存時直接內聯於原 Section 底部，以 muted 停用顏色 (`color: var(--text-muted); opacity: 0.55`) 與 `📦` 標籤呈現。
+  - **多 Section 鍵盤上下鍵導覽修正**：建立 DOM 實時渲染對映表 (`renderedLayoutEntries`)，徹底解決跨 Section 重複 Space 導致向下鍵卡住選不到底部項目的問題。
+- **主要檔案**：`src/types.ts`、`src/manager.ts`、`src/modals/saveModal.ts`、`src/modals/restoreModal.ts`、`src/i18n/*`、`tests/validationAndGuardrails.test.ts`。
+- **完成日期**：2026-07-28
+
+### UX-026 Window Spaces Panel Toolbar 原生對齊 (Sidebar / Editor Tab Parity)
+
+- [x] **目標**：讓 Window Spaces 出現在左側欄、右側欄與 Editor Tab Area 時，工具列的 DOM 結構、按鈕排列、邊框與上下留白一致，並與 Obsidian 內建 File Explorer 對齊。
+- **實作方案**：
+  - **共用 Persistent ItemView**：由 `src/views/windowLayoutsView.ts` 註冊 `window-spaces-layouts`，支援 `left`、`right`、`tab` 三種位置，三者共用 `WindowLayoutsModal` controller。
+  - **共用原生 Toolbar 結構**：`src/modals/restoreModal.ts` 在所有 Panel 位置建立相同的 `nav-header window-layouts-panel-header` 與 `nav-buttons-container window-layouts-header-actions`，固定按鈕順序與置中方式，不再使用 sidebar 專用分支。
+  - **原生邊界對齊**：`styles.css` 隱藏 Window Spaces 的標準 `.view-header`，並以 `.window-layouts-panel { padding: 0 8px 6px 8px !important; }` 清除 `view-content` 上方留白，使 toolbar 從與 File Explorer 相同的 leaf 頂端開始。
+  - **回歸測試**：`tests/restoreModal.test.ts` 比對 sidebar 與 tab 的 toolbar header class 及按鈕結構一致。
+- **主要檔案**：`src/views/windowLayoutsView.ts`、`src/modals/restoreModal.ts`、`styles.css`、`tests/restoreModal.test.ts`。
+- **驗收結果**：使用三欄畫面實測 File Explorer、Editor Tab Window Spaces、Right Sidebar Window Spaces；中、右兩個 Window Spaces toolbar 已與 File Explorer 的 padding/margin 對齊。`npm run test` 38/38 通過，`npm run lint` 與 `npm run build` 通過，並已部署至 `test-vault` 與 `Note`。
+- **完成日期**：2026-07-31
 
 ---
 
 ## 🏆 專案階段總結 (Project Summary)
 
-- **UX-001 ~ UX-014 核心需求**：**100% 大滿貫竣工 Pass** 🎉
+- **UX-001 ~ UX-026 核心需求**：**100% 大滿貫竣工 Pass** 🎉
 - **全站 Icon 大一統**：`Restore (history)`, `Manage (layout)`, `Save (save)`, `Auto-Save (refresh-cw)`
-- **UI 精簡重構**：Window Layouts Modal `+ 新視窗` 按鈕、Tasks 齒輪 ⚙️ 排序選單、項目向下箭頭 `∨` 下拉選單 (Auto-save, Rename, Edit, Delete)。
-- **動態幾分之幾進度 Notice**：Restore 過程中呈現實時進度（例如 `🔄 正在復原佈局... (2/5)`）。
+- **UI 精簡重構**：Window Layouts Modal `+ 新視窗` 按鈕、Tasks 齒輪 ⚙️ 排序選單、項目向下箭頭 `∨` 下拉選單 (Auto-save, Rename, Edit, Delete, Archive)。
+- **動態幾分之幾進度 Notice**：Restore 過程中呈現實時進度（例如 `🔄 正在復原空間... (2/5)`）。
 - **底層優化與安全防呆**：
   - 旁觀 Popout 視窗 Virtual DOM 記憶體引用微創保護（消弭 90% 視窗閃爍抖動）。
   - Auto-Save 0 檔案覆寫動態攔截與 `lastValidSnapshots` 備份退回保護。
-  - Save Modal 動態繼承與連動 `autoSave` 狀態。
+  - Save Modal 動態繼承與連動 `autoSave` 及 `includeGeometry` 狀態。
   - 視窗幾何屬性精簡合併為單一「包含視窗位置與大小」選項。
   - `createdAt` 與 `updatedAt` 獨立時間戳記錄（複製另存時重置 B 的建立時間）。
   - 實時多源動態 i18n 語系檢測（`zh-TW`, `zh-CN`, `en` 切換零延遲）。
+  - 已開啟佈局智慧 Focus 切換與 `🟢 視窗開啟中` 狀態感知。
+  - 跨視窗與 Sidebar Panel 即時自動廣播重繪與同步。
+  - 全站術語大統一（`Window Spaces` 標題 / `Space (空間)` 操作）。
+  - Space list 組織性增強（Tag-Pills 編輯、拖曳重排 Section、雙擊內聯改名 Section、👁️ 顯示選項選單、📦 封存獨立分組）。
+  - Panel toolbar 統一（Sidebar / Editor Tab 共用原生 `nav-header` 結構，與 File Explorer 對齊）。
 
 ---
 
@@ -245,11 +303,21 @@
   - [x] **中頭資料更新**：更新 `manifest.json` 與 `package.json` 的 `author`、`authorUrl` 與 `description` SEO 關鍵字
   - [x] **授權文件**：根目錄創建標準 MIT `LICENSE` 檔案 (Copyright (c) 2026)
   - [x] **文件多語系化**：擴充 `README.md` 包含 9 國語言說明與英文審核主文件
-  - [x] **代碼修飾與驗證**：清理 4 個 ESLint warnings (`npm run lint` 達 0 errors, 0 warnings)，`npm run build` 與 `npm test` 17 項測試全數通過
+  - [x] **代碼修飾與驗證**：清理 4 個 ESLint warnings (`npm run lint` 達 0 errors, 0 warnings)，`npm run build` 與 `npm test` 31 項測試全數通過
 - **待執行工作 (GitHub 平台與 PR 提交)**：
   - [ ] **GitHub Release**：創建 `1.0.0` Tag 並上傳 `manifest.json`, `main.js`, `styles.css` Assets
   - [ ] **PR 提交**：Fork `obsidianmd/obsidian-releases` 並更新 `community-plugins.json` 發起 PR
 - **落成文件**：[doc/STORE_SUBMISSION_CHECKLIST.md](file:///D:/GitDev/ObsidianWindowSpaces/doc/STORE_SUBMISSION_CHECKLIST.md)
+
+---
+
+## P4：未來擴充功能 (Future Enhancements)
+
+### UX-021 清單自訂拖拽排序 (Custom Layout Reordering)
+
+- [ ] **目標**：允許使用者在 Window Layouts 視窗中透過拖拽 (Drag & Drop) 或上下按鈕手動調整 Layout 顯示順序。
+- **說明**：目前清單支援 6 大動態排序維度 (`updated-desc`, `updated-asc`, `created-desc`, `created-asc`, `name-asc`, `name-desc`)。未來可增加 `custom` 自訂排序維度與拖拽手勢支援。
+- **主要檔案**：`src/modals/restoreModal.ts`, `src/types.ts`, `styles.css`
 
 ---
 

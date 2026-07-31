@@ -38,6 +38,13 @@ E:\vaults\test-vault\.obsidian\plugins\obsidian-window-spaces\
 2. 輸入 **"管理視窗佈局"** 並執行
 3. ✅ 應該看到設定頁面中的佈局管理界面
 
+#### 測試 C-1：Panel Toolbar 位置一致性
+1. 同時開啟 Obsidian 內建 **File Explorer**、Window Spaces Editor Tab，以及 Window Spaces Right Sidebar。
+2. 確認三個區域的 toolbar 都從各自 leaf 的相同頂端開始。
+3. 確認 Editor Tab 與 Right Sidebar 的 Window Spaces toolbar 按鈕順序、置中位置、邊框與上下 padding/margin 一致，且與 File Explorer 的 toolbar 高度對齊。
+4. 將 Window Spaces 從 Editor Tab 改開至 Left Sidebar，再重複檢查；不應出現位置專用的排列差異。
+5. 若修改 toolbar CSS，完成 Obsidian 完整重啟後再驗收，避免舊版 `styles.css` 快取造成誤判。
+
 ### 3. 進階功能測試
 
 #### 測試 D：設定頁面
@@ -92,6 +99,7 @@ A: 確保在彈出視窗中保存佈局，而不是主視窗
 - [ ] 保存佈局功能正常
 - [ ] 恢復佈局功能正常
 - [ ] 佈局管理界面正常
+- [ ] Window Spaces 在 Editor Tab、Left Sidebar、Right Sidebar 的 toolbar 外觀一致
 - [ ] 設定頁面功能正常
 - [ ] 快速恢復命令正常
 - [ ] 錯誤處理正常
