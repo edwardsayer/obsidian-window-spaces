@@ -147,6 +147,7 @@ main.js.map
 *.map
 
 # AI & IDE directories
+agents
 .agents/
 .claude/
 .gemini/
