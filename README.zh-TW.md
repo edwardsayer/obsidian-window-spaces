@@ -53,7 +53,7 @@ Obsidian 原生內建的 **Workspaces** 外掛是針對 **「全域應用程式�
 
 #### 手動安裝
 1. 至 GitHub Release 下載最新的 `main.js`、`styles.css` 與 `manifest.json`。
-2. 複製至 `<你的 Vault>/.obsidian/plugins/obsidian-window-spaces/`。
+2. 複製至 `<你的 Vault>/.obsidian/plugins/window-spaces/`。
 3. 重新載入 Obsidian 並於設定中啟用。
 
 ### 🚀 使用指南

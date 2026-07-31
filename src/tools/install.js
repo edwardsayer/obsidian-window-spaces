@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const projectRoot = path.resolve(__dirname, '..', '..');
+const manifest = JSON.parse(fs.readFileSync(path.join(projectRoot, 'manifest.json'), 'utf8'));
 
 console.log('🚀 Window Spaces 插件安裝向導');
 
@@ -29,13 +30,13 @@ rl.question('請輸入你的 Obsidian vault 名稱: ', (vaultName) => {
   let pluginDir;
   switch (platform) {
     case 'win32':
-      pluginDir = path.join(process.env.APPDATA, 'Obsidian', vaultName, '.obsidian', 'plugins', 'obsidian-window-spaces');
+      pluginDir = path.join(process.env.APPDATA, 'Obsidian', vaultName, '.obsidian', 'plugins', manifest.id);
       break;
     case 'darwin':
-      pluginDir = path.join(os.homedir(), 'Library', 'Application Support', 'Obsidian', vaultName, '.obsidian', 'plugins', 'obsidian-window-spaces');
+      pluginDir = path.join(os.homedir(), 'Library', 'Application Support', 'Obsidian', vaultName, '.obsidian', 'plugins', manifest.id);
       break;
     default: // linux
-      pluginDir = path.join(os.homedir(), '.config', 'obsidian', vaultName, '.obsidian', 'plugins', 'obsidian-window-spaces');
+      pluginDir = path.join(os.homedir(), '.config', 'obsidian', vaultName, '.obsidian', 'plugins', manifest.id);
       break;
   }
 

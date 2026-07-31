@@ -53,7 +53,7 @@ Obsidian's built-in **Workspaces** plugin is designed for **global application s
 
 #### Manual Installation
 1. Download `main.js`, `styles.css`, and `manifest.json` from the latest GitHub Release.
-2. Copy them to `<your-vault>/.obsidian/plugins/obsidian-window-spaces/`.
+2. Copy them to `<your-vault>/.obsidian/plugins/window-spaces/`.
 3. Reload Obsidian and enable **Window Spaces** in settings.
 
 ### 🚀 Usage

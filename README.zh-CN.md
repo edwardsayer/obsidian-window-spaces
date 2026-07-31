@@ -53,7 +53,7 @@ Obsidian 内置的 **Workspaces** 插件是针对 **「全局应用状态」** �
 
 #### 手动安装
 1. 至 GitHub Release 下载最新的 `main.js`、`styles.css` 与 `manifest.json`。
-2. 复制到 `<你的 Vault>/.obsidian/plugins/obsidian-window-spaces/`。
+2. 复制到 `<你的 Vault>/.obsidian/plugins/window-spaces/`。
 3. 重新加载 Obsidian 并于设置中启用。
 
 ### 🚀 使用指南
