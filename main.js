@@ -771,7 +771,6 @@ class WindowLayoutsModal extends obsidian.Modal {
         this.filteredLayouts = [];
         this.selectedIndex = 0;
         this.panelMode = false;
-        this.panelPointerInside = false;
         this.renderedLayoutEntries = [];
         this.plugin = plugin;
         this.targetWindow = targetWindow;
@@ -818,19 +817,11 @@ class WindowLayoutsModal extends obsidian.Modal {
      * The modal instance is intentionally kept as the controller so the panel
      * and modal always expose the same layout actions and keyboard behavior.
      */
-    mountInContainer(rootEl, isSidebar) {
+    mountInContainer(rootEl, isSidebar, isPanelActive) {
         WindowLayoutsModal.activeInstances.add(this);
-        this.removePanelPointerTracking();
         this.panelRootEl = rootEl;
+        this.isPanelActive = isPanelActive;
         this.panelMode = true;
-        this.panelPointerEnterListener = () => {
-            this.panelPointerInside = true;
-        };
-        this.panelPointerLeaveListener = () => {
-            this.panelPointerInside = false;
-        };
-        rootEl.addEventListener("pointerenter", this.panelPointerEnterListener);
-        rootEl.addEventListener("pointerleave", this.panelPointerLeaveListener);
         this.renderContent();
     }
     /**
@@ -842,8 +833,8 @@ class WindowLayoutsModal extends obsidian.Modal {
      */
     mountInModalContainer(rootEl, closeHost) {
         WindowLayoutsModal.activeInstances.add(this);
-        this.removePanelPointerTracking();
         this.panelRootEl = rootEl;
+        this.isPanelActive = undefined;
         this.panelMode = false;
         this.externalHostClose = closeHost;
         this.renderContent();
@@ -852,9 +843,9 @@ class WindowLayoutsModal extends obsidian.Modal {
         var _a;
         WindowLayoutsModal.activeInstances.delete(this);
         this.removeKeydownListener();
-        this.removePanelPointerTracking();
         (_a = this.panelRootEl) === null || _a === void 0 ? void 0 : _a.empty();
         this.panelRootEl = undefined;
+        this.isPanelActive = undefined;
         this.panelMode = false;
         this.externalHostClose = undefined;
     }
@@ -932,7 +923,7 @@ class WindowLayoutsModal extends obsidian.Modal {
         const targetWindow = targetDoc.defaultView || window;
         this.removeKeydownListener();
         this.keydownListener = (event) => {
-            var _a;
+            var _a, _b;
             if (event.key !== "ArrowDown" && event.key !== "ArrowUp" && event.key !== "Enter") {
                 return;
             }
@@ -946,9 +937,11 @@ class WindowLayoutsModal extends obsidian.Modal {
                 }
             }
             // A native Modal owns keyboard input while it is open. Persistent
-            // panels only own navigation while focused or hovered.
+            // panels only own navigation while they are the active leaf (clicking
+            // the panel, its tab, or opening it via command activates the leaf) or
+            // while the focus is inside the panel.
             const shouldHandle = this.panelMode
-                ? (focusedInstance ? focusedInstance === this : this.panelPointerInside)
+                ? (focusedInstance ? focusedInstance === this : ((_a = this.isPanelActive) === null || _a === void 0 ? void 0 : _a.call(this)) === true)
                 : true;
             if (!shouldHandle)
                 return;
@@ -962,7 +955,7 @@ class WindowLayoutsModal extends obsidian.Modal {
                 return;
             event.preventDefault();
             event.stopImmediatePropagation();
-            const rawQuery = ((_a = this.searchInput) === null || _a === void 0 ? void 0 : _a.value.trim()) || "";
+            const rawQuery = ((_b = this.searchInput) === null || _b === void 0 ? void 0 : _b.value.trim()) || "";
             const selectedLayout = this.filteredLayouts[this.selectedIndex >= 0 ? this.selectedIndex : 0];
             if (selectedLayout) {
                 void this.restoreLayout(selectedLayout, !event.shiftKey);
@@ -972,7 +965,7 @@ class WindowLayoutsModal extends obsidian.Modal {
             }
         };
         // Listen on Window capture so Obsidian's document/workspace keymap cannot
-        // consume ArrowUp/ArrowDown before a hovered Window Spaces panel sees it.
+        // consume ArrowUp/ArrowDown before an active Window Spaces panel sees it.
         this.keydownTarget = targetWindow;
         this.keydownTarget.addEventListener("keydown", this.keydownListener, true);
         if (this.initialFocusTimer !== undefined) {
@@ -1883,17 +1876,6 @@ class WindowLayoutsModal extends obsidian.Modal {
             this.keydownListener = undefined;
             this.keydownTarget = undefined;
         }
-    }
-    removePanelPointerTracking() {
-        if (this.panelRootEl && this.panelPointerEnterListener) {
-            this.panelRootEl.removeEventListener("pointerenter", this.panelPointerEnterListener);
-        }
-        if (this.panelRootEl && this.panelPointerLeaveListener) {
-            this.panelRootEl.removeEventListener("pointerleave", this.panelPointerLeaveListener);
-        }
-        this.panelPointerEnterListener = undefined;
-        this.panelPointerLeaveListener = undefined;
-        this.panelPointerInside = false;
     }
 }
 WindowLayoutsModal.activeInstances = new Set();
@@ -4191,9 +4173,13 @@ class WindowLayoutsView extends obsidian.ItemView {
     onOpen() {
         return __awaiter(this, void 0, void 0, function* () {
             this.contentController = new WindowLayoutsModal(this.app, this.plugin);
-            // The panel header is intentionally location-neutral. Obsidian applies
-            // the same native nav-header treatment in editor tabs and sidebars.
-            this.contentController.mountInContainer(this.contentEl);
+            // The panel is considered active when Obsidian marks its leaf as the
+            // active leaf. Clicking the panel (or its tab) and opening it via a
+            // command all activate the leaf natively, so arrow-key ownership follows
+            // the same rule as every other Obsidian panel.
+            this.contentController.mountInContainer(this.contentEl, undefined, () => {
+                return this.app.workspace.activeLeaf === this.leaf;
+            });
         });
     }
     onClose() {

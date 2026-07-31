@@ -15,11 +15,9 @@ export class WindowLayoutsModal extends Modal {
 
   private keydownListener?: (event: KeyboardEvent) => void;
   private keydownTarget?: Window | Document | HTMLElement;
+  private isPanelActive?: () => boolean;
   private panelRootEl?: HTMLElement;
   private panelMode = false;
-  private panelPointerInside = false;
-  private panelPointerEnterListener?: () => void;
-  private panelPointerLeaveListener?: () => void;
   private externalHostClose?: () => void;
   private initialFocusTimer?: number;
   private initialSearchQuery?: string;
@@ -90,22 +88,18 @@ export class WindowLayoutsModal extends Modal {
    * The modal instance is intentionally kept as the controller so the panel
    * and modal always expose the same layout actions and keyboard behavior.
    */
-  mountInContainer(rootEl: HTMLElement, isSidebar?: boolean): void {
+  mountInContainer(
+    rootEl: HTMLElement,
+    isSidebar?: boolean,
+    isPanelActive?: () => boolean
+  ): void {
     // Keep the optional argument for compatibility with older callers. The
     // panel UI is deliberately identical in editor tabs and sidebars.
     void isSidebar;
     WindowLayoutsModal.activeInstances.add(this);
-    this.removePanelPointerTracking();
     this.panelRootEl = rootEl;
+    this.isPanelActive = isPanelActive;
     this.panelMode = true;
-    this.panelPointerEnterListener = () => {
-      this.panelPointerInside = true;
-    };
-    this.panelPointerLeaveListener = () => {
-      this.panelPointerInside = false;
-    };
-    rootEl.addEventListener("pointerenter", this.panelPointerEnterListener);
-    rootEl.addEventListener("pointerleave", this.panelPointerLeaveListener);
     this.renderContent();
   }
 
@@ -118,8 +112,8 @@ export class WindowLayoutsModal extends Modal {
    */
   mountInModalContainer(rootEl: HTMLElement, closeHost: () => void): void {
     WindowLayoutsModal.activeInstances.add(this);
-    this.removePanelPointerTracking();
     this.panelRootEl = rootEl;
+    this.isPanelActive = undefined;
     this.panelMode = false;
     this.externalHostClose = closeHost;
     this.renderContent();
@@ -128,9 +122,9 @@ export class WindowLayoutsModal extends Modal {
   unmountFromContainer(): void {
     WindowLayoutsModal.activeInstances.delete(this);
     this.removeKeydownListener();
-    this.removePanelPointerTracking();
     this.panelRootEl?.empty();
     this.panelRootEl = undefined;
+    this.isPanelActive = undefined;
     this.panelMode = false;
     this.externalHostClose = undefined;
   }
@@ -237,9 +231,11 @@ export class WindowLayoutsModal extends Modal {
       }
 
       // A native Modal owns keyboard input while it is open. Persistent
-      // panels only own navigation while focused or hovered.
+      // panels only own navigation while they are the active leaf (clicking
+      // the panel, its tab, or opening it via command activates the leaf) or
+      // while the focus is inside the panel.
       const shouldHandle = this.panelMode
-        ? (focusedInstance ? focusedInstance === this : this.panelPointerInside)
+        ? (focusedInstance ? focusedInstance === this : this.isPanelActive?.() === true)
         : true;
       if (!shouldHandle) return;
 
@@ -262,7 +258,7 @@ export class WindowLayoutsModal extends Modal {
       }
     };
     // Listen on Window capture so Obsidian's document/workspace keymap cannot
-    // consume ArrowUp/ArrowDown before a hovered Window Spaces panel sees it.
+    // consume ArrowUp/ArrowDown before an active Window Spaces panel sees it.
     this.keydownTarget = targetWindow;
     this.keydownTarget.addEventListener("keydown", this.keydownListener, true);
 
@@ -1285,15 +1281,5 @@ export class WindowLayoutsModal extends Modal {
     }
   }
 
-  private removePanelPointerTracking(): void {
-    if (this.panelRootEl && this.panelPointerEnterListener) {
-      this.panelRootEl.removeEventListener("pointerenter", this.panelPointerEnterListener);
-    }
-    if (this.panelRootEl && this.panelPointerLeaveListener) {
-      this.panelRootEl.removeEventListener("pointerleave", this.panelPointerLeaveListener);
-    }
-    this.panelPointerEnterListener = undefined;
-    this.panelPointerLeaveListener = undefined;
-    this.panelPointerInside = false;
-  }
+
 }

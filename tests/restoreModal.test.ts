@@ -150,19 +150,32 @@ describe("WindowLayoutsModal restore target", () => {
     expect((modal1 as any).selectedIndex).toBe(1);
     expect((modal2 as any).selectedIndex).toBe(0);
 
-    // Obsidian may consume workspace key events at document level. The panel
-    // must receive navigation from Window capture while the pointer is inside.
+    // Hovering without clicking must NOT steal arrow keys: a panel only owns
+    // navigation when it is the active leaf or contains the focus.
     div1.dispatchEvent(new Event("pointerenter"));
-    const arrowEvent = new KeyboardEvent("keydown", {
+    const hoverArrowEvent = new KeyboardEvent("keydown", {
       key: "ArrowDown",
       bubbles: true,
       cancelable: true,
     });
-    window.dispatchEvent(arrowEvent);
+    window.dispatchEvent(hoverArrowEvent);
+
+    expect((modal1 as any).selectedIndex).toBe(1);
+    expect((modal2 as any).selectedIndex).toBe(0);
+    expect(hoverArrowEvent.defaultPrevented).toBe(false);
+
+    // When the panel is the active leaf, Window capture delivers navigation.
+    (modal1 as any).isPanelActive = () => true;
+    const activeArrowEvent = new KeyboardEvent("keydown", {
+      key: "ArrowDown",
+      bubbles: true,
+      cancelable: true,
+    });
+    window.dispatchEvent(activeArrowEvent);
 
     expect((modal1 as any).selectedIndex).toBe(0);
     expect((modal2 as any).selectedIndex).toBe(0);
-    expect(arrowEvent.defaultPrevented).toBe(true);
+    expect(activeArrowEvent.defaultPrevented).toBe(true);
 
     // Test new panel initial independence
     const div3 = createMockEl();

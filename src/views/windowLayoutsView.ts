@@ -37,9 +37,13 @@ export class WindowLayoutsView extends ItemView {
 
   async onOpen(): Promise<void> {
     this.contentController = new WindowLayoutsModal(this.app, this.plugin);
-    // The panel header is intentionally location-neutral. Obsidian applies
-    // the same native nav-header treatment in editor tabs and sidebars.
-    this.contentController.mountInContainer(this.contentEl);
+    // The panel is considered active when Obsidian marks its leaf as the
+    // active leaf. Clicking the panel (or its tab) and opening it via a
+    // command all activate the leaf natively, so arrow-key ownership follows
+    // the same rule as every other Obsidian panel.
+    this.contentController.mountInContainer(this.contentEl, undefined, () => {
+      return this.app.workspace.activeLeaf === this.leaf;
+    });
   }
 
   async onClose(): Promise<void> {
