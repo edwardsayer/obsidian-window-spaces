@@ -154,6 +154,10 @@ main.js.map
 .idea/
 .vscode/
 
+# Local-only files & archived development documents
+AGENTS.md
+doc/done/
+
 # Visual Studio files
 *.suo
 *.ntvs*

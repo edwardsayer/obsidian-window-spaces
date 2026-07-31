@@ -40,6 +40,12 @@ Obsidian's built-in **Workspaces** plugin is designed for **global application s
 - **Unified Quick-Switch & Management Modal**: Search layouts in real-time, view hover file tooltips, sort by 6 dimensions (gear menu ⚙️), rename, edit, auto-save, or delete.
 - **Safe Placement & Guardrails**: Prevents off-screen windows on monitor changes and guards against accidental 0-file layout overwrites.
 
+### 🖼️ Screenshots
+
+| Multi-workspace popouts | Popout window | Sidebar panel |
+| :---: | :---: | :---: |
+| ![Multi-workspace popouts](screenshots/multi-workspaces.png) | ![Popout window](screenshots/popup.png) | ![Sidebar panel](screenshots/sidebar.png) |
+
 ### 📥 Installation
 
 #### From Community Plugins (Recommended — Application Pending)
@@ -65,7 +71,22 @@ Obsidian's built-in **Workspaces** plugin is designed for **global application s
 - Click a layout normally, or press `Enter`, to restore it in a new popout window.
 - Hold `Shift` while clicking a layout, or press `Shift + Enter`, to restore it in the current active popout window.
 - Access dropdown options (∨) to toggle auto-save, rename, edit, or delete saved layouts.
-- See [Use Cases & Workflows](doc/USE_CASES.md) for project, research, Canvas, Tasks, writing, meeting, and development workspace examples.
+- See the [Use Cases & Workflows](#use-cases--workflows) section below for project, research, Canvas, Tasks, writing, meeting, and development workspace examples.
+
+### 🚀 Use Cases & Workflows
+
+Think of each saved Space as a reusable **work cabin** for a project, research topic, work session, or recurring process:
+
+- **Basic pattern**: Pin a navigation view (Base, Canvas, or Tasks) on the left, keep the file you are working on to the right, and pin the nav view so clicking files never replaces it. Save the arrangement under a project or workflow name.
+- **Project control center** (`Project — Map & Workbench`): Pinned Base map on the left, project home, specs and meeting notes to the right.
+- **Research literature** (`Research — Literature Review`): Literature Base on the left, reading notes and open research questions to the right.
+- **Canvas visual planning** (`Planning — Canvas & Notes`): Canvas holds the big picture on the left while specs and decision notes are edited on the right.
+- **Tasks cycle management** (`Weekly Review — Tasks & Notes`, `Daily Focus`): Tasks query on the left, daily note and source documents to the right.
+- **Writing & content** (`Writing — Draft & References`): Content Base on the left, draft in the center, references and checklists to the right.
+- **Meetings & decisions** (`Meeting — Agenda & Actions`): Meeting Base and agenda on the left, running notes and follow-up Tasks to the right.
+- **Software development** (`Dev — Issue Triage`, `Dev — Implementation`, `Dev — Code Review`, `Dev — Release`): Issue Base on the left, specs and implementation notes to the right.
+
+Once saved, a single click (or `Enter`) restores the whole cabin into a fresh popout window, or `Shift + click` (`Shift + Enter`) applies it to the current popout.
 
 ### ⌨️ Keyboard Shortcuts
 - No default command shortcuts are assigned. You can assign an optional shortcut to `Window Spaces: Open window layouts` in Obsidian's Hotkeys settings.
@@ -131,7 +152,7 @@ Obsidian 原生內建的 **Workspaces** 外掛是針對 **「全域應用程式�
 - 在清單中直接點擊佈局，或按 `Enter`，會在新的 Popout 視窗套用佈局。
 - 按住 `Shift` 點擊佈局，或按 `Shift + Enter`，會套用至目前 active 的 Popout 視窗。
 - 透過下拉選單 (∨) 切換自動保存、重命名、編輯或刪除佈局。
-- 詳細案例與工作流請參閱 [Use Cases & Workflows](doc/USE_CASES.md)。
+- 詳細案例與工作流請參閱 [Use Cases & Workflows](#use-cases--workflows)。
 
 ### ⌨️ 鍵盤操作
 - 外掛沒有預設指令快捷鍵；可在 Obsidian 快捷鍵設定中自行為 `開啟視窗佈局` 指令指定快捷鍵。
@@ -180,7 +201,7 @@ Obsidian 原生內建的 **Workspaces** 外掛是針對 **「全域應用程式�
 - 在列表中直接点击布局，或按 `Enter`，会在新的 Popout 窗口应用布局。
 - 按住 `Shift` 点击布局，或按 `Shift + Enter`，会应用至当前 active Popout 窗口。
 - 通过下拉菜单 (∨) 切换自动保存、重命名、编辑或删除布局。
-- 更多项目、研究、Canvas、Tasks、写作、会议与开发工作流示例，请参阅 [Use Cases & Workflows](doc/USE_CASES.md)。
+- 更多项目、研究、Canvas、Tasks、写作、会议与开发工作流示例，请参阅 [Use Cases & Workflows](#use-cases--workflows)。
 
 ### ⌨️ 键盘操作
 - 插件没有预设指令快捷键；可在 Obsidian 快捷键设置中自行为 `打开窗口布局` 指令指定快捷键。
@@ -217,7 +238,7 @@ Obsidian 原生內建的 **Workspaces** 外掛是針對 **「全域應用程式�
 - レイアウトを通常クリックするか `Enter` を押すと、新しい Popout ウィンドウに復元します。
 - `Shift` を押しながらクリックするか `Shift + Enter` を押すと、現在のアクティブな Popout ウィンドウに復元します。
 - 各レイアウトの下矢印メニュー (∨) から、自動保存、名前変更、編集、削除を実行できます。
-- 詳細な使用例とワークフローは [Use Cases & Workflows](doc/USE_CASES.md) を参照してください。
+- 詳細な使用例とワークフローは [Use Cases & Workflows](#use-cases--workflows) を参照してください。
 
 ### ⌨️ キーボード操作
 - コマンドにデフォルトのショートカットはありません。必要に応じて Obsidian のホットキー設定で割り当ててください。
@@ -247,7 +268,7 @@ Obsidian 原生內建的 **Workspaces** 外掛是針對 **「全域應用程式�
 - Haz clic normalmente en un diseño o pulsa `Enter` para restaurarlo en una nueva ventana Popout.
 - Mantén `Shift` al hacer clic o pulsa `Shift + Enter` para restaurarlo en la ventana Popout activa.
 - Usa el menú desplegable (∨) de cada diseño para activar el guardado automático, renombrar, editar o eliminarlo.
-- Consulta [Use Cases & Workflows](doc/USE_CASES.md) para ver ejemplos de proyectos, investigación, Canvas, Tasks y desarrollo.
+- Consulta [Use Cases & Workflows](#use-cases--workflows) para ver ejemplos de proyectos, investigación, Canvas, Tasks y desarrollo.
 
 ### ⌨️ Operación con teclado
 - No hay atajos de comando predeterminados; puedes asignarlos en la configuración de teclas rápidas de Obsidian.
@@ -277,7 +298,7 @@ Obsidian 原生內建的 **Workspaces** 外掛是針對 **「全域應用程式�
 - Cliquez normalement sur une disposition ou appuyez sur `Enter` pour la restaurer dans une nouvelle fenêtre Popout.
 - Maintenez `Shift` en cliquant ou appuyez sur `Shift + Enter` pour la restaurer dans la fenêtre Popout active.
 - Utilisez le menu déroulant (∨) de chaque disposition pour activer la sauvegarde automatique, renommer, modifier ou supprimer.
-- Consultez [Use Cases & Workflows](doc/USE_CASES.md) pour découvrir des exemples de projets, de recherche, de Canvas, de Tasks et de développement.
+- Consultez [Use Cases & Workflows](#use-cases--workflows) pour découvrir des exemples de projets, de recherche, de Canvas, de Tasks et de développement.
 
 ### ⌨️ Utilisation du clavier
 - Aucun raccourci de commande n'est défini par défaut ; vous pouvez en attribuer un dans les raccourcis d'Obsidian.
@@ -307,7 +328,7 @@ Obsidian 原生內建的 **Workspaces** 外掛是針對 **「全域應用程式�
 - انقر على التخطيط بشكل عادي أو اضغط `Enter` لاستعادته في نافذة Popout جديدة.
 - اضغط باستمرار على `Shift` أثناء النقر أو اضغط `Shift + Enter` لاستعادته في نافذة Popout النشطة.
 - استخدم القائمة المنسدلة (∨) لكل تخطيط لتفعيل الحفظ التلقائي أو إعادة التسمية أو التعديل أو الحذف.
-- راجع [Use Cases & Workflows](doc/USE_CASES.md) للاطلاع على أمثلة المشاريع والبحث وCanvas وTasks والتطوير.
+- راجع [Use Cases & Workflows](#use-cases--workflows) للاطلاع على أمثلة المشاريع والبحث وCanvas وTasks والتطوير.
 
 ### ⌨️ استخدام لوحة المفاتيح
 - لا توجد اختصارات أوامر افتراضية؛ يمكنك تعيين اختصار من إعدادات مفاتيح Obsidian.
@@ -337,7 +358,7 @@ Obsidian 原生內建的 **Workspaces** 外掛是針對 **「全域應用程式�
 - Klicke ein Layout normal an oder drücke `Enter`, um es in einem neuen Popout-Fenster wiederherzustellen.
 - Halte beim Klicken `Shift` gedrückt oder drücke `Shift + Enter`, um es im aktiven Popout-Fenster wiederherzustellen.
 - Über das Dropdown-Menü (∨) jedes Layouts kannst du Auto-Save, Umbenennen, Bearbeiten oder Löschen ausführen.
-- Weitere Beispiele und Arbeitsabläufe findest du unter [Use Cases & Workflows](doc/USE_CASES.md).
+- Weitere Beispiele und Arbeitsabläufe findest du unter [Use Cases & Workflows](#use-cases--workflows).
 
 ### ⌨️ Tastaturbedienung
 - Es gibt keine standardmäßigen Befehls-Tastenkürzel; du kannst sie in den Obsidian-Hotkeys zuweisen.
@@ -367,7 +388,7 @@ Obsidian 原生內建的 **Workspaces** 外掛是針對 **「全域應用程式�
 - Обычный щелчок по макету или клавиша `Enter` восстановит его в новом окне Popout.
 - Удерживайте `Shift` при щелчке или нажмите `Shift + Enter`, чтобы восстановить макет в активном окне Popout.
 - В выпадающем меню (∨) каждого макета доступны автосохранение, переименование, редактирование и удаление.
-- Примеры рабочих процессов доступны в [Use Cases & Workflows](doc/USE_CASES.md).
+- Примеры рабочих процессов доступны в [Use Cases & Workflows](#use-cases--workflows).
 
 ### ⌨️ Управление с клавиатуры
 - Команды не имеют сочетаний клавиш по умолчанию; их можно назначить в настройках горячих клавиш Obsidian.
