@@ -36,6 +36,83 @@ describe("Validation & Auto-Save Guardrails (validationAndGuardrails.test.ts)", 
     expect((manager as any).validateLayout(valid)).toBe(true);
   });
 
+  test("openNewPopoutWindow waits for the leaf view before resolving its Window", async () => {
+    const popoutWindow = {
+      document: {
+        body: {
+          classList: {
+            contains: (className: string) => className === "is-popout-window",
+          },
+        },
+      },
+      focus: vi.fn(),
+    } as unknown as Window;
+
+    const leaf: any = {
+      containerEl: { ownerDocument: { defaultView: null } },
+      setViewState: vi.fn(async () => {
+        await Promise.resolve();
+        leaf.containerEl.ownerDocument.defaultView = popoutWindow;
+      }),
+    };
+    mockPlugin.app.workspace.openPopoutLeaf = vi.fn(() => leaf);
+
+    const result = await manager.openNewPopoutWindow();
+
+    expect(leaf.setViewState).toHaveBeenCalledWith({ type: "empty" });
+    expect(result).toBe(popoutWindow);
+    expect(popoutWindow.focus).toHaveBeenCalled();
+  });
+
+  test("forceNewWindow bypasses smart-focus and creates a new popout for an already-open space", async () => {
+    const popoutBody = {
+      classList: { contains: (className: string) => className === "is-popout-window" },
+    };
+    const existingWindow = { document: { body: popoutBody } } as unknown as Window;
+    const newWindow = {
+      document: { body: popoutBody },
+      focus: vi.fn(),
+      setTimeout: (callback: () => void) => {
+        callback();
+        return 0;
+      },
+    } as unknown as Window;
+    const openPopoutLeaf = vi.fn(() => ({}));
+
+    mockPlugin.settings.showNotifications = false;
+    mockPlugin.app.workspace.getLayout = vi.fn(() => ({ floating: [] }));
+    mockPlugin.app.workspace.openPopoutLeaf = openPopoutLeaf;
+    mockPlugin.app.workspace.changeLayout = vi.fn().mockResolvedValue(undefined);
+
+    const layout: WindowLayout = {
+      id: "force-new-space",
+      name: "Already Open Space",
+      timestamp: Date.now(),
+      windowState: { size: { width: 800, height: 600 } },
+      workspace: {
+        layout: { type: "leaf", id: "leaf-force-new", state: { type: "empty", state: {} } },
+        leaves: [],
+      },
+      metadata: { fileCount: 0, tabCount: 0, splitCount: 0 },
+    };
+
+    vi.spyOn(manager as any, "getOpenWindowForLayout").mockReturnValue(existingWindow);
+    vi.spyOn(manager as any, "capturePreservedWindowLayouts").mockReturnValue([]);
+    vi.spyOn(manager as any, "getSavedViewStates").mockReturnValue([]);
+    vi.spyOn(manager, "getLivePopoutWindows").mockReturnValue([newWindow]);
+    vi.spyOn(manager as any, "getLeavesForWindow").mockReturnValue([]);
+    vi.spyOn(manager as any, "restoreWindowGeometry").mockImplementation(() => {});
+    vi.spyOn(manager as any, "restorePreservedWindowLabels").mockImplementation(() => {});
+    vi.spyOn(manager as any, "setLayoutLabelForWindow").mockImplementation(() => {});
+    vi.spyOn(manager as any, "refreshLayoutLabels").mockImplementation(() => {});
+    const focusSpy = vi.spyOn(manager, "focusTargetWindow");
+
+    await manager.restoreLayout(layout, { forceNewWindow: true, showNotifications: false });
+
+    expect(focusSpy).not.toHaveBeenCalled();
+    expect(openPopoutLeaf).toHaveBeenCalledTimes(1);
+  });
+
   test("autoSaveWindowLayout should suppress overwriting with 0 files if existing layout contains files", async () => {
     const existingLayout: WindowLayout = {
       id: "l-existing",

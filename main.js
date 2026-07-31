@@ -778,74 +778,40 @@ class WindowLayoutsModal extends obsidian.Modal {
     }
     onOpen() {
         var _a, _b;
-        WindowLayoutsModal.activeInstances.add(this);
-        this.modalEl.addClass("window-layouts-modal");
-        // Modal 實際所在的 document 是鍵盤 Enter 操作最可靠的來源視窗。
-        // Command Palette / activeLeaf 可能仍指向另一個 popout。
-        const modalWindow = (_a = this.modalEl.ownerDocument) === null || _a === void 0 ? void 0 : _a.defaultView;
-        const modalBody = (_b = modalWindow === null || modalWindow === void 0 ? void 0 : modalWindow.document) === null || _b === void 0 ? void 0 : _b.body;
-        if (modalWindow &&
-            modalBody &&
-            (modalBody.classList.contains("is-popout-window") ||
-                modalBody.classList.contains("mod-popout"))) {
-            this.targetWindow = modalWindow;
-        }
-        this.setTitle(t("common.windowLayouts"));
-        // 隱藏原生的 modal-close-button，避免觸發 Obsidian 原生 close()
-        const nativeCloseBtn = this.containerEl.querySelector(".modal-close-button");
-        if (nativeCloseBtn) {
-            nativeCloseBtn.style.display = "none";
-        }
-        // Modal 與 ItemView 共用同一組 header actions：排序、以 panel 開啟。
-        const titleHeader = this.containerEl.querySelector(".modal-title");
-        if (titleHeader) {
-            titleHeader.style.display = "flex";
-            titleHeader.style.alignItems = "center";
-            titleHeader.style.justifyContent = "space-between";
-            titleHeader.style.width = "100%";
-            this.createHeaderActions(titleHeader);
-        }
-        // 註冊 Obsidian Scope 鍵盤導覽
-        this.scope.register([], "ArrowDown", (evt) => {
-            this.handleArrowKey(1);
-            evt.preventDefault();
-            return false;
-        });
-        this.scope.register([], "ArrowUp", (evt) => {
-            this.handleArrowKey(-1);
-            evt.preventDefault();
-            return false;
-        });
-        // 捕獲階段全域 Keydown 監聽（無論焦點在標題、空白處還是任何元素上均 100% 生效）
-        const targetDoc = this.modalEl.ownerDocument || document;
-        this.keydownListener = (event) => {
-            var _a;
-            if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-                event.preventDefault();
-                event.stopPropagation();
-                this.handleArrowKey(event.key === "ArrowDown" ? 1 : -1);
+        try {
+            WindowLayoutsModal.activeInstances.add(this);
+            this.modalEl.addClass("window-layouts-modal");
+            const modalWindow = (_a = this.modalEl.ownerDocument) === null || _a === void 0 ? void 0 : _a.defaultView;
+            const modalBody = (_b = modalWindow === null || modalWindow === void 0 ? void 0 : modalWindow.document) === null || _b === void 0 ? void 0 : _b.body;
+            if (modalWindow &&
+                modalBody &&
+                (modalBody.classList.contains("is-popout-window") ||
+                    modalBody.classList.contains("mod-popout"))) {
+                this.targetWindow = modalWindow;
             }
-            else if (event.key === "Enter") {
-                const activeEl = targetDoc.activeElement;
-                if (activeEl && activeEl.tagName === "BUTTON") {
-                    return;
-                }
-                event.preventDefault();
-                event.stopPropagation();
-                const rawQuery = ((_a = this.searchInput) === null || _a === void 0 ? void 0 : _a.value.trim()) || "";
-                const targetIndex = this.selectedIndex >= 0 ? this.selectedIndex : 0;
-                const selectedLayout = this.filteredLayouts[targetIndex];
-                if (selectedLayout) {
-                    void this.restoreLayout(selectedLayout, !event.shiftKey);
-                }
-                else if (rawQuery) {
-                    void this.createAndSaveLayout(rawQuery, !event.shiftKey);
-                }
+            this.setTitle(t("common.windowLayouts"));
+            const titleHeader = this.containerEl.querySelector(".modal-title");
+            if (titleHeader) {
+                titleHeader.style.display = "flex";
+                titleHeader.style.alignItems = "center";
+                titleHeader.style.justifyContent = "space-between";
+                titleHeader.style.width = "100%";
+                this.createHeaderActions(titleHeader);
             }
-        };
-        this.keydownTarget = targetDoc;
-        this.keydownTarget.addEventListener("keydown", this.keydownListener, true);
-        this.renderContent();
+            this.renderContent();
+        }
+        catch (err) {
+            console.error("[WindowSpaces] Error during WindowLayoutsModal onOpen:", err);
+            WindowLayoutsModal.activeInstances.delete(this);
+            this.removeKeydownListener();
+            // Keep the native Modal alive and visibly report the failure. Closing a
+            // Modal while Obsidian is still running Modal.open()/onOpen() can leave
+            // its keyboard scope above the Command Palette scope.
+            this.contentEl.empty();
+            this.contentEl.createEl("p", {
+                text: `Error loading Window Spaces: ${(err === null || err === void 0 ? void 0 : err.message) || err}`,
+            });
+        }
     }
     /**
      * Render this modal's content inside an ItemView (or another host).
@@ -867,6 +833,21 @@ class WindowLayoutsModal extends obsidian.Modal {
         rootEl.addEventListener("pointerleave", this.panelPointerLeaveListener);
         this.renderContent();
     }
+    /**
+     * Mount the shared picker inside a plain native Obsidian Modal.
+     *
+     * This deliberately avoids calling WindowLayoutsModal.open(): Obsidian
+     * 1.13 can fail while opening a subclass with a complex onOpen lifecycle,
+     * while a native Modal plus mounted content remains reliable.
+     */
+    mountInModalContainer(rootEl, closeHost) {
+        WindowLayoutsModal.activeInstances.add(this);
+        this.removePanelPointerTracking();
+        this.panelRootEl = rootEl;
+        this.panelMode = false;
+        this.externalHostClose = closeHost;
+        this.renderContent();
+    }
     unmountFromContainer() {
         var _a;
         WindowLayoutsModal.activeInstances.delete(this);
@@ -875,15 +856,21 @@ class WindowLayoutsModal extends obsidian.Modal {
         (_a = this.panelRootEl) === null || _a === void 0 ? void 0 : _a.empty();
         this.panelRootEl = undefined;
         this.panelMode = false;
+        this.externalHostClose = undefined;
     }
     getRootEl() {
         return this.panelRootEl || this.contentEl;
     }
     closeHost() {
-        if (!this.panelMode)
+        if (this.externalHostClose) {
+            this.externalHostClose();
+        }
+        else if (!this.panelMode) {
             this.close();
+        }
     }
     renderContent() {
+        var _a, _b, _c, _d;
         const contentEl = this.getRootEl();
         contentEl.empty();
         // This is the shared content component's root class. It must be present
@@ -941,57 +928,64 @@ class WindowLayoutsModal extends obsidian.Modal {
         const dismissInst = instructionsEl.createDiv("prompt-instruction");
         dismissInst.createEl("span", { text: "esc", cls: "prompt-instruction-command" });
         dismissInst.createEl("span", { text: t("instructions.dismiss") });
-        if (this.panelMode) {
-            const targetDoc = contentEl.ownerDocument || document;
-            this.removeKeydownListener();
-            this.keydownListener = (event) => {
-                var _a;
-                if (event.key !== "ArrowDown" && event.key !== "ArrowUp" && event.key !== "Enter") {
-                    return;
+        const targetDoc = contentEl.ownerDocument || document;
+        const targetWindow = targetDoc.defaultView || window;
+        this.removeKeydownListener();
+        this.keydownListener = (event) => {
+            var _a;
+            if (event.key !== "ArrowDown" && event.key !== "ArrowUp" && event.key !== "Enter") {
+                return;
+            }
+            const activeEl = targetDoc.activeElement;
+            let focusedInstance = null;
+            for (const instance of WindowLayoutsModal.activeInstances) {
+                const root = instance.getRootEl();
+                if (activeEl && root && root.ownerDocument === targetDoc && root.contains(activeEl)) {
+                    focusedInstance = instance;
+                    break;
                 }
-                const activeEl = targetDoc.activeElement;
-                // Determine if ANY instance in this document currently has keyboard focus
-                let focusedInstance = null;
-                for (const instance of WindowLayoutsModal.activeInstances) {
-                    const root = instance.getRootEl();
-                    if (activeEl && root && root.contains(activeEl)) {
-                        focusedInstance = instance;
-                        break;
-                    }
-                }
-                // Strict focus priority: if a panel has keyboard focus, ONLY that panel processes keydown.
-                // Otherwise, fallback to the panel currently receiving pointer hover.
-                const shouldHandle = focusedInstance
-                    ? focusedInstance === this
-                    : this.panelPointerInside;
-                if (!shouldHandle)
-                    return;
-                if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    this.handleArrowKey(event.key === "ArrowDown" ? 1 : -1);
-                }
-                else if (event.key === "Enter") {
-                    if (activeEl && activeEl.tagName === "BUTTON")
-                        return;
-                    event.preventDefault();
-                    event.stopPropagation();
-                    const rawQuery = ((_a = this.searchInput) === null || _a === void 0 ? void 0 : _a.value.trim()) || "";
-                    const selectedLayout = this.filteredLayouts[this.selectedIndex >= 0 ? this.selectedIndex : 0];
-                    if (selectedLayout) {
-                        void this.restoreLayout(selectedLayout, !event.shiftKey);
-                    }
-                    else if (rawQuery) {
-                        void this.createAndSaveLayout(rawQuery, !event.shiftKey);
-                    }
-                }
-            };
-            // Keep listening at document level so hover over any part of the panel
-            // grants keyboard navigation even when another element owns focus.
-            this.keydownTarget = targetDoc;
-            this.keydownTarget.addEventListener("keydown", this.keydownListener, true);
+            }
+            // A native Modal owns keyboard input while it is open. Persistent
+            // panels only own navigation while focused or hovered.
+            const shouldHandle = this.panelMode
+                ? (focusedInstance ? focusedInstance === this : this.panelPointerInside)
+                : true;
+            if (!shouldHandle)
+                return;
+            if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                this.handleArrowKey(event.key === "ArrowDown" ? 1 : -1);
+                return;
+            }
+            if (activeEl && activeEl.tagName === "BUTTON")
+                return;
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            const rawQuery = ((_a = this.searchInput) === null || _a === void 0 ? void 0 : _a.value.trim()) || "";
+            const selectedLayout = this.filteredLayouts[this.selectedIndex >= 0 ? this.selectedIndex : 0];
+            if (selectedLayout) {
+                void this.restoreLayout(selectedLayout, !event.shiftKey);
+            }
+            else if (rawQuery) {
+                void this.createAndSaveLayout(rawQuery, !event.shiftKey);
+            }
+        };
+        // Listen on Window capture so Obsidian's document/workspace keymap cannot
+        // consume ArrowUp/ArrowDown before a hovered Window Spaces panel sees it.
+        this.keydownTarget = targetWindow;
+        this.keydownTarget.addEventListener("keydown", this.keydownListener, true);
+        if (this.initialFocusTimer !== undefined) {
+            const timerWindow = ((_b = (_a = this.modalEl) === null || _a === void 0 ? void 0 : _a.ownerDocument) === null || _b === void 0 ? void 0 : _b.defaultView) || window;
+            timerWindow.clearTimeout(this.initialFocusTimer);
         }
-        window.setTimeout(() => { var _a; return (_a = this.searchInput) === null || _a === void 0 ? void 0 : _a.focus(); }, 50);
+        const focusWindow = ((_d = (_c = this.modalEl) === null || _c === void 0 ? void 0 : _c.ownerDocument) === null || _d === void 0 ? void 0 : _d.defaultView) || window;
+        this.initialFocusTimer = focusWindow.setTimeout(() => {
+            this.initialFocusTimer = undefined;
+            if (this.searchInput && this.searchInput.isConnected !== false) {
+                this.searchInput.focus();
+            }
+        }, 50);
     }
     createPanelButton(parentEl) {
         const panelButton = parentEl.createEl("button", {
@@ -1179,7 +1173,10 @@ class WindowLayoutsModal extends obsidian.Modal {
                 }
                 else {
                     // 情境 2：在主視窗中執行 -> 建立全新的 0 檔案 Popout 佈局，並開啟新 Popout 視窗
-                    const newWin = this.plugin.manager.openNewPopoutWindow();
+                    const newWin = yield this.plugin.manager.openNewPopoutWindow();
+                    if (!newWin) {
+                        throw new Error(t("errors.cannotRestore"));
+                    }
                     const emptyLayout = {
                         id: typeof this.plugin.manager.generateId === "function"
                             ? this.plugin.manager.generateId()
@@ -1252,6 +1249,7 @@ class WindowLayoutsModal extends obsidian.Modal {
                 WindowLayoutsModal.renderAllInstances();
             }
             catch (err) {
+                this.closeHost();
                 new obsidian.Notice((err === null || err === void 0 ? void 0 : err.message) || String(err));
             }
         });
@@ -1866,8 +1864,14 @@ class WindowLayoutsModal extends obsidian.Modal {
         menu.showAtMouseEvent(event);
     }
     onClose() {
+        var _a, _b;
         WindowLayoutsModal.activeInstances.delete(this);
         this.removeKeydownListener();
+        if (this.initialFocusTimer !== undefined) {
+            const timerWindow = ((_b = (_a = this.modalEl) === null || _a === void 0 ? void 0 : _a.ownerDocument) === null || _b === void 0 ? void 0 : _b.defaultView) || window;
+            timerWindow.clearTimeout(this.initialFocusTimer);
+            this.initialFocusTimer = undefined;
+        }
         this.contentEl.empty();
     }
     removeKeydownListener() {
@@ -1875,6 +1879,7 @@ class WindowLayoutsModal extends obsidian.Modal {
         if (this.keydownListener) {
             const target = this.keydownTarget || ((_a = this.panelRootEl) === null || _a === void 0 ? void 0 : _a.ownerDocument) || ((_b = this.modalEl) === null || _b === void 0 ? void 0 : _b.ownerDocument) || document;
             target.removeEventListener("keydown", this.keydownListener, true);
+            target.removeEventListener("keydown", this.keydownListener, false);
             this.keydownListener = undefined;
             this.keydownTarget = undefined;
         }
@@ -2083,15 +2088,32 @@ class WindowLayoutManager {
         element.setAttribute("title", layoutName);
         element.dataset.layoutName = layoutName;
     }
-    /** 開啟全新的 Popout 視窗 */
+    /** 開啟全新的 Popout 視窗（等待 leaf 與 DOM 都完成掛載後再回傳視窗物件） */
     openNewPopoutWindow() {
         var _a, _b;
-        try {
-            const leaf = this.app.workspace.openPopoutLeaf();
-            if (leaf) {
-                leaf.setViewState({ type: "empty" });
-                const targetWin = ((_b = (_a = leaf.containerEl) === null || _a === void 0 ? void 0 : _a.ownerDocument) === null || _b === void 0 ? void 0 : _b.defaultView) || null;
-                if (targetWin && typeof targetWin.focus === "function") {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const leaf = this.app.workspace.openPopoutLeaf();
+                if (!leaf)
+                    return null;
+                // openPopoutLeaf() 同步回傳 leaf，但 setViewState() 會非同步完成
+                // view/container 的建立。若不等待這個 Promise，下面讀到的 ownerDocument
+                // 可能仍是空值或尚未切換到真正的 Popout Window。
+                yield Promise.resolve(leaf.setViewState({ type: "empty" }));
+                let targetWin = null;
+                for (let attempt = 0; attempt < 40; attempt++) {
+                    const candidate = (_b = (_a = leaf.containerEl) === null || _a === void 0 ? void 0 : _a.ownerDocument) === null || _b === void 0 ? void 0 : _b.defaultView;
+                    if (candidate && this.isPopoutDocument(candidate.document)) {
+                        targetWin = candidate;
+                        break;
+                    }
+                    yield new Promise((resolve) => setTimeout(resolve, 50));
+                }
+                if (!targetWin) {
+                    console.warn("Popout leaf was created, but its Window was not mounted in time.");
+                    return null;
+                }
+                if (typeof targetWin.focus === "function") {
                     try {
                         targetWin.focus();
                     }
@@ -2101,11 +2123,11 @@ class WindowLayoutManager {
                 }
                 return targetWin;
             }
-        }
-        catch (e) {
-            console.warn("Failed to open new popout window:", e);
-        }
-        return null;
+            catch (e) {
+                console.warn("Failed to open new popout window:", e);
+            }
+            return null;
+        });
     }
     saveLayoutFromWindow(targetWin) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -2534,15 +2556,17 @@ class WindowLayoutManager {
         });
     }
     restoreLayoutInternal(layout, options = {}) {
-        var _a, _b, _c, _d, _e;
+        var _a, _b, _c, _d, _e, _f, _g;
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 // 驗證佈局數據
                 if (!this.validateLayout(layout)) {
                     throw new Error(t("errors.invalidData"));
                 }
-                // 0. 若該 Layout 已經在某個 Popout 視窗中開啟，且非強制重載 (forceReload)，直接聚焦該視窗即可
-                if (!options.forceReload) {
+                // 0. 只有「目前視窗還原」才在 Layout 已開啟時直接聚焦既有視窗。
+                // 一般 Enter / click 會傳入 forceNewWindow，必須繼續走新 Popout 流程，
+                // 否則已開啟的 Layout 會被 Smart Focus 提前攔截，永遠不會開新視窗。
+                if (!options.forceReload && !options.forceNewWindow) {
                     const existingWin = this.getOpenWindowForLayout(layout);
                     if (existingWin && !existingWin.closed && this.isPopoutDocument(existingWin.document)) {
                         this.focusTargetWindow(existingWin);
@@ -2596,25 +2620,40 @@ class WindowLayoutManager {
                         }
                     }
                     else {
+                        // 記錄開啟前的 Popout 視窗集合
+                        const popoutWinsBefore = new Set(this.getLivePopoutWindows());
+                        // 呼叫 openPopoutLeaf 建立新 Popout 分頁
                         const popoutLeaf = this.app.workspace.openPopoutLeaf();
-                        targetWin = this.getWindowForLeaf(popoutLeaf);
-                        // 等待 Popout 視窗誕生
-                        yield new Promise((resolve) => setTimeout(resolve, 150));
+                        // 輪詢等待全新的 Live Popout Window 在 Electron 中被正式掛載建立（最多等待 2 秒）
+                        let newlyCreatedWin = null;
+                        for (let attempt = 0; attempt < 40; attempt++) {
+                            yield new Promise((resolve) => setTimeout(resolve, 50));
+                            const currentPopoutWins = this.getLivePopoutWindows();
+                            newlyCreatedWin = currentPopoutWins.find((w) => !popoutWinsBefore.has(w)) || null;
+                            if (newlyCreatedWin)
+                                break;
+                        }
+                        targetWin = newlyCreatedWin || ((_d = (_c = popoutLeaf === null || popoutLeaf === void 0 ? void 0 : popoutLeaf.containerEl) === null || _c === void 0 ? void 0 : _c.ownerDocument) === null || _d === void 0 ? void 0 : _d.defaultView) || null;
                         // 重新讀取最新的 Layout
                         currentLayout = this.app.workspace.getLayout();
                         floatingWindows = this.getFloatingWindows(currentLayout);
-                        // 新開的視窗位於 floating 陣列末尾
-                        targetIndex = floatingWindows.length - 1;
+                        // 以新開視窗的 ID 或在 floating 陣列末尾精確定位 targetIndex
+                        if (targetWin) {
+                            targetIndex = this.findFloatingWindowIndexForWindow(targetWin, floatingWindows);
+                        }
+                        if (targetIndex < 0) {
+                            targetIndex = floatingWindows.length - 1;
+                        }
                     }
                 }
                 // 3. 只替換目標 window 的 children，保留 floating container 與
                 // window id。Obsidian 1.12 的 floating schema 是：
                 // floating object -> window children -> split/tabs/leaf；不能把
                 // floating 當成陣列，也不能直接用 leaf/split 覆蓋 window。
-                if (targetIndex >= 0 && ((_c = layout.workspace) === null || _c === void 0 ? void 0 : _c.layout)) {
+                if (targetIndex >= 0 && ((_e = layout.workspace) === null || _e === void 0 ? void 0 : _e.layout)) {
                     const currentFloatingWindow = floatingWindows[targetIndex];
                     const restoredWindow = this.prepareFloatingWindowForRestore(layout.workspace.layout, currentFloatingWindow, layout.includeGeometry);
-                    if (((_d = currentLayout.floating) === null || _d === void 0 ? void 0 : _d.type) === "floating" && Array.isArray(currentLayout.floating.children)) {
+                    if (((_f = currentLayout.floating) === null || _f === void 0 ? void 0 : _f.type) === "floating" && Array.isArray(currentLayout.floating.children)) {
                         currentLayout.floating.children = currentLayout.floating.children.map((child, idx) => (idx === targetIndex ? restoredWindow : child));
                     }
                     else if (Array.isArray(currentLayout.floating)) {
@@ -2643,7 +2682,7 @@ class WindowLayoutManager {
                 targetWin = liveTargetWin || this.findWindowForSavedLeaves(savedLeaves, options.targetWindow, targetWin) || targetWin;
                 let missingFiles = [];
                 if (options.validateFiles !== false && savedLeaves.length > 0) {
-                    missingFiles = yield this.restoreFileStatesForWindow(targetWin, savedLeaves, (_e = layout.workspace) === null || _e === void 0 ? void 0 : _e.activeFile);
+                    missingFiles = yield this.restoreFileStatesForWindow(targetWin, savedLeaves, (_g = layout.workspace) === null || _g === void 0 ? void 0 : _g.activeFile);
                 }
                 // 5. 調整視窗尺寸與座標，並聚焦視窗
                 if (targetWin) {
@@ -2654,7 +2693,7 @@ class WindowLayoutManager {
                         try {
                             this.app.workspace.setActiveLeaf(winLeaves[0], { focus: true });
                         }
-                        catch (_f) {
+                        catch (_h) {
                             // Ignore focus error
                         }
                     }
@@ -3396,6 +3435,18 @@ class WindowLayoutManager {
                 let targetLeaf = leavesById.get(leafState.id) || null;
                 if (i < windowLeaves.length && !targetLeaf)
                     targetLeaf = windowLeaves[i];
+                // 若該視窗現有分頁數少於所需分頁，自動為其切割建立新分頁容器
+                if (!targetLeaf && windowLeaves.length > 0) {
+                    try {
+                        const baseLeaf = windowLeaves[windowLeaves.length - 1];
+                        targetLeaf = this.app.workspace.createLeafBySplit(baseLeaf, "vertical");
+                        if (targetLeaf)
+                            windowLeaves.push(targetLeaf);
+                    }
+                    catch (e) {
+                        console.warn("Failed to create leaf by split for target window:", e);
+                    }
+                }
                 const file = this.app.vault.getAbstractFileByPath(filePath);
                 if (file instanceof obsidian.TFile) {
                     if (targetLeaf) {
@@ -4313,8 +4364,37 @@ class WindowSpacesPlugin extends obsidian.Plugin {
         });
     }
     openWindowLayoutsModal(targetWindow) {
-        const win = targetWindow || (this.manager ? this.manager.getActiveWindow() : undefined);
-        new WindowLayoutsModal(this.app, this, win).open();
+        try {
+            const win = targetWindow || (this.manager ? this.manager.getActiveWindow() : undefined);
+            // Use a plain native Modal as the host. The same Window Spaces
+            // controller already mounts reliably in ItemView panels; mounting it
+            // here avoids the failing custom Modal.open()/onOpen lifecycle seen in
+            // Obsidian 1.13 while preserving the shared picker and restore logic.
+            const hostModal = new obsidian.Modal(this.app);
+            const controller = new WindowLayoutsModal(this.app, this, win);
+            hostModal.setTitle(t("common.windowLayouts"));
+            hostModal.onOpen = () => {
+                try {
+                    hostModal.modalEl.addClass("window-layouts-modal");
+                    controller.mountInModalContainer(hostModal.contentEl, () => hostModal.close());
+                }
+                catch (error) {
+                    console.error("[WindowSpaces] Error mounting Window Spaces picker:", error);
+                    hostModal.contentEl.empty();
+                    hostModal.contentEl.createEl("p", {
+                        text: `Error loading Window Spaces: ${(error === null || error === void 0 ? void 0 : error.message) || error}`,
+                    });
+                }
+            };
+            hostModal.onClose = () => {
+                controller.unmountFromContainer();
+            };
+            hostModal.open();
+        }
+        catch (error) {
+            console.error("[WindowSpaces] Error opening WindowLayoutsModal:", error);
+            new obsidian.Notice(`Window Spaces Error: ${(error === null || error === void 0 ? void 0 : error.message) || error}`);
+        }
     }
     openWindowLayoutsPanel(location = "tab") {
         return __awaiter(this, void 0, void 0, function* () {

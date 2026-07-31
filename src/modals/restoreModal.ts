@@ -14,12 +14,14 @@ export class WindowLayoutsModal extends Modal {
   private selectedIndex = 0;
 
   private keydownListener?: (event: KeyboardEvent) => void;
-  private keydownTarget?: Document | HTMLElement;
+  private keydownTarget?: Window | Document | HTMLElement;
   private panelRootEl?: HTMLElement;
   private panelMode = false;
   private panelPointerInside = false;
   private panelPointerEnterListener?: () => void;
   private panelPointerLeaveListener?: () => void;
+  private externalHostClose?: () => void;
+  private initialFocusTimer?: number;
   private initialSearchQuery?: string;
   private clearSearchBtn?: HTMLElement;
 
@@ -42,81 +44,45 @@ export class WindowLayoutsModal extends Modal {
   }
 
   onOpen() {
-    WindowLayoutsModal.activeInstances.add(this);
-    this.modalEl.addClass("window-layouts-modal");
+    try {
+      WindowLayoutsModal.activeInstances.add(this);
+      this.modalEl.addClass("window-layouts-modal");
 
-    // Modal 實際所在的 document 是鍵盤 Enter 操作最可靠的來源視窗。
-    // Command Palette / activeLeaf 可能仍指向另一個 popout。
-    const modalWindow = this.modalEl.ownerDocument?.defaultView;
-    const modalBody = modalWindow?.document?.body;
-    if (
-      modalWindow &&
-      modalBody &&
-      (modalBody.classList.contains("is-popout-window") ||
-        modalBody.classList.contains("mod-popout"))
-    ) {
-      this.targetWindow = modalWindow;
-    }
-
-    this.setTitle(t("common.windowLayouts"));
-
-    // 隱藏原生的 modal-close-button，避免觸發 Obsidian 原生 close()
-    const nativeCloseBtn = this.containerEl.querySelector<HTMLElement>(".modal-close-button");
-    if (nativeCloseBtn) {
-      nativeCloseBtn.style.display = "none";
-    }
-
-    // Modal 與 ItemView 共用同一組 header actions：排序、以 panel 開啟。
-    const titleHeader = this.containerEl.querySelector<HTMLElement>(".modal-title");
-    if (titleHeader) {
-      titleHeader.style.display = "flex";
-      titleHeader.style.alignItems = "center";
-      titleHeader.style.justifyContent = "space-between";
-      titleHeader.style.width = "100%";
-      this.createHeaderActions(titleHeader);
-    }
-
-    // 註冊 Obsidian Scope 鍵盤導覽
-    this.scope.register([], "ArrowDown", (evt: KeyboardEvent) => {
-      this.handleArrowKey(1);
-      evt.preventDefault();
-      return false;
-    });
-
-    this.scope.register([], "ArrowUp", (evt: KeyboardEvent) => {
-      this.handleArrowKey(-1);
-      evt.preventDefault();
-      return false;
-    });
-
-    // 捕獲階段全域 Keydown 監聽（無論焦點在標題、空白處還是任何元素上均 100% 生效）
-    const targetDoc = this.modalEl.ownerDocument || document;
-    this.keydownListener = (event: KeyboardEvent) => {
-      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-        event.preventDefault();
-        event.stopPropagation();
-        this.handleArrowKey(event.key === "ArrowDown" ? 1 : -1);
-      } else if (event.key === "Enter") {
-        const activeEl = targetDoc.activeElement;
-        if (activeEl && activeEl.tagName === "BUTTON") {
-          return;
-        }
-        event.preventDefault();
-        event.stopPropagation();
-        const rawQuery = this.searchInput?.value.trim() || "";
-        const targetIndex = this.selectedIndex >= 0 ? this.selectedIndex : 0;
-        const selectedLayout = this.filteredLayouts[targetIndex];
-        if (selectedLayout) {
-          void this.restoreLayout(selectedLayout, !event.shiftKey);
-        } else if (rawQuery) {
-          void this.createAndSaveLayout(rawQuery, !event.shiftKey);
-        }
+      const modalWindow = this.modalEl.ownerDocument?.defaultView;
+      const modalBody = modalWindow?.document?.body;
+      if (
+        modalWindow &&
+        modalBody &&
+        (modalBody.classList.contains("is-popout-window") ||
+          modalBody.classList.contains("mod-popout"))
+      ) {
+        this.targetWindow = modalWindow;
       }
-    };
-    this.keydownTarget = targetDoc;
-    this.keydownTarget.addEventListener("keydown", this.keydownListener, true);
 
-    this.renderContent();
+      this.setTitle(t("common.windowLayouts"));
+
+      const titleHeader = this.containerEl.querySelector<HTMLElement>(".modal-title");
+      if (titleHeader) {
+        titleHeader.style.display = "flex";
+        titleHeader.style.alignItems = "center";
+        titleHeader.style.justifyContent = "space-between";
+        titleHeader.style.width = "100%";
+        this.createHeaderActions(titleHeader);
+      }
+
+      this.renderContent();
+    } catch (err: any) {
+      console.error("[WindowSpaces] Error during WindowLayoutsModal onOpen:", err);
+      WindowLayoutsModal.activeInstances.delete(this);
+      this.removeKeydownListener();
+      // Keep the native Modal alive and visibly report the failure. Closing a
+      // Modal while Obsidian is still running Modal.open()/onOpen() can leave
+      // its keyboard scope above the Command Palette scope.
+      this.contentEl.empty();
+      this.contentEl.createEl("p", {
+        text: `Error loading Window Spaces: ${err?.message || err}`,
+      });
+    }
   }
 
   /**
@@ -143,6 +109,22 @@ export class WindowLayoutsModal extends Modal {
     this.renderContent();
   }
 
+  /**
+   * Mount the shared picker inside a plain native Obsidian Modal.
+   *
+   * This deliberately avoids calling WindowLayoutsModal.open(): Obsidian
+   * 1.13 can fail while opening a subclass with a complex onOpen lifecycle,
+   * while a native Modal plus mounted content remains reliable.
+   */
+  mountInModalContainer(rootEl: HTMLElement, closeHost: () => void): void {
+    WindowLayoutsModal.activeInstances.add(this);
+    this.removePanelPointerTracking();
+    this.panelRootEl = rootEl;
+    this.panelMode = false;
+    this.externalHostClose = closeHost;
+    this.renderContent();
+  }
+
   unmountFromContainer(): void {
     WindowLayoutsModal.activeInstances.delete(this);
     this.removeKeydownListener();
@@ -150,6 +132,7 @@ export class WindowLayoutsModal extends Modal {
     this.panelRootEl?.empty();
     this.panelRootEl = undefined;
     this.panelMode = false;
+    this.externalHostClose = undefined;
   }
 
   private getRootEl(): HTMLElement {
@@ -157,7 +140,11 @@ export class WindowLayoutsModal extends Modal {
   }
 
   private closeHost(): void {
-    if (!this.panelMode) this.close();
+    if (this.externalHostClose) {
+      this.externalHostClose();
+    } else if (!this.panelMode) {
+      this.close();
+    }
   }
 
   private renderContent(): void {
@@ -231,58 +218,66 @@ export class WindowLayoutsModal extends Modal {
     dismissInst.createEl("span", { text: "esc", cls: "prompt-instruction-command" });
     dismissInst.createEl("span", { text: t("instructions.dismiss") });
 
-    if (this.panelMode) {
-      const targetDoc = contentEl.ownerDocument || document;
-      this.removeKeydownListener();
-      this.keydownListener = (event: KeyboardEvent) => {
-        if (event.key !== "ArrowDown" && event.key !== "ArrowUp" && event.key !== "Enter") {
-          return;
+    const targetDoc = contentEl.ownerDocument || document;
+    const targetWindow = targetDoc.defaultView || window;
+    this.removeKeydownListener();
+    this.keydownListener = (event: KeyboardEvent) => {
+      if (event.key !== "ArrowDown" && event.key !== "ArrowUp" && event.key !== "Enter") {
+        return;
+      }
+
+      const activeEl = targetDoc.activeElement;
+      let focusedInstance: WindowLayoutsModal | null = null;
+      for (const instance of WindowLayoutsModal.activeInstances) {
+        const root = instance.getRootEl();
+        if (activeEl && root && root.ownerDocument === targetDoc && root.contains(activeEl)) {
+          focusedInstance = instance;
+          break;
         }
+      }
 
-        const activeEl = targetDoc.activeElement;
+      // A native Modal owns keyboard input while it is open. Persistent
+      // panels only own navigation while focused or hovered.
+      const shouldHandle = this.panelMode
+        ? (focusedInstance ? focusedInstance === this : this.panelPointerInside)
+        : true;
+      if (!shouldHandle) return;
 
-        // Determine if ANY instance in this document currently has keyboard focus
-        let focusedInstance: WindowLayoutsModal | null = null;
-        for (const instance of WindowLayoutsModal.activeInstances) {
-          const root = instance.getRootEl();
-          if (activeEl && root && root.contains(activeEl)) {
-            focusedInstance = instance;
-            break;
-          }
-        }
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        this.handleArrowKey(event.key === "ArrowDown" ? 1 : -1);
+        return;
+      }
 
-        // Strict focus priority: if a panel has keyboard focus, ONLY that panel processes keydown.
-        // Otherwise, fallback to the panel currently receiving pointer hover.
-        const shouldHandle = focusedInstance
-          ? focusedInstance === this
-          : this.panelPointerInside;
+      if (activeEl && activeEl.tagName === "BUTTON") return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      const rawQuery = this.searchInput?.value.trim() || "";
+      const selectedLayout = this.filteredLayouts[this.selectedIndex >= 0 ? this.selectedIndex : 0];
+      if (selectedLayout) {
+        void this.restoreLayout(selectedLayout, !event.shiftKey);
+      } else if (rawQuery) {
+        void this.createAndSaveLayout(rawQuery, !event.shiftKey);
+      }
+    };
+    // Listen on Window capture so Obsidian's document/workspace keymap cannot
+    // consume ArrowUp/ArrowDown before a hovered Window Spaces panel sees it.
+    this.keydownTarget = targetWindow;
+    this.keydownTarget.addEventListener("keydown", this.keydownListener, true);
 
-        if (!shouldHandle) return;
-
-        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-          event.preventDefault();
-          event.stopPropagation();
-          this.handleArrowKey(event.key === "ArrowDown" ? 1 : -1);
-        } else if (event.key === "Enter") {
-          if (activeEl && activeEl.tagName === "BUTTON") return;
-          event.preventDefault();
-          event.stopPropagation();
-          const rawQuery = this.searchInput?.value.trim() || "";
-          const selectedLayout = this.filteredLayouts[this.selectedIndex >= 0 ? this.selectedIndex : 0];
-          if (selectedLayout) {
-            void this.restoreLayout(selectedLayout, !event.shiftKey);
-          } else if (rawQuery) {
-            void this.createAndSaveLayout(rawQuery, !event.shiftKey);
-          }
-        }
-      };
-      // Keep listening at document level so hover over any part of the panel
-      // grants keyboard navigation even when another element owns focus.
-      this.keydownTarget = targetDoc;
-      this.keydownTarget.addEventListener("keydown", this.keydownListener, true);
+    if (this.initialFocusTimer !== undefined) {
+      const timerWindow = this.modalEl?.ownerDocument?.defaultView || window;
+      timerWindow.clearTimeout(this.initialFocusTimer);
     }
 
-    window.setTimeout(() => this.searchInput?.focus(), 50);
+    const focusWindow = this.modalEl?.ownerDocument?.defaultView || window;
+    this.initialFocusTimer = focusWindow.setTimeout(() => {
+      this.initialFocusTimer = undefined;
+      if (this.searchInput && this.searchInput.isConnected !== false) {
+        this.searchInput.focus();
+      }
+    }, 50);
   }
 
   private createPanelButton(parentEl: HTMLElement): void {
@@ -475,7 +470,10 @@ export class WindowLayoutsModal extends Modal {
         }
       } else {
         // 情境 2：在主視窗中執行 -> 建立全新的 0 檔案 Popout 佈局，並開啟新 Popout 視窗
-        const newWin = this.plugin.manager.openNewPopoutWindow();
+        const newWin = await this.plugin.manager.openNewPopoutWindow();
+        if (!newWin) {
+          throw new Error(t("errors.cannotRestore"));
+        }
 
         const emptyLayout: WindowLayout = {
           id: typeof (this.plugin.manager as any).generateId === "function"
@@ -551,6 +549,7 @@ export class WindowLayoutsModal extends Modal {
       this.selectedIndex = 0;
       WindowLayoutsModal.renderAllInstances();
     } catch (err: any) {
+      this.closeHost();
       new Notice(err?.message || String(err));
     }
   }
@@ -1266,6 +1265,13 @@ export class WindowLayoutsModal extends Modal {
   onClose() {
     WindowLayoutsModal.activeInstances.delete(this);
     this.removeKeydownListener();
+
+    if (this.initialFocusTimer !== undefined) {
+      const timerWindow = this.modalEl?.ownerDocument?.defaultView || window;
+      timerWindow.clearTimeout(this.initialFocusTimer);
+      this.initialFocusTimer = undefined;
+    }
+
     this.contentEl.empty();
   }
 
@@ -1273,6 +1279,7 @@ export class WindowLayoutsModal extends Modal {
     if (this.keydownListener) {
       const target = this.keydownTarget || this.panelRootEl?.ownerDocument || this.modalEl?.ownerDocument || document;
       target.removeEventListener("keydown", this.keydownListener, true);
+      target.removeEventListener("keydown", this.keydownListener, false);
       this.keydownListener = undefined;
       this.keydownTarget = undefined;
     }

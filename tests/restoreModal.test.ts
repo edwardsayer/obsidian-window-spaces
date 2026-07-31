@@ -150,6 +150,20 @@ describe("WindowLayoutsModal restore target", () => {
     expect((modal1 as any).selectedIndex).toBe(1);
     expect((modal2 as any).selectedIndex).toBe(0);
 
+    // Obsidian may consume workspace key events at document level. The panel
+    // must receive navigation from Window capture while the pointer is inside.
+    div1.dispatchEvent(new Event("pointerenter"));
+    const arrowEvent = new KeyboardEvent("keydown", {
+      key: "ArrowDown",
+      bubbles: true,
+      cancelable: true,
+    });
+    window.dispatchEvent(arrowEvent);
+
+    expect((modal1 as any).selectedIndex).toBe(0);
+    expect((modal2 as any).selectedIndex).toBe(0);
+    expect(arrowEvent.defaultPrevented).toBe(true);
+
     // Test new panel initial independence
     const div3 = createMockEl();
     const modal3 = new WindowLayoutsModal({} as any, plugin);

@@ -267,22 +267,41 @@ export class WindowLayoutManager {
     element.dataset.layoutName = layoutName;
   }
 
-  /** 開啟全新的 Popout 視窗 */
-  openNewPopoutWindow(): Window | null {
+  /** 開啟全新的 Popout 視窗（等待 leaf 與 DOM 都完成掛載後再回傳視窗物件） */
+  async openNewPopoutWindow(): Promise<Window | null> {
     try {
       const leaf = (this.app.workspace as any).openPopoutLeaf();
-      if (leaf) {
-        (leaf as any).setViewState({ type: "empty" });
-        const targetWin = (leaf as any).containerEl?.ownerDocument?.defaultView || null;
-        if (targetWin && typeof targetWin.focus === "function") {
-          try {
-            targetWin.focus();
-          } catch (e) {
-            console.warn("Failed to focus new popout window:", e);
-          }
+      if (!leaf) return null;
+
+      // openPopoutLeaf() 同步回傳 leaf，但 setViewState() 會非同步完成
+      // view/container 的建立。若不等待這個 Promise，下面讀到的 ownerDocument
+      // 可能仍是空值或尚未切換到真正的 Popout Window。
+      await Promise.resolve((leaf as any).setViewState({ type: "empty" }));
+
+      let targetWin: Window | null = null;
+      for (let attempt = 0; attempt < 40; attempt++) {
+        const candidate = (leaf as any).containerEl?.ownerDocument?.defaultView as Window | undefined;
+        if (candidate && this.isPopoutDocument(candidate.document)) {
+          targetWin = candidate;
+          break;
         }
-        return targetWin;
+
+        await new Promise((resolve) => setTimeout(resolve, 50));
       }
+
+      if (!targetWin) {
+        console.warn("Popout leaf was created, but its Window was not mounted in time.");
+        return null;
+      }
+
+      if (typeof targetWin.focus === "function") {
+        try {
+          targetWin.focus();
+        } catch (e) {
+          console.warn("Failed to focus new popout window:", e);
+        }
+      }
+      return targetWin;
     } catch (e) {
       console.warn("Failed to open new popout window:", e);
     }
@@ -759,8 +778,10 @@ export class WindowLayoutManager {
         throw new Error(t("errors.invalidData"));
       }
 
-      // 0. 若該 Layout 已經在某個 Popout 視窗中開啟，且非強制重載 (forceReload)，直接聚焦該視窗即可
-      if (!options.forceReload) {
+      // 0. 只有「目前視窗還原」才在 Layout 已開啟時直接聚焦既有視窗。
+      // 一般 Enter / click 會傳入 forceNewWindow，必須繼續走新 Popout 流程，
+      // 否則已開啟的 Layout 會被 Smart Focus 提前攔截，永遠不會開新視窗。
+      if (!options.forceReload && !options.forceNewWindow) {
         const existingWin = this.getOpenWindowForLayout(layout);
         if (existingWin && !existingWin.closed && this.isPopoutDocument(existingWin.document)) {
           this.focusTargetWindow(existingWin);
@@ -823,18 +844,34 @@ export class WindowLayoutManager {
             throw new Error(t("errors.cannotRestore"));
           }
         } else {
-          const popoutLeaf = this.app.workspace.openPopoutLeaf();
-          targetWin = this.getWindowForLeaf(popoutLeaf as WorkspaceLeaf);
+          // 記錄開啟前的 Popout 視窗集合
+          const popoutWinsBefore = new Set(this.getLivePopoutWindows());
 
-          // 等待 Popout 視窗誕生
-          await new Promise((resolve) => setTimeout(resolve, 150));
+          // 呼叫 openPopoutLeaf 建立新 Popout 分頁
+          const popoutLeaf = (this.app.workspace as any).openPopoutLeaf();
+
+          // 輪詢等待全新的 Live Popout Window 在 Electron 中被正式掛載建立（最多等待 2 秒）
+          let newlyCreatedWin: Window | null = null;
+          for (let attempt = 0; attempt < 40; attempt++) {
+            await new Promise((resolve) => setTimeout(resolve, 50));
+            const currentPopoutWins = this.getLivePopoutWindows();
+            newlyCreatedWin = currentPopoutWins.find((w) => !popoutWinsBefore.has(w)) || null;
+            if (newlyCreatedWin) break;
+          }
+
+          targetWin = newlyCreatedWin || (popoutLeaf as any)?.containerEl?.ownerDocument?.defaultView || null;
 
           // 重新讀取最新的 Layout
           currentLayout = this.app.workspace.getLayout();
           floatingWindows = this.getFloatingWindows(currentLayout);
 
-          // 新開的視窗位於 floating 陣列末尾
-          targetIndex = floatingWindows.length - 1;
+          // 以新開視窗的 ID 或在 floating 陣列末尾精確定位 targetIndex
+          if (targetWin) {
+            targetIndex = this.findFloatingWindowIndexForWindow(targetWin, floatingWindows);
+          }
+          if (targetIndex < 0) {
+            targetIndex = floatingWindows.length - 1;
+          }
         }
       }
 
@@ -1732,6 +1769,17 @@ export class WindowLayoutManager {
 
       let targetLeaf: WorkspaceLeaf | null = leavesById.get(leafState.id) || null;
       if (i < windowLeaves.length && !targetLeaf) targetLeaf = windowLeaves[i];
+
+      // 若該視窗現有分頁數少於所需分頁，自動為其切割建立新分頁容器
+      if (!targetLeaf && windowLeaves.length > 0) {
+        try {
+          const baseLeaf = windowLeaves[windowLeaves.length - 1];
+          targetLeaf = (this.app.workspace as any).createLeafBySplit(baseLeaf, "vertical");
+          if (targetLeaf) windowLeaves.push(targetLeaf);
+        } catch (e) {
+          console.warn("Failed to create leaf by split for target window:", e);
+        }
+      }
 
       const file = this.app.vault.getAbstractFileByPath(filePath);
       if (file instanceof TFile) {

@@ -1,4 +1,4 @@
-import { Plugin, Notice } from "obsidian";
+import { Modal, Plugin, Notice } from "obsidian";
 import { WindowLayout, WindowSettings } from "./types";
 import { WindowLayoutManager } from "./manager";
 import { SaveLayoutModal } from "./modals/saveModal";
@@ -198,8 +198,39 @@ export default class WindowSpacesPlugin extends Plugin {
   openWindowLayoutsModal(
     targetWindow?: Window
   ): void {
-    const win = targetWindow || (this.manager ? this.manager.getActiveWindow() : undefined);
-    new WindowLayoutsModal(this.app, this, win).open();
+    try {
+      const win = targetWindow || (this.manager ? this.manager.getActiveWindow() : undefined);
+      // Use a plain native Modal as the host. The same Window Spaces
+      // controller already mounts reliably in ItemView panels; mounting it
+      // here avoids the failing custom Modal.open()/onOpen lifecycle seen in
+      // Obsidian 1.13 while preserving the shared picker and restore logic.
+      const hostModal = new Modal(this.app);
+      const controller = new WindowLayoutsModal(this.app, this, win);
+
+      hostModal.setTitle(t("common.windowLayouts"));
+      hostModal.onOpen = () => {
+        try {
+          hostModal.modalEl.addClass("window-layouts-modal");
+          controller.mountInModalContainer(
+            hostModal.contentEl,
+            () => hostModal.close()
+          );
+        } catch (error: any) {
+          console.error("[WindowSpaces] Error mounting Window Spaces picker:", error);
+          hostModal.contentEl.empty();
+          hostModal.contentEl.createEl("p", {
+            text: `Error loading Window Spaces: ${error?.message || error}`,
+          });
+        }
+      };
+      hostModal.onClose = () => {
+        controller.unmountFromContainer();
+      };
+      hostModal.open();
+    } catch (error: any) {
+      console.error("[WindowSpaces] Error opening WindowLayoutsModal:", error);
+      new Notice(`Window Spaces Error: ${error?.message || error}`);
+    }
   }
 
   async openWindowLayoutsPanel(
