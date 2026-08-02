@@ -1,15 +1,16 @@
-import { App, Modal, Setting, Notice } from "obsidian";
+import { App, Modal, Setting, Notice, ToggleComponent } from "obsidian";
 import { WindowLayout } from "../types";
 import { t, getI18n } from "../i18n";
+import WindowSpacesPlugin from "../main";
 
 export class SaveLayoutModal extends Modal {
-  private plugin: any;
+  private plugin: WindowSpacesPlugin;
   private layout: WindowLayout;
   private onSubmit: (layout: WindowLayout) => void;
 
   constructor(
     app: App,
-    plugin: any,
+    plugin: WindowSpacesPlugin,
     layout: WindowLayout,
     onSubmit: (layout: WindowLayout) => void
   ) {
@@ -28,7 +29,7 @@ export class SaveLayoutModal extends Modal {
     let selectedSections: string[] = Array.from(this.layout.sections || []);
 
     // 名稱輸入與動態同名提示
-    let nameInput: HTMLInputElement;
+    let nameInput!: HTMLInputElement;
     const nameSetting = new Setting(contentEl)
       .setName(t("saveModal.nameLabel"))
       .addText((text) => {
@@ -48,7 +49,7 @@ export class SaveLayoutModal extends Modal {
     const noticeContainer = contentEl.createDiv("save-overwrite-notice");
 
     let autoSave = this.layout.autoSave ?? false;
-    let autoSaveToggleComponent: any = null;
+    let autoSaveToggleComponent: ToggleComponent | null = null;
 
     // 佈局資訊顯示
     const i18n = getI18n();
@@ -74,7 +75,7 @@ export class SaveLayoutModal extends Modal {
       this.layout.windowState.position !== undefined ||
       (this.layout.windowState.size && this.layout.windowState.size.width > 0)
     );
-    let geometryToggleComponent: any = null;
+    let geometryToggleComponent: ToggleComponent | null = null;
 
     let archived = this.layout.archived ?? false;
 
@@ -112,9 +113,9 @@ export class SaveLayoutModal extends Modal {
     selectedSections = Array.from(this.layout.sections || []);
     
     // 獲取目前全域已存在的所有 Sections
-    const allSpaces: WindowLayout[] = this.plugin?.manager?.getSavedLayouts() || [];
+    const allSpaces: WindowLayout[] = this.plugin.manager.getSavedLayouts();
     const existingSectionsSet = new Set<string>();
-    (this.plugin?.settings?.sectionsOrder || []).forEach((s: string) => existingSectionsSet.add(s));
+    (this.plugin.settings?.sectionsOrder || []).forEach((s: string) => existingSectionsSet.add(s));
     allSpaces.forEach((s) => (s.sections || []).forEach((sec) => existingSectionsSet.add(sec)));
     const existingSections = Array.from(existingSectionsSet);
 
@@ -174,8 +175,8 @@ export class SaveLayoutModal extends Modal {
         noticeContainer.setText("");
         return;
       }
-      const existingLayouts = this.plugin?.manager?.getSavedLayouts() || [];
-      const match = existingLayouts.find((l: any) => l.name === currentName);
+      const existingLayouts = this.plugin.manager.getSavedLayouts();
+      const match = existingLayouts.find((l) => l.name === currentName);
       if (match) {
         noticeContainer.setText(`ℹ️ ${t("saveModal.overwriteNotice")}「${currentName}」`);
         if (autoSaveToggleComponent && match.autoSave !== undefined) {
@@ -195,7 +196,7 @@ export class SaveLayoutModal extends Modal {
       }
     };
 
-    nameInput!.addEventListener("input", checkDuplicateName);
+    nameInput.addEventListener("input", checkDuplicateName);
     checkDuplicateName();
 
     // 按鈕
@@ -214,7 +215,7 @@ export class SaveLayoutModal extends Modal {
       void this.submitForm(nameInput, includeGeometry, autoSave, selectedSections, archived);
     };
 
-    setTimeout(() => nameInput?.focus(), 50);
+    window.setTimeout(() => nameInput?.focus(), 50);
   }
 
   private async submitForm(
@@ -251,7 +252,7 @@ export class SaveLayoutModal extends Modal {
   }
 
   private generateDefaultName(): string {
-    if (this.plugin?.manager?.generateSmartLayoutName) {
+    if (this.plugin.manager?.generateSmartLayoutName) {
       return this.plugin.manager.generateSmartLayoutName(this.layout);
     }
     const now = new Date();
@@ -260,3 +261,4 @@ export class SaveLayoutModal extends Modal {
     return `${t("saveModal.title")} ${dateStr}`;
   }
 }
+

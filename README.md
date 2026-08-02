@@ -46,7 +46,7 @@ Obsidian's built-in **Workspaces** plugin is designed for **global application s
 
 ### 📥 Installation
 
-#### From Community Plugins (Recommended — Application Pending)
+#### From Community Plugins
 1. Open Obsidian **Settings** > **Community plugins**.
 2. Search for **Window Spaces**.
 3. Click **Install** and then **Enable**.
@@ -64,7 +64,7 @@ Obsidian's built-in **Workspaces** plugin is designed for **global application s
 - Enter a name or use the auto-generated smart name, then press `Enter`.
 
 #### 2. Open Window Layouts
-- Run `Window Spaces: Open as popup window` to open the picker in a popup, `Open as tab panel` to open it in the main workspace area, or `Open in left/right sidebar` to dock it in a sidebar.
+- Run `Window Spaces: Open as popup window` to open the picker in a popup, `Open as tab panel` to open it in a tab, or `Open in left/right sidebar` to dock it in a sidebar. The tab and sidebar commands open in the **focused window**: run them from a popout window to open the panel inside that popout, or from the main window to open it in the main workspace.
 - Select a layout from the unified restore and management dialog.
 - Click a layout normally, or press `Enter`, to restore it in a new popout window.
 - Hold `Shift` while clicking a layout, or press `Shift + Enter`, to restore it in the current active popout window.
@@ -90,6 +90,7 @@ Once saved, a single click (or `Enter`) restores the whole cabin into a fresh po
 ### ⌨️ Keyboard Shortcuts
 - No default command shortcuts are assigned. You can assign optional shortcuts to `Window Spaces: Open as popup window` (or the tab/sidebar panel commands) in Obsidian's Hotkeys settings.
 - Within the layout list, `Enter` restores in a new popout and `Shift + Enter` restores in the current active popout.
+- Arrow-key navigation only engages while the panel itself is focused; keys typed into the command palette, a rename dialog, a dropdown menu, or another window are never intercepted.
 
 ### 💻 Compatibility
 - **Obsidian Version**: `v0.15.0+`

@@ -645,16 +645,37 @@
   border-color: var(--background-modifier-border-hover);
 }
 
-.window-layouts-modal .layout-actions .layout-restore-btn {
-  border-color: var(--interactive-accent);
-  background-color: var(--interactive-accent);
-  color: var(--text-on-accent, white);
+.window-layouts-modal .layout-actions .layout-restore-btn,
+.window-layouts-modal .layout-actions .layout-more-btn {
+  background-color: var(--interactive-accent) !important;
+  color: var(--text-on-accent, #ffffff) !important;
+  border: 1px solid var(--interactive-accent) !important;
+  font-weight: var(--font-medium, 500);
 }
 
-.window-layouts-modal .layout-actions .layout-restore-btn:hover {
-  border-color: var(--interactive-accent-hover, var(--interactive-accent));
-  background-color: var(--interactive-accent-hover, var(--interactive-accent));
-  color: var(--text-on-accent, white);
+.window-layouts-modal .layout-actions .layout-more-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  padding: 0;
+  box-shadow: var(--input-shadow);
+}
+
+.window-layouts-modal .layout-actions .layout-more-btn svg {
+  color: var(--text-on-accent, #ffffff) !important;
+  stroke: var(--text-on-accent, #ffffff) !important;
+}
+
+.window-layouts-modal .layout-actions .layout-restore-btn:hover,
+.window-layouts-modal .layout-actions .layout-more-btn:hover,
+.window-layouts-modal .layout-actions .layout-more-btn:focus-visible {
+  background-color: var(--interactive-accent-hover, var(--interactive-accent)) !important;
+  border-color: var(--interactive-accent-hover, var(--interactive-accent)) !important;
+  color: var(--text-on-accent, #ffffff) !important;
+  opacity: 0.92;
 }
 
 .window-layouts-modal .layout-actions .layout-delete-btn {
@@ -702,38 +723,6 @@
   pointer-events: auto;
   transform: translate3d(0, -50%, 0);
 }
-
-.window-layouts-modal .suggestion-item.window-layout-item .layout-actions button {
-  white-space: nowrap;
-}
-
-.window-layouts-modal .layout-actions .layout-more-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  min-width: 28px;
-  height: 28px;
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: var(--text-muted);
-  box-shadow: none;
-}
-
-.window-layouts-modal .layout-actions .layout-more-btn:hover,
-.window-layouts-modal .layout-actions .layout-more-btn:focus-visible {
-  border: none;
-  background: var(--background-modifier-hover);
-  color: var(--text-normal);
-  box-shadow: none;
-}
-
-/* Leave enough room for the floating layer when the item is narrow. */
-.window-layouts-panel .suggestion-item.window-layout-item {
-  padding-right: 8px;
-}
-
 /* Footer prompt instructions matching native Obsidian suggestion modals */
 /* CRITICAL: user 驗證過，不要動到!! (Verified by user, DO NOT MODIFY) */
 .window-layouts-modal .prompt-instructions {

@@ -25,6 +25,18 @@ export class Modal {
   close() {}
 }
 
+export class Plugin {
+  constructor(public app: any, public manifest: any) {}
+}
+
+export class PluginSettingTab {
+  constructor(public app: any, public plugin: any) {}
+}
+
+export class ItemView {
+  constructor(public leaf: any) {}
+}
+
 export class Setting {
   constructor(public containerEl: HTMLElement) {}
   setName(name: string) { return this; }

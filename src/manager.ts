@@ -5,9 +5,13 @@ import {
   ViewState,
   SaveLayoutOptions,
   RestoreLayoutOptions,
+  ExtendedWorkspace,
+  ExtendedWorkspaceLeaf,
+  WindowSettings,
 } from "./types";
 import { t, tWithParams, getI18n } from "./i18n";
 import { WindowLayoutsModal } from "./modals/restoreModal";
+import WindowSpacesPlugin from "./main";
 
 interface LayoutLabelElements {
   statusBar: HTMLElement | null;
@@ -21,15 +25,15 @@ interface PreservedWindowLayout {
 }
 
 export class WindowLayoutManager {
-  private plugin: any;
+  private plugin: WindowSpacesPlugin;
   private app: App;
-  private layoutWindows = new WeakMap<WindowLayout, Window>();
+  public layoutWindows = new WeakMap<WindowLayout, Window>();
   private popoutWindows = new Set<Window>();
   private layoutNames = new Map<Window, string>();
   private layoutLabels = new Map<Window, LayoutLabelElements>();
   private activeRestorePromise: Promise<void> | null = null;
 
-  constructor(plugin: any) {
+  constructor(plugin: WindowSpacesPlugin) {
     this.plugin = plugin;
     this.app = plugin.app;
   }
@@ -49,8 +53,9 @@ export class WindowLayoutManager {
 
   /** 插件重新載入時，補註冊已經存在的 Popout。 */
   registerExistingPopoutWindows(): void {
-    (this.app.workspace as any).iterateAllLeaves((leaf: WorkspaceLeaf) => {
-      const targetWin = (leaf as any).containerEl?.ownerDocument?.defaultView as Window | undefined;
+    (this.app.workspace as unknown as ExtendedWorkspace).iterateAllLeaves((leaf: WorkspaceLeaf) => {
+      const extLeaf = leaf as unknown as ExtendedWorkspaceLeaf;
+      const targetWin = extLeaf.containerEl?.ownerDocument?.defaultView as Window | undefined;
       if (targetWin && this.isPopoutDocument(targetWin.document)) {
         this.registerPopoutWindow(targetWin);
       }
@@ -159,9 +164,7 @@ export class WindowLayoutManager {
     const existing = body.querySelector<HTMLElement>(`.${className}`);
     if (existing) return existing;
 
-    const element = targetDocument.createElement("div");
-    element.className = className;
-    body.appendChild(element);
+    const element = body.createEl("div", { cls: className });
     return element;
   }
 
@@ -170,27 +173,20 @@ export class WindowLayoutManager {
     layoutName: string,
     targetWin: Window
   ): void {
-    const targetDocument = targetWin.document;
     let iconElement = element.querySelector<HTMLElement>(".window-spaces-layout-icon");
     if (!iconElement) {
-      iconElement = targetDocument.createElement("span");
-      iconElement.className = "window-spaces-layout-icon";
+      iconElement = element.createEl("span", { cls: "window-spaces-layout-icon" });
       setIcon(iconElement, "history");
-      element.appendChild(iconElement);
     }
 
     let nameElement = element.querySelector<HTMLElement>(".window-spaces-layout-name");
     if (!nameElement) {
-      nameElement = targetDocument.createElement("span");
-      nameElement.className = "window-spaces-layout-name";
-      element.appendChild(nameElement);
+      nameElement = element.createEl("span", { cls: "window-spaces-layout-name" });
     }
 
     let actionsElement = element.querySelector<HTMLElement>(".window-spaces-layout-actions");
     if (!actionsElement) {
-      actionsElement = targetDocument.createElement("div");
-      actionsElement.className = "window-spaces-layout-actions";
-      element.appendChild(actionsElement);
+      actionsElement = element.createEl("div", { cls: "window-spaces-layout-actions" });
     }
 
     const ensureActionButton = (
@@ -201,11 +197,11 @@ export class WindowLayoutManager {
     ): HTMLButtonElement => {
       let button = actionsElement!.querySelector<HTMLButtonElement>(`.${className}`);
       if (!button) {
-        button = targetDocument.createElement("button");
-        button.className = `window-spaces-layout-action ${className} clickable-icon`;
-        button.type = "button";
-        setIcon(button, icon as any);
-        actionsElement!.appendChild(button);
+        button = actionsElement!.createEl("button", {
+          cls: `window-spaces-layout-action ${className} clickable-icon`,
+          attr: { type: "button" },
+        });
+        setIcon(button, icon);
       }
       button.onclick = (event: MouseEvent) => {
         event.preventDefault();
@@ -233,20 +229,22 @@ export class WindowLayoutManager {
       "window-spaces-layout-auto-save",
       "refresh-cw",
       isAutoSave ? t("manageModal.autoSaveEnabled") : t("manageModal.autoSaveDisabled"),
-      async () => {
-        const targetLayout = this.plugin.settings.spaces.find((l: WindowLayout) => l.name === layoutName);
-        if (targetLayout) {
-          targetLayout.autoSave = !targetLayout.autoSave;
-          await this.plugin.saveSettings();
-          new Notice(
-            targetLayout.autoSave
-              ? `${layoutName}: ${t("manageModal.autoSaveEnabled")}`
-              : `${layoutName}: ${t("manageModal.autoSaveDisabled")}`
-          );
-          this.updateLayoutLabelElement(element, layoutName, targetWin);
-        } else {
-          void this.saveLayoutFromWindow(targetWin);
-        }
+      () => {
+        void (async () => {
+          const targetLayout = this.plugin.settings.spaces.find((l: WindowLayout) => l.name === layoutName);
+          if (targetLayout) {
+            targetLayout.autoSave = !targetLayout.autoSave;
+            await this.plugin.saveSettings();
+            new Notice(
+              targetLayout.autoSave
+                ? `${layoutName}: ${t("manageModal.autoSaveEnabled")}`
+                : `${layoutName}: ${t("manageModal.autoSaveDisabled")}`
+            );
+            this.updateLayoutLabelElement(element, layoutName, targetWin);
+          } else {
+            void this.saveLayoutFromWindow(targetWin);
+          }
+        })();
       }
     );
 
@@ -267,20 +265,23 @@ export class WindowLayoutManager {
     element.dataset.layoutName = layoutName;
   }
 
+
   /** 開啟全新的 Popout 視窗（等待 leaf 與 DOM 都完成掛載後再回傳視窗物件） */
   async openNewPopoutWindow(): Promise<Window | null> {
     try {
-      const leaf = (this.app.workspace as any).openPopoutLeaf();
+      const workspace = this.app.workspace as unknown as ExtendedWorkspace & { openPopoutLeaf?: () => WorkspaceLeaf };
+      const leaf = workspace.openPopoutLeaf?.();
       if (!leaf) return null;
 
       // openPopoutLeaf() 同步回傳 leaf，但 setViewState() 會非同步完成
       // view/container 的建立。若不等待這個 Promise，下面讀到的 ownerDocument
       // 可能仍是空值或尚未切換到真正的 Popout Window。
-      await Promise.resolve((leaf as any).setViewState({ type: "empty" }));
+      const extLeaf = leaf as unknown as ExtendedWorkspaceLeaf;
+      await Promise.resolve(extLeaf.setViewState({ type: "empty" }));
 
       let targetWin: Window | null = null;
       for (let attempt = 0; attempt < 40; attempt++) {
-        const candidate = (leaf as any).containerEl?.ownerDocument?.defaultView as Window | undefined;
+        const candidate = extLeaf.containerEl?.ownerDocument?.defaultView as Window | undefined;
         if (candidate && this.isPopoutDocument(candidate.document)) {
           targetWin = candidate;
           break;
@@ -323,13 +324,14 @@ export class WindowLayoutManager {
       }
 
       this.plugin.openSaveLayoutModal(layout);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to capture layout from Popout:", error);
-      new Notice(`${t("errors.failedToSave")}: ${error?.message || error}`);
+      const message = error instanceof Error ? error.message : String(error);
+      new Notice(`${t("errors.failedToSave")}: ${message}`);
     }
   }
 
-  private autoSaveTimers = new Map<Window, any>();
+  private autoSaveTimers = new Map<Window, number | ReturnType<typeof window.setTimeout>>();
   private lastValidSnapshots = new Map<Window, WindowLayout>();
 
   /**
@@ -351,8 +353,9 @@ export class WindowLayoutManager {
           .catch(() => {});
 
         // 2. 設置 5 秒 Debounce 定時器
-        if (this.autoSaveTimers.has(targetWin)) {
-          window.clearTimeout(this.autoSaveTimers.get(targetWin));
+        const existingTimer = this.autoSaveTimers.get(targetWin);
+        if (existingTimer !== undefined) {
+          window.clearTimeout(existingTimer as number);
         }
 
         const timer = window.setTimeout(() => {
@@ -424,8 +427,9 @@ export class WindowLayoutManager {
 
   private removeLayoutLabel(targetWin: Window): void {
     // 1. 若有待發動的 5 秒 Debounce 定時器，將其清除
-    if (this.autoSaveTimers.has(targetWin)) {
-      window.clearTimeout(this.autoSaveTimers.get(targetWin));
+    const timer = this.autoSaveTimers.get(targetWin);
+    if (timer !== undefined) {
+      window.clearTimeout(timer as number);
       this.autoSaveTimers.delete(targetWin);
     }
 
@@ -465,8 +469,9 @@ export class WindowLayoutManager {
 
     // 2. 遍歷目前所有存活的 Popout 視窗，依名稱與標籤比對
     const liveWindows = new Set<Window>();
-    if (typeof (this.app.workspace as any)?.iterateAllLeaves === "function") {
-      (this.app.workspace as any).iterateAllLeaves((leaf: WorkspaceLeaf) => {
+    const workspace = this.app.workspace as unknown as ExtendedWorkspace;
+    if (typeof workspace.iterateAllLeaves === "function") {
+      workspace.iterateAllLeaves((leaf: WorkspaceLeaf) => {
         const win = this.getWindowForLeaf(leaf);
         if (win && !win.closed && this.isPopoutDocument(win.document)) {
           liveWindows.add(win);
@@ -493,49 +498,53 @@ export class WindowLayoutManager {
     return null;
   }
 
-  private getWindowForLayout(layout: WindowLayout): Window | null {
+  public getWindowForLayout(layout: WindowLayout): Window | null {
     return this.getOpenWindowForLayout(layout) ||
       this.layoutWindows.get(layout) ||
       this.findWindowForSavedLeaves(this.getSavedViewStates(layout));
   }
 
   /**
-   * 聚焦 (Focus) 指定 Popout 視窗並啟用首個 Leaf
+   * 聚焦 (Focus) 指定 Popout 視窗並啟用合適的 Leaf (顯式呼叫 revealLeaf 確保分頁真實切換為可見)
    */
-  focusTargetWindow(targetWin: Window): void {
+  focusTargetWindow(targetWin: Window, preferredLeaf?: WorkspaceLeaf | null): void {
     if (!targetWin || targetWin.closed) return;
 
-    if (typeof targetWin.focus === "function") {
+    const doFocusAndReveal = async () => {
       try {
-        targetWin.focus();
+        if (typeof targetWin.focus === "function") {
+          targetWin.focus();
+        }
+
+        const freshLeaves = this.getLeavesForWindow(targetWin);
+        if (freshLeaves.length === 0) return;
+
+        let targetLeaf: WorkspaceLeaf | null = null;
+
+        if (preferredLeaf && freshLeaves.includes(preferredLeaf)) {
+          targetLeaf = preferredLeaf;
+        } else {
+          // 若無指定 preferredLeaf，優先保留當前視窗原有的 activeLeaf
+          const activeLeaf = this.app.workspace.activeLeaf;
+          if (activeLeaf && freshLeaves.includes(activeLeaf)) {
+            targetLeaf = activeLeaf;
+          } else {
+            targetLeaf = freshLeaves[0];
+          }
+        }
+
+        if (targetLeaf) {
+          await this.app.workspace.revealLeaf(targetLeaf);
+          this.app.workspace.setActiveLeaf(targetLeaf, { focus: true });
+        }
       } catch {
         // Ignore focus error
       }
+    };
 
-      targetWin.setTimeout(() => {
-        try {
-          targetWin.focus();
-          const freshLeaves = this.getLeavesForWindow(targetWin);
-          if (freshLeaves.length > 0) {
-            this.app.workspace.setActiveLeaf(freshLeaves[0], { focus: true });
-          }
-        } catch {
-          // Ignore focus error
-        }
-      }, 50);
-
-      targetWin.setTimeout(() => {
-        try {
-          targetWin.focus();
-          const freshLeaves = this.getLeavesForWindow(targetWin);
-          if (freshLeaves.length > 0) {
-            this.app.workspace.setActiveLeaf(freshLeaves[0], { focus: true });
-          }
-        } catch {
-          // Ignore focus error
-        }
-      }, 200);
-    }
+    void doFocusAndReveal();
+    targetWin.setTimeout(() => { void doFocusAndReveal(); }, 50);
+    targetWin.setTimeout(() => { void doFocusAndReveal(); }, 200);
   }
 
   /**
@@ -546,14 +555,15 @@ export class WindowLayoutManager {
     const globalActiveLeaf = this.app.workspace.getMostRecentLeaf();
 
     // 1. 若全域 activeLeaf 的 ownerWindow 就是 currentWin，直接返回
-    if (globalActiveLeaf && (globalActiveLeaf as any).containerEl?.ownerDocument?.defaultView === currentWin) {
+    if (globalActiveLeaf && (globalActiveLeaf as unknown as ExtendedWorkspaceLeaf).containerEl?.ownerDocument?.defaultView === currentWin) {
       return globalActiveLeaf;
     }
 
     // 2. 若全域 activeLeaf 不在 currentWin（例如 Command Palette modal 搶焦），遍歷尋找屬於 currentWin 的 leaf
     let windowLeaf: WorkspaceLeaf | null = null;
-    (this.app.workspace as any).iterateAllLeaves((leaf: WorkspaceLeaf) => {
-      if (!windowLeaf && (leaf as any).containerEl?.ownerDocument?.defaultView === currentWin) {
+    (this.app.workspace as unknown as ExtendedWorkspace).iterateAllLeaves((leaf: WorkspaceLeaf) => {
+      const extLeaf = leaf as unknown as ExtendedWorkspaceLeaf;
+      if (!windowLeaf && extLeaf.containerEl?.ownerDocument?.defaultView === currentWin) {
         windowLeaf = leaf;
       }
     });
@@ -566,8 +576,9 @@ export class WindowLayoutManager {
    */
   private getLeavesForWindow(targetWin: Window): WorkspaceLeaf[] {
     const leaves: WorkspaceLeaf[] = [];
-    (this.app.workspace as any).iterateAllLeaves((leaf: WorkspaceLeaf) => {
-      if ((leaf as any).containerEl?.ownerDocument?.defaultView === targetWin) {
+    (this.app.workspace as unknown as ExtendedWorkspace).iterateAllLeaves((leaf: WorkspaceLeaf) => {
+      const extLeaf = leaf as unknown as ExtendedWorkspaceLeaf;
+      if (extLeaf.containerEl?.ownerDocument?.defaultView === targetWin) {
         leaves.push(leaf);
       }
     });
@@ -577,11 +588,12 @@ export class WindowLayoutManager {
   /** 保存指定 Window 的 live leaf 狀態，供 changeLayout 後重新辨識視窗。 */
   private getViewStatesForWindow(targetWin: Window): ViewState[] {
     return this.getLeavesForWindow(targetWin).map((leaf) => {
-      const viewState = typeof (leaf as any).getViewState === "function"
-        ? (leaf as any).getViewState()
-        : {};
+      const extLeaf = leaf as unknown as ExtendedWorkspaceLeaf;
+      const viewState = typeof extLeaf.getViewState === "function"
+        ? extLeaf.getViewState()
+        : { id: "", type: leaf.view?.getViewType() || "unknown", state: {} };
       return {
-        id: (leaf as any).id || this.generateId(),
+        id: extLeaf.id || this.generateId(),
         type: viewState.type || leaf.view?.getViewType() || "unknown",
         state: viewState.state || {},
       };
@@ -591,7 +603,7 @@ export class WindowLayoutManager {
   /** 快照目前所有已套用 layout 的 live popout，供新視窗 restore 後復原標籤。 */
   private capturePreservedWindowLayouts(): PreservedWindowLayout[] {
     const liveWindows = new Set<Window>();
-    (this.app.workspace as any).iterateAllLeaves((leaf: WorkspaceLeaf) => {
+    (this.app.workspace as unknown as ExtendedWorkspace).iterateAllLeaves((leaf: WorkspaceLeaf) => {
       const targetWin = this.getWindowForLeaf(leaf);
       if (targetWin && this.isPopoutDocument(targetWin.document)) {
         liveWindows.add(targetWin);
@@ -620,7 +632,8 @@ export class WindowLayoutManager {
     targetWindow?: Window
   ): Promise<WindowLayout> {
     try {
-      const fullLayout = this.app.workspace.getLayout();
+      const workspace = this.app.workspace as unknown as ExtendedWorkspace;
+      const fullLayout = workspace.getLayout();
       const activeLeaf = this.getActiveLeafForCurrentWindow(targetWindow);
       const currentWin = targetWindow || (typeof activeWindow !== "undefined" ? activeWindow : window);
 
@@ -631,7 +644,8 @@ export class WindowLayoutManager {
       let floatingLayout = this.extractCurrentFloatingLayout(fullLayout, activeLeaf);
 
       if (!floatingLayout) {
-        const rootInfo = activeLeaf && typeof (activeLeaf as any).getRoot === "function" ? (activeLeaf as any).getRoot()?.constructor?.name : "no-leaf";
+        const extActiveLeaf = activeLeaf as unknown as ExtendedWorkspaceLeaf | null;
+        const rootInfo = extActiveLeaf && typeof extActiveLeaf.getRoot === "function" ? extActiveLeaf.getRoot()?.constructor?.name : "no-leaf";
         const isPopout = this.isCurrentlyInPopoutWindow(activeLeaf);
         console.warn("[WindowSpaces Debug]", { rootInfo, isPopout, fullLayout });
         throw new Error(`${t("errors.notInPopoutWindow")} (root: ${rootInfo}, isPopout: ${isPopout})`);
@@ -643,15 +657,18 @@ export class WindowLayoutManager {
           type: "split",
           id: this.generateId(),
           direction: "vertical",
-          children: windowLeaves.map((leaf) => ({
-            id: this.generateId(),
-            type: "tabs",
-            children: [{
-              id: (leaf as any).id || this.generateId(),
-              type: "leaf",
-              state: typeof (leaf as any).getViewState === "function" ? (leaf as any).getViewState() : { type: leaf.view?.getViewType() || "markdown", state: {} }
-            }]
-          }))
+          children: windowLeaves.map((leaf) => {
+            const extLeaf = leaf as unknown as ExtendedWorkspaceLeaf;
+            return {
+              id: this.generateId(),
+              type: "tabs",
+              children: [{
+                id: extLeaf.id || this.generateId(),
+                type: "leaf",
+                state: typeof extLeaf.getViewState === "function" ? extLeaf.getViewState() : { type: leaf.view?.getViewType() || "markdown", state: {} }
+              }]
+            };
+          })
         };
       }
 
@@ -663,7 +680,7 @@ export class WindowLayoutManager {
       const layoutLeaves = this.extractLeavesFromLayout(floatingLayout);
       const liveLeavesById = new Map<string, WorkspaceLeaf>();
       windowLeaves.forEach((leaf) => {
-        const id = (leaf as any).id;
+        const id = (leaf as unknown as ExtendedWorkspaceLeaf).id;
         if (id) liveLeavesById.set(id, leaf);
       });
 
@@ -671,9 +688,10 @@ export class WindowLayoutManager {
         const liveLeaf = liveLeavesById.get(layoutLeaf.id);
         if (!liveLeaf) return layoutLeaf;
 
-        const viewState = typeof (liveLeaf as any).getViewState === "function"
-          ? (liveLeaf as any).getViewState()
-          : {};
+        const extLiveLeaf = liveLeaf as unknown as ExtendedWorkspaceLeaf;
+        const viewState = typeof extLiveLeaf.getViewState === "function"
+          ? extLiveLeaf.getViewState()
+          : { id: "", type: liveLeaf.view?.getViewType() || layoutLeaf.type, state: {} };
         return {
           id: layoutLeaf.id,
           type: viewState.type || liveLeaf.view?.getViewType() || layoutLeaf.type,
@@ -685,12 +703,13 @@ export class WindowLayoutManager {
       // 仍保留即時找到的 leaf，避免保存時遺失其他檔案。
       const capturedIds = new Set(leaves.map((leaf) => leaf.id));
       windowLeaves.forEach((leaf) => {
-        const id = (leaf as any).id || this.generateId();
+        const extLeaf = leaf as unknown as ExtendedWorkspaceLeaf;
+        const id = extLeaf.id || this.generateId();
         if (capturedIds.has(id)) return;
 
-        const viewState = typeof (leaf as any).getViewState === "function"
-          ? (leaf as any).getViewState()
-          : {};
+        const viewState = typeof extLeaf.getViewState === "function"
+          ? extLeaf.getViewState()
+          : { id: "", type: leaf.view?.getViewType() || "unknown", state: {} };
         leaves.push({
           id,
           type: viewState.type || leaf.view?.getViewType() || "unknown",
@@ -711,8 +730,8 @@ export class WindowLayoutManager {
             options.includePosition !== false ? windowInfo.position : undefined,
         },
         workspace: {
-          layout: floatingLayout,
-          activeFile: (activeLeaf?.view as any)?.file?.path,
+          layout: floatingLayout as Record<string, unknown>,
+          activeFile: (activeLeaf?.view as unknown as { file?: TFile })?.file?.path,
           leaves,
         },
         metadata: {
@@ -720,7 +739,7 @@ export class WindowLayoutManager {
           tabCount: leaves.length,
           splitCount: 0,
           createdAt: new Date().toISOString(),
-          obsidianVersion: (this.app as any).version || "unknown",
+          obsidianVersion: (this.app as unknown as { version?: string }).version || "unknown",
           pluginVersion: this.plugin?.manifest?.version || "1.0.0",
         },
         windowInfo: {
@@ -728,7 +747,7 @@ export class WindowLayoutManager {
         },
       };
 
-      const existingLayout = this.plugin?.settings?.spaces?.find(
+      const existingLayout = this.plugin.settings?.spaces?.find(
         (l: WindowLayout) => l.name === capturedLayout.name
       );
       if (existingLayout && existingLayout.includeGeometry !== undefined) {
@@ -739,11 +758,12 @@ export class WindowLayoutManager {
       // 因此保存 capture 當下的 DOM Window，供 saveLayout 使用。
       this.layoutWindows.set(capturedLayout, currentWin);
       return capturedLayout;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to capture layout:", error);
       throw error;
     }
   }
+
 
   /**
    * 恢復指定的佈局 (忠實還原 Tabs, Horizontal/Vertical Splits 與檔案狀態)
@@ -808,7 +828,8 @@ export class WindowLayoutManager {
 
       const savedLeaves = this.getSavedViewStates(layout);
       const savedLeafId = layout.windowInfo?.firstLeafId || savedLeaves[0]?.id;
-      let currentLayout: any = this.app.workspace.getLayout();
+      const workspace = this.app.workspace as unknown as ExtendedWorkspace;
+      let currentLayout: Record<string, unknown> = workspace.getLayout();
       let floatingWindows = this.getFloatingWindows(currentLayout);
 
       // 1. 嘗試尋找目標現有視窗
@@ -852,7 +873,8 @@ export class WindowLayoutManager {
           const popoutWinsBefore = new Set(this.getLivePopoutWindows());
 
           // 呼叫 openPopoutLeaf 建立新 Popout 分頁
-          const popoutLeaf = (this.app.workspace as any).openPopoutLeaf();
+          const extWs = this.app.workspace as unknown as ExtendedWorkspace & { openPopoutLeaf?: () => WorkspaceLeaf };
+          const popoutLeaf = extWs.openPopoutLeaf?.();
 
           // 輪詢等待全新的 Live Popout Window 在 Electron 中被正式掛載建立（最多等待 2 秒）
           let newlyCreatedWin: Window | null = null;
@@ -863,10 +885,11 @@ export class WindowLayoutManager {
             if (newlyCreatedWin) break;
           }
 
-          targetWin = newlyCreatedWin || (popoutLeaf as any)?.containerEl?.ownerDocument?.defaultView || null;
+          const extPopoutLeaf = popoutLeaf as unknown as ExtendedWorkspaceLeaf | undefined;
+          targetWin = newlyCreatedWin || extPopoutLeaf?.containerEl?.ownerDocument?.defaultView || null;
 
           // 重新讀取最新的 Layout
-          currentLayout = this.app.workspace.getLayout();
+          currentLayout = workspace.getLayout();
           floatingWindows = this.getFloatingWindows(currentLayout);
 
           // 以新開視窗的 ID 或在 floating 陣列末尾精確定位 targetIndex
@@ -890,14 +913,15 @@ export class WindowLayoutManager {
           currentFloatingWindow,
           layout.includeGeometry
         );
-        if (currentLayout.floating?.type === "floating" && Array.isArray(currentLayout.floating.children)) {
-          currentLayout.floating.children = currentLayout.floating.children.map(
-            (child: any, idx: number) => (idx === targetIndex ? restoredWindow : child)
+        const floatingObj = currentLayout.floating as { type?: string; children?: unknown[] } | unknown[];
+        if (typeof floatingObj === "object" && floatingObj !== null && "type" in floatingObj && (floatingObj as { type?: string }).type === "floating" && Array.isArray((floatingObj as { children?: unknown[] }).children)) {
+          (floatingObj as { children: unknown[] }).children = (floatingObj as { children: unknown[] }).children.map(
+            (child: unknown, idx: number) => (idx === targetIndex ? restoredWindow : child)
           );
-        } else if (Array.isArray(currentLayout.floating)) {
-          currentLayout.floating[targetIndex] = restoredWindow;
+        } else if (Array.isArray(floatingObj)) {
+          floatingObj[targetIndex] = restoredWindow;
         }
-        await this.app.workspace.changeLayout(currentLayout);
+        await workspace.changeLayout(currentLayout);
       }
 
       await new Promise((resolve) => window.setTimeout(resolve, 150));
@@ -992,9 +1016,10 @@ export class WindowLayoutManager {
           new Notice(`${t("notifications.layoutRestored")}: ${layout.name}`);
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to restore layout:", error);
-      throw new Error(`${t("errors.failedToRestore")}: ${error?.message || error}`);
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`${t("errors.failedToRestore")}: ${message}`);
     }
   }
 
@@ -1002,7 +1027,7 @@ export class WindowLayoutManager {
    * 獲取所有保存的佈局 (按建立時間降序排列，最新儲存的在最上面)
    */
   getSavedLayouts(): WindowLayout[] {
-    const settings = this.plugin.settings || {};
+    const settings: Partial<WindowSettings> = this.plugin.settings || {};
     const spaces = settings.spaces || [];
 
     return [...spaces].sort((a, b) => {
@@ -1083,7 +1108,7 @@ export class WindowLayoutManager {
           : `${t("notifications.layoutSaved")}: ${layout.name}`;
         new Notice(noticeMsg);
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Failed to save layout:", error);
       throw new Error(t("errors.failedToSave"));
     }
@@ -1109,11 +1134,12 @@ export class WindowLayoutManager {
           );
         }
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Failed to delete layout:", error);
       throw new Error(t("errors.failedToDelete"));
     }
   }
+
 
   /**
    * 重命名 Section 名稱並同步更新所有帶有該標籤的 Space 與 sectionsOrder
@@ -1694,7 +1720,7 @@ export class WindowLayoutManager {
    * 取得保存的所有 leaf 狀態。以 layout tree 為主，並補上舊版本資料
    * 中可能存在但未被寫入 layout tree 的 workspace.leaves。
    */
-  private getSavedViewStates(layout: WindowLayout): ViewState[] {
+  public getSavedViewStates(layout: WindowLayout): ViewState[] {
     const fromLayout = this.extractLeavesFromLayout(layout.workspace?.layout);
     const explicitLeaves = Array.isArray(layout.workspace?.leaves)
       ? layout.workspace.leaves
@@ -1725,12 +1751,13 @@ export class WindowLayoutManager {
     return leaves.filter((leaf) => leaf.state.file).length;
   }
 
-  private getFilePathFromLeafState(leafState: any): string | null {
+  public getFilePathFromLeafState(leafState: unknown): string | null {
     if (!leafState) return null;
     if (typeof leafState === "string") return leafState;
-    if (typeof leafState.state?.file === "string") return leafState.state.file;
-    if (typeof leafState.state?.state?.file === "string") return leafState.state.state.file;
-    if (typeof leafState.file === "string") return leafState.file;
+    const stateObj = leafState as { file?: unknown; state?: { file?: unknown; state?: { file?: unknown } } };
+    if (typeof stateObj.state?.file === "string") return stateObj.state.file;
+    if (typeof stateObj.state?.state?.file === "string") return stateObj.state.state.file;
+    if (typeof stateObj.file === "string") return stateObj.file;
     return null;
   }
 
@@ -1788,7 +1815,8 @@ export class WindowLayoutManager {
       const file = this.app.vault.getAbstractFileByPath(filePath);
       if (file instanceof TFile) {
         if (targetLeaf) {
-          const viewMode = leafState.state?.mode || leafState.state?.state?.mode;
+          const stateObj = leafState.state as { mode?: string; state?: { mode?: string } } | undefined;
+          const viewMode = stateObj?.mode || stateObj?.state?.mode;
           const openOptions: any = { active: false };
           if (viewMode) {
             openOptions.state = { mode: viewMode };
@@ -1820,6 +1848,7 @@ export class WindowLayoutManager {
     const leafToFocus = targetActiveLeaf || windowLeaves[0] || null;
     if (leafToFocus) {
       try {
+        await this.app.workspace.revealLeaf(leafToFocus);
         this.app.workspace.setActiveLeaf(leafToFocus, { focus: true });
         if ((leafToFocus as any)?.containerEl && typeof (leafToFocus as any).containerEl.focus === "function") {
           (leafToFocus as any).containerEl.focus();
@@ -1999,7 +2028,7 @@ export class WindowLayoutManager {
   /**
    * 生成唯一 ID
    */
-  private generateId(): string {
+  public generateId(): string {
     return Date.now().toString(36) + Math.random().toString(36).substring(2);
   }
 }

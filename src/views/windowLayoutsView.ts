@@ -1,6 +1,8 @@
 import { ItemView, WorkspaceLeaf } from "obsidian";
 import { WindowLayoutsModal } from "../modals/restoreModal";
 import { t } from "../i18n";
+import WindowSpacesPlugin from "../main";
+import { ExtendedWorkspace } from "../types";
 
 export const WINDOW_LAYOUTS_VIEW_TYPE = "window-spaces-layouts";
 
@@ -14,13 +16,13 @@ export type WindowLayoutsPanelLocation = "left" | "right" | "tab";
  * mounted after a layout is restored.
  */
 export class WindowLayoutsView extends ItemView {
-  private plugin: any;
+  private plugin: WindowSpacesPlugin;
   private contentController?: WindowLayoutsModal;
+  navigation = false;
 
-  constructor(leaf: WorkspaceLeaf, plugin: any) {
+  constructor(leaf: WorkspaceLeaf, plugin: WindowSpacesPlugin) {
     super(leaf);
     this.plugin = plugin;
-    (this as any).navigation = false;
   }
 
   getViewType(): string {
@@ -42,8 +44,8 @@ export class WindowLayoutsView extends ItemView {
     // command all activate the leaf natively, so arrow-key ownership follows
     // the same rule as every other Obsidian panel.
     this.contentController.mountInContainer(this.contentEl, undefined, () => {
-      const ws = this.app.workspace as any;
-      return ws.getMostRecentLeaf() === this.leaf || ws.activeLeaf === this.leaf;
+      const ws = this.app.workspace as unknown as ExtendedWorkspace & { getMostRecentLeaf?: () => WorkspaceLeaf | null };
+      return ws.getMostRecentLeaf?.() === this.leaf || ws.activeLeaf === this.leaf;
     });
   }
 
@@ -52,3 +54,4 @@ export class WindowLayoutsView extends ItemView {
     this.contentController = undefined;
   }
 }
+

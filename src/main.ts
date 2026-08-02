@@ -1,5 +1,10 @@
 import { Modal, Plugin, Notice, WorkspaceLeaf } from "obsidian";
-import { WindowLayout, WindowSettings } from "./types";
+import {
+  WindowLayout,
+  WindowSettings,
+  ExtendedWorkspace,
+  ExtendedWorkspaceLeaf,
+} from "./types";
 import { WindowLayoutManager } from "./manager";
 import { SaveLayoutModal } from "./modals/saveModal";
 import { WindowLayoutsModal } from "./modals/restoreModal";
@@ -94,10 +99,12 @@ export default class WindowSpacesPlugin extends Plugin {
   }
 
   async loadSettings() {
-    const savedSettings = await this.loadData();
-    if (savedSettings && (savedSettings as any).layouts && !savedSettings.spaces) {
-      savedSettings.spaces = (savedSettings as any).layouts;
-      delete (savedSettings as any).layouts;
+    const savedSettings = (await this.loadData()) as
+      | (Partial<WindowSettings> & { layouts?: WindowLayout[] })
+      | null;
+    if (savedSettings && savedSettings.layouts && !savedSettings.spaces) {
+      savedSettings.spaces = savedSettings.layouts;
+      delete savedSettings.layouts;
     }
     this.settings = Object.assign({}, DEFAULT_SETTINGS, savedSettings);
 
@@ -128,8 +135,9 @@ export default class WindowSpacesPlugin extends Plugin {
       callback: async () => {
         try {
           await this.openSaveCurrentLayoutModal();
-        } catch (error) {
-          new Notice(`${t("errors.failedToSave")}: ${error.message}`);
+        } catch (error: unknown) {
+          const message = error instanceof Error ? error.message : String(error);
+          new Notice(`${t("errors.failedToSave")}: ${message}`);
         }
       },
     });
@@ -169,12 +177,15 @@ export default class WindowSpacesPlugin extends Plugin {
       this.app,
       this,
       layout,
-      async (savedLayout) => {
-        try {
-          await this.manager.saveLayout(savedLayout);
-        } catch (error) {
-          new Notice(`${t("errors.failedToSave")}: ${error.message}`);
-        }
+      (savedLayout) => {
+        void (async () => {
+          try {
+            await this.manager.saveLayout(savedLayout);
+          } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : String(error);
+            new Notice(`${t("errors.failedToSave")}: ${message}`);
+          }
+        })();
       }
     );
     modal.open();
@@ -184,8 +195,9 @@ export default class WindowSpacesPlugin extends Plugin {
     try {
       const layout = await this.manager.captureCurrentLayout({}, targetWindow);
       this.openSaveLayoutModal(layout);
-    } catch (error: any) {
-      new Notice(`${t("errors.failedToSave")}: ${error?.message || error}`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      new Notice(`${t("errors.failedToSave")}: ${message}`);
     }
   }
 
@@ -213,11 +225,12 @@ export default class WindowSpacesPlugin extends Plugin {
           if (titleHeader) {
             controller.mountHeaderActions(titleHeader);
           }
-        } catch (error: any) {
+        } catch (error: unknown) {
           console.error("[WindowSpaces] Error mounting Window Spaces picker:", error);
+          const message = error instanceof Error ? error.message : String(error);
           hostModal.contentEl.empty();
           hostModal.contentEl.createEl("p", {
-            text: `Error loading Window Spaces: ${error?.message || error}`,
+            text: `Error loading Window Spaces: ${message}`,
           });
         }
       };
@@ -225,41 +238,70 @@ export default class WindowSpacesPlugin extends Plugin {
         controller.unmountFromContainer();
       };
       hostModal.open();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("[WindowSpaces] Error opening WindowLayoutsModal:", error);
-      new Notice(`Window Spaces Error: ${error?.message || error}`);
+      const message = error instanceof Error ? error.message : String(error);
+      new Notice(`Window Spaces Error: ${message}`);
     }
   }
 
   async openWindowLayoutsPanel(
-    location: WindowLayoutsPanelLocation = "tab"
-  ): Promise<void> {
-    const workspace = this.app.workspace as any;
+    location: WindowLayoutsPanelLocation = "tab",
+    targetWindow?: Window
+  ): Promise<WorkspaceLeaf | null> {
+    // 步驟 1：最先偵測開在哪個視窗 (Main Window 或特定 Popout Window)
+    const win =
+      targetWindow ||
+      (this.manager ? this.manager.getActiveWindow() : undefined) ||
+      (typeof activeWindow !== "undefined" ? activeWindow : window);
 
-    // 若指定位置已有 Window Spaces panel，直接啟用既有的 panel，
-    // 避免重複開啟。
-    const existingPanelLeaf = this.findPanelLeafAtLocation(location);
-    if (existingPanelLeaf) {
-      await workspace.revealLeaf(existingPanelLeaf);
-      return;
+    const isPopout =
+      win !== window &&
+      Boolean(
+        win.document?.body?.classList.contains("is-popout-window") ||
+          win.document?.body?.classList.contains("mod-popout")
+      );
+
+    const workspace = this.app.workspace as unknown as ExtendedWorkspace;
+
+    // 處理在 Popout 視窗開啟
+    if (isPopout) {
+      return this.openPanelInPopoutWindow(location, win);
     }
 
-    let leaf;
+    // 處理在 Main Window 開啟
+    let root: any;
+    if (location === "left") {
+      root = workspace.leftSplit;
+    } else if (location === "right") {
+      root = workspace.rightSplit;
+    } else {
+      root = workspace.rootSplit;
+    }
 
+    // 步驟 2 & 3：看該 split (root) 中是否已有 Window Spaces panel 開啟，如果有就 reveal 並 active
+    const existingLeaf = findLeafInRoot(workspace, root, WINDOW_LAYOUTS_VIEW_TYPE);
+    if (existingLeaf) {
+      await workspace.revealLeaf(existingLeaf);
+      workspace.setActiveLeaf(existingLeaf, { focus: true });
+      return existingLeaf;
+    }
+
+    // 沒有就在該 split 開啟 Window Space tab
+    let leaf: WorkspaceLeaf;
     if (location === "left") {
       leaf = workspace.getLeftLeaf(false);
     } else if (location === "right") {
       leaf = workspace.getRightLeaf(false);
     } else {
-      // Commands can be invoked while a popout is focused. Select a main
-      // workspace leaf first so getLeaf("tab") cannot create the view in a
-      // popout window by accident.
-      let mainLeaf = null;
-      workspace.iterateAllLeaves((candidate: any) => {
-        const body = candidate.containerEl?.ownerDocument?.body;
-        const isPopout = body?.classList?.contains("is-popout-window") ||
+      let mainLeaf: WorkspaceLeaf | null = null;
+      workspace.iterateAllLeaves((candidate: WorkspaceLeaf) => {
+        const extCandidate = candidate as unknown as ExtendedWorkspaceLeaf;
+        const body = extCandidate.containerEl?.ownerDocument?.body;
+        const isCandidatePopout =
+          body?.classList?.contains("is-popout-window") ||
           body?.classList?.contains("mod-popout");
-        if (!mainLeaf && !isPopout) mainLeaf = candidate;
+        if (!mainLeaf && !isCandidatePopout) mainLeaf = candidate;
       });
       if (mainLeaf) workspace.setActiveLeaf(mainLeaf, { focus: false });
       leaf = workspace.getLeaf("tab");
@@ -271,34 +313,230 @@ export default class WindowSpacesPlugin extends Plugin {
 
     await leaf.setViewState({ type: WINDOW_LAYOUTS_VIEW_TYPE, state: {} });
     await workspace.revealLeaf(leaf);
+    workspace.setActiveLeaf(leaf, { focus: true });
+    return leaf;
   }
 
-  /** 在指定位置尋找已開啟的 Window Spaces panel leaf。 */
-  private findPanelLeafAtLocation(
-    location: WindowLayoutsPanelLocation
-  ): WorkspaceLeaf | null {
-    const workspace = this.app.workspace as any;
-    let found: WorkspaceLeaf | null = null;
+  private async openPanelInPopoutWindow(
+    location: WindowLayoutsPanelLocation,
+    win: Window
+  ): Promise<WorkspaceLeaf> {
+    const workspace = this.app.workspace;
+    const columns = this.collectPopoutColumns(win);
 
-    workspace.iterateAllLeaves((leaf: any) => {
-      if (found) return;
-      if (!leaf || typeof leaf.getRoot !== "function") return;
-      if (leaf.view?.getViewType?.() !== WINDOW_LAYOUTS_VIEW_TYPE) return;
+    if (location === "left" || location === "right") {
+      const sidebar = location === "left"
+        ? findTrueLeftSidebar(win, columns)
+        : findTrueRightSidebar(win, columns);
 
-      const root = leaf.getRoot();
-      const matches =
-        location === "left"
-          ? root === workspace.leftSplit
-          : location === "right"
-            ? root === workspace.rightSplit
-            : location === "tab"
-              ? root === workspace.rootSplit
-              : false;
+      if (sidebar) {
+        // 已有滿高度的標準側欄 (紅框)
+        const existingInSidebar = findLeafInTabs(sidebar.tabs, WINDOW_LAYOUTS_VIEW_TYPE);
+        if (existingInSidebar) {
+          await workspace.revealLeaf(existingInSidebar);
+          workspace.setActiveLeaf(existingInSidebar, { focus: true });
+          return existingInSidebar;
+        }
 
-      if (matches) found = leaf;
+        const newLeaf = await this.openPanelInTabs(sidebar.tabs);
+        await workspace.revealLeaf(newLeaf);
+        workspace.setActiveLeaf(newLeaf, { focus: true });
+        return newLeaf;
+      }
+
+      // 尚無標準滿高度側欄 (綠框或單一/上下分割)：創立標準滿高度側欄 Vertical Split
+      let editorLeaf = this.getActiveLeafInWindow(win) || this.getLastLeafInWindow(win);
+      if (editorLeaf && editorLeaf.getViewState()?.type === WINDOW_LAYOUTS_VIEW_TYPE) {
+        let otherLeaf: WorkspaceLeaf | null = null;
+        workspace.iterateAllLeaves((l: WorkspaceLeaf) => {
+          if (!otherLeaf && getWindowOfLeaf(l) === win && l.getViewState()?.type !== WINDOW_LAYOUTS_VIEW_TYPE) {
+            otherLeaf = l;
+          }
+        });
+        if (otherLeaf) editorLeaf = otherLeaf;
+      }
+
+      if (!editorLeaf) {
+        return this.openPanelInPopoutEditor(win);
+      }
+
+      const targetNode = getTopLevelNodeInWindow(editorLeaf) || editorLeaf;
+      const isParentNode = targetNode !== editorLeaf && Boolean((targetNode as any).children);
+      const before = location === "left" ? !isParentNode : isParentNode;
+      const panelLeaf = workspace.createLeafBySplit(targetNode, "vertical", before);
+
+      await panelLeaf.setViewState({
+        type: WINDOW_LAYOUTS_VIEW_TYPE,
+        active: false,
+        state: {}
+      });
+
+      scheduleInitialSplitSizing(panelLeaf, editorLeaf, win);
+
+      await workspace.revealLeaf(panelLeaf);
+      workspace.setActiveLeaf(panelLeaf, { focus: true });
+      return panelLeaf;
+    }
+
+    // location === "tab" (在 Popout 編輯器中央區域開啟/切換)
+    const allPanes = columns.reduce((acc, col) => acc.concat(col.panes), [] as PopoutPane[]);
+    const targetPane = pickCenterPopoutPane(allPanes, win);
+    const targetTabs = targetPane ? targetPane.tabs : (this.getActiveLeafInWindow(win)?.parent as any);
+
+    if (targetTabs) {
+      const existingInTarget = findLeafInTabs(targetTabs, WINDOW_LAYOUTS_VIEW_TYPE);
+      if (existingInTarget) {
+        await workspace.revealLeaf(existingInTarget);
+        workspace.setActiveLeaf(existingInTarget, { focus: true });
+        return existingInTarget;
+      }
+      const newLeaf = await this.openPanelInTabs(targetTabs);
+      await workspace.revealLeaf(newLeaf);
+      workspace.setActiveLeaf(newLeaf, { focus: true });
+      return newLeaf;
+    }
+
+    const leaf = workspace.getLeaf("tab");
+    await leaf.setViewState({
+      type: WINDOW_LAYOUTS_VIEW_TYPE,
+      active: true,
+      state: {}
+    });
+    await workspace.revealLeaf(leaf);
+    workspace.setActiveLeaf(leaf, { focus: true });
+    return leaf;
+  }
+
+  private async openPanelInPopoutEditor(win: Window): Promise<WorkspaceLeaf> {
+    const workspace = this.app.workspace;
+    const columns = this.collectPopoutColumns(win);
+    const allPanes = columns.reduce((acc, col) => acc.concat(col.panes), [] as PopoutPane[]);
+    const targetPane = pickCenterPopoutPane(allPanes, win);
+
+    if (targetPane) {
+      const existingInTabs = findLeafInTabs(targetPane.tabs, WINDOW_LAYOUTS_VIEW_TYPE);
+      if (existingInTabs) {
+        await workspace.revealLeaf(existingInTabs);
+        workspace.setActiveLeaf(existingInTabs, { focus: true });
+        return existingInTabs;
+      }
+      return this.openPanelInTabs(targetPane.tabs);
+    }
+
+    const baseLeaf = this.getActiveLeafInWindow(win) ?? this.getLastLeafInWindow(win);
+    if (!baseLeaf) {
+      const leaf = workspace.getLeaf("tab");
+      await leaf.setViewState({
+        type: WINDOW_LAYOUTS_VIEW_TYPE,
+        active: true,
+        state: {}
+      });
+      await workspace.revealLeaf(leaf);
+      workspace.setActiveLeaf(leaf, { focus: true });
+      return leaf;
+    }
+
+    const tabs = baseLeaf.parent as any;
+    if (tabs) {
+      const existingInTabs = findLeafInTabs(tabs, WINDOW_LAYOUTS_VIEW_TYPE);
+      if (existingInTabs) {
+        await workspace.revealLeaf(existingInTabs);
+        workspace.setActiveLeaf(existingInTabs, { focus: true });
+        return existingInTabs;
+      }
+    }
+    return this.openPanelInTabs(tabs);
+  }
+
+  private async openPanelInTabs(tabs: any): Promise<WorkspaceLeaf> {
+    const workspace = this.app.workspace;
+    const children = (tabs?.children ?? []) as WorkspaceLeaf[];
+
+    for (const leaf of children) {
+      if (leaf.getViewState().type === WINDOW_LAYOUTS_VIEW_TYPE) {
+        await workspace.revealLeaf(leaf);
+        workspace.setActiveLeaf(leaf, { focus: true });
+        return leaf;
+      }
+    }
+
+    const leaf = workspace.createLeafInParent(tabs, children.length);
+    await leaf.setViewState({
+      type: WINDOW_LAYOUTS_VIEW_TYPE,
+      active: true,
+      state: {}
+    });
+    await workspace.revealLeaf(leaf);
+    workspace.setActiveLeaf(leaf, { focus: true });
+    return leaf;
+  }
+
+  private collectPopoutColumns(win: Window): PopoutColumn[] {
+    const panes = this.collectPopoutPanes(win);
+    if (panes.length === 0) return [];
+
+    const columns: PopoutColumn[] = [];
+    for (const pane of panes) {
+      const paneWidth = pane.width ?? 400;
+      let matchedColumn = columns.find((col) => {
+        const overlap = Math.max(0, Math.min(pane.left + paneWidth, col.left + col.width) - Math.max(pane.left, col.left));
+        const minWidth = Math.min(paneWidth, col.width);
+        const overlapRatio = minWidth > 0 ? overlap / minWidth : 0;
+        return overlapRatio > 0.5 || Math.abs(pane.left - col.left) < 30;
+      });
+
+      if (matchedColumn) {
+        matchedColumn.panes.push(pane);
+      } else {
+        columns.push({
+          left: pane.left,
+          width: paneWidth,
+          panes: [pane],
+        });
+      }
+    }
+
+    columns.sort((a, b) => a.left - b.left);
+    return columns;
+  }
+
+  private collectPopoutPanes(win: Window): PopoutPane[] {
+    const tabsSet = new Set<any>();
+
+    this.app.workspace.iterateAllLeaves((leaf: WorkspaceLeaf) => {
+      if (getWindowOfLeaf(leaf) !== win) {
+        return;
+      }
+      if (leaf.parent) {
+        tabsSet.add(leaf.parent);
+      }
     });
 
-    return found;
+    const panes: PopoutPane[] = [];
+    for (const tabs of tabsSet) {
+      const rect = getPaneRect(tabs);
+      const left = rect ? rect.left : 0;
+      const width = rect ? rect.width : 400;
+      panes.push({ tabs, left, width, center: left + width / 2 });
+    }
+
+    panes.sort((a, b) => a.left - b.left);
+    return panes;
+  }
+
+  private getActiveLeafInWindow(win: Window): WorkspaceLeaf | null {
+    const activeLeaf = this.app.workspace.activeLeaf;
+    return activeLeaf && getWindowOfLeaf(activeLeaf) === win ? activeLeaf : null;
+  }
+
+  private getLastLeafInWindow(win: Window): WorkspaceLeaf | null {
+    let lastLeaf: WorkspaceLeaf | null = null;
+    this.app.workspace.iterateAllLeaves((leaf: WorkspaceLeaf) => {
+      if (getWindowOfLeaf(leaf) === win) {
+        lastLeaf = leaf;
+      }
+    });
+    return lastLeaf;
   }
 
   private setupEventListeners() {
@@ -339,8 +577,9 @@ export default class WindowSpacesPlugin extends Plugin {
         // Shift+點擊：快速保存
         void this.manager.captureCurrentLayout().then((layout) => {
           this.openSaveLayoutModal(layout);
-        }).catch((error: any) => {
-          new Notice(`${t("errors.failedToSave")}: ${error?.message || error}`);
+        }).catch((error: unknown) => {
+          const message = error instanceof Error ? error.message : String(error);
+          new Notice(`${t("errors.failedToSave")}: ${message}`);
         });
       } else {
         // 普通點擊：顯示佈局列表
@@ -357,3 +596,183 @@ export default class WindowSpacesPlugin extends Plugin {
 
   private autoSaveCleanup: (() => void) | null = null;
 }
+
+interface PopoutPane {
+  tabs: any;
+  left: number;
+  width?: number;
+  center: number;
+}
+
+interface PopoutColumn {
+  left: number;
+  width: number;
+  panes: PopoutPane[];
+}
+
+const INITIAL_SPLIT_RATIO = 0.34;
+
+function getWindowOfLeaf(leaf: WorkspaceLeaf): Window | null {
+  const container = (leaf.view as any)?.containerEl;
+  return container?.ownerDocument?.defaultView ?? null;
+}
+
+function getTopLevelNodeInWindow(leaf: WorkspaceLeaf): any {
+  let curr: any = leaf;
+  while (curr && curr.parent) {
+    const parent = curr.parent;
+    if (!parent.parent || parent.type === "root" || parent.isRoot || parent.kind === "root") {
+      return curr;
+    }
+    curr = parent;
+  }
+  return curr;
+}
+
+function getPaneRect(tabs: any): DOMRect | null {
+  const container = tabs?.containerEl;
+  if (container instanceof HTMLElement) {
+    const rect = container.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) return rect;
+  }
+  const children = (tabs?.children ?? []) as WorkspaceLeaf[];
+  for (const leaf of children) {
+    const leafContainer = (leaf.view as any)?.containerEl;
+    if (leafContainer instanceof HTMLElement) {
+      const rect = leafContainer.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) return rect;
+    }
+  }
+  return null;
+}
+
+interface SidebarInfo {
+  pane: PopoutPane;
+  tabs: any;
+}
+
+function findTrueLeftSidebar(win: Window, columns: PopoutColumn[]): SidebarInfo | null {
+  if (columns.length < 2) return null;
+  const leftCol = columns[0];
+
+  // 標準側欄 (紅框) 必須是該直欄唯一的全高分欄
+  if (leftCol.panes.length !== 1) return null;
+
+  const pane = leftCol.panes[0];
+  const rect = getPaneRect(pane.tabs);
+  const winHeight = win?.innerHeight || 600;
+
+  if (rect) {
+    const isFullHeight = rect.top < winHeight * 0.15 && (rect.top + rect.height) > winHeight * 0.85;
+    if (!isFullHeight) return null;
+  }
+
+  return { pane, tabs: pane.tabs };
+}
+
+function findTrueRightSidebar(win: Window, columns: PopoutColumn[]): SidebarInfo | null {
+  if (columns.length < 2) return null;
+  const rightCol = columns[columns.length - 1];
+
+  // 標準側欄 (紅框) 必須是該直欄唯一的全高分欄
+  if (rightCol.panes.length !== 1) return null;
+
+  const pane = rightCol.panes[0];
+  const rect = getPaneRect(pane.tabs);
+  const winHeight = win?.innerHeight || 600;
+
+  if (rect) {
+    const isFullHeight = rect.top < winHeight * 0.15 && (rect.top + rect.height) > winHeight * 0.85;
+    if (!isFullHeight) return null;
+  }
+
+  return { pane, tabs: pane.tabs };
+}
+
+
+function pickCenterPopoutPane(panes: PopoutPane[], win: Window): PopoutPane | null {
+  const firstPane = panes[0];
+  if (!firstPane) return null;
+  if (panes.length === 1) return firstPane;
+
+  const winCenter = win.innerWidth / 2;
+  let bestPane = firstPane;
+  let bestDistance = Infinity;
+  for (const pane of panes) {
+    const distance = Math.abs(pane.center - winCenter);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestPane = pane;
+    }
+  }
+  return bestPane;
+}
+
+function scheduleInitialSplitSizing(
+  panelLeaf: WorkspaceLeaf,
+  editorLeaf: WorkspaceLeaf,
+  win: Window
+): void {
+  const raf = win.requestAnimationFrame?.bind(win) || window.requestAnimationFrame.bind(window);
+  raf(() => {
+    raf(() => {
+      applyInitialSplitSizing(panelLeaf, editorLeaf);
+    });
+  });
+}
+
+function applyInitialSplitSizing(
+  panelLeaf: WorkspaceLeaf,
+  editorLeaf: WorkspaceLeaf
+): void {
+  const panelContainer = getViewContainer(panelLeaf);
+  const editorContainer = getViewContainer(editorLeaf);
+  if (!panelContainer || !editorContainer) return;
+
+  const split = panelContainer.closest<HTMLElement>(".workspace-split.mod-vertical");
+  if (!split || !split.contains(editorContainer)) return;
+
+  const panelPane = getDirectSplitChild(split, panelContainer);
+  const editorPane = getDirectSplitChild(split, editorContainer);
+  if (!panelPane || !editorPane || panelPane === editorPane) return;
+
+  panelPane.style.flex = `0 0 ${INITIAL_SPLIT_RATIO * 100}%`;
+  editorPane.style.flex = "1 1 0%";
+}
+
+function getViewContainer(leaf: WorkspaceLeaf): HTMLElement | null {
+  const container = (leaf.view as any)?.containerEl;
+  return container instanceof HTMLElement ? container : null;
+}
+
+function getDirectSplitChild(split: HTMLElement, element: HTMLElement): HTMLElement | null {
+  let current: HTMLElement | null = element;
+  while (current && current.parentElement !== split) {
+    current = current.parentElement;
+  }
+  return current;
+}
+
+function findLeafInTabs(tabs: any, viewType: string): WorkspaceLeaf | null {
+  const children = (tabs?.children ?? []) as WorkspaceLeaf[];
+  for (const leaf of children) {
+    if (leaf.getViewState()?.type === viewType) {
+      return leaf;
+    }
+  }
+  return null;
+}
+
+function findLeafInRoot(workspace: any, root: any, viewType: string): WorkspaceLeaf | null {
+  if (!root) return null;
+  let found: WorkspaceLeaf | null = null;
+  workspace.iterateAllLeaves((leaf: WorkspaceLeaf) => {
+    if (found) return;
+    if ((leaf as any).getRoot?.() === root && leaf.getViewState()?.type === viewType) {
+      found = leaf;
+    }
+  });
+  return found;
+}
+
+

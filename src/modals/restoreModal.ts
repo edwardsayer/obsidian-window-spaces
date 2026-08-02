@@ -1,15 +1,16 @@
 import { App, Modal, Notice, Setting, setIcon, setTooltip, Menu } from "obsidian";
-import { WindowLayout, ViewState } from "../types";
+import { WindowLayout, ViewState, WindowSettings } from "../types";
 import { t, getI18n } from "../i18n";
+import WindowSpacesPlugin from "../main";
 
 /**
  * 統一的 Window Layouts 視窗：搜尋、恢復與管理都在同一個入口完成。
  */
 export class WindowLayoutsModal extends Modal {
-  private plugin: any;
+  private plugin: WindowSpacesPlugin;
   private targetWindow?: Window;
-  private searchInput: HTMLInputElement;
-  private listEl: HTMLElement;
+  private searchInput!: HTMLInputElement;
+  private listEl!: HTMLElement;
   private filteredLayouts: WindowLayout[] = [];
   private selectedIndex = 0;
 
@@ -19,7 +20,7 @@ export class WindowLayoutsModal extends Modal {
   private panelRootEl?: HTMLElement;
   private panelMode = false;
   private externalHostClose?: () => void;
-  private initialFocusTimer?: number;
+  private initialFocusTimer?: number | ReturnType<typeof window.setTimeout>;
   private initialSearchQuery?: string;
   private clearSearchBtn?: HTMLElement;
 
@@ -33,7 +34,7 @@ export class WindowLayoutsModal extends Modal {
 
   constructor(
     app: App,
-    plugin: any,
+    plugin: WindowSpacesPlugin,
     targetWindow?: Window
   ) {
     super(app);
@@ -65,16 +66,17 @@ export class WindowLayoutsModal extends Modal {
       }
 
       this.renderContent();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[WindowSpaces] Error during WindowLayoutsModal onOpen:", err);
       WindowLayoutsModal.activeInstances.delete(this);
       this.removeKeydownListener();
       // Keep the native Modal alive and visibly report the failure. Closing a
       // Modal while Obsidian is still running Modal.open()/onOpen() can leave
       // its keyboard scope above the Command Palette scope.
+      const message = err instanceof Error ? err.message : String(err);
       this.contentEl.empty();
       this.contentEl.createEl("p", {
-        text: `Error loading Window Spaces: ${err?.message || err}`,
+        text: `Error loading Window Spaces: ${message}`,
       });
     }
   }
@@ -127,6 +129,24 @@ export class WindowLayoutsModal extends Modal {
 
   private getRootEl(): HTMLElement {
     return this.panelRootEl || this.contentEl;
+  }
+
+  /**
+   * Find the .modal-container that hosts this instance, if any. Panels hosted
+   * in sidebars or editor tabs return null; popup pickers mounted inside a
+   * native Modal return that modal's container so stacked modals (rename
+   * dialog, Command Palette, ...) can be told apart from the picker itself.
+   */
+  private getOwnModalContainer(): HTMLElement | null {
+    let el: HTMLElement | null = this.getRootEl();
+    const doc = el?.ownerDocument;
+    while (el && doc && el !== doc.documentElement) {
+      if (typeof el.classList?.contains === "function" && el.classList.contains("modal-container")) {
+        return el;
+      }
+      el = el.parentElement;
+    }
+    return null;
   }
 
   private closeHost(): void {
@@ -216,7 +236,24 @@ export class WindowLayoutsModal extends Modal {
         return;
       }
 
-      const activeEl = targetDoc.activeElement;
+      const activeEl = targetDoc.activeElement as HTMLElement | null;
+      const ownRootEl = this.getRootEl();
+
+      // 當焦點位於 ownRootEl 之外的輸入框、編輯器或彈出對話框（如 Command Palette, Quick Switcher, Rename dialog 等）時，絕對不攔截按鍵
+      if (activeEl && !ownRootEl.contains(activeEl)) {
+        const tagName = activeEl.tagName?.toUpperCase();
+        if (
+          tagName === "INPUT" ||
+          tagName === "TEXTAREA" ||
+          tagName === "SELECT" ||
+          activeEl.isContentEditable ||
+          activeEl.classList?.contains("cm-content") ||
+          Boolean(activeEl.closest(".modal-container, .modal, .prompt, .prompt-container, .menu"))
+        ) {
+          return;
+        }
+      }
+
       let focusedInstance: WindowLayoutsModal | null = null;
       for (const instance of WindowLayoutsModal.activeInstances) {
         const root = instance.getRootEl();
@@ -226,17 +263,57 @@ export class WindowLayoutsModal extends Modal {
         }
       }
 
-      // A native Modal owns keyboard input while it is open, so an open
-      // popup instance takes precedence over every persistent panel. Panels
-      // own navigation only while no popup is open AND they are the active
-      // leaf (clicking the panel, its tab, or opening it via command
-      // activates the leaf) or while the focus is inside the panel itself.
+      // A panel or popup must never answer keys while the user is actually
+      // typing in a DIFFERENT window (a popout). Obsidian forwards key events
+      // between windows so core shortcuts keep working, so check the event's
+      // origin window, the event target's document, and whether THIS document
+      // currently holds OS focus. A forwarded event either keeps its original
+      // window/document (caught by the first two checks) or is rebuilt in the
+      // focused window (caught by document.hasFocus()).
+      const eventView = (event as KeyboardEvent & { view?: Window | null }).view;
+      const eventFromThisWindow = eventView == null || eventView === targetWindow;
+      const eventTargetDoc = (event.target as Element | null)?.ownerDocument ?? null;
+      const eventTargetsThisDocument = eventTargetDoc == null || eventTargetDoc === targetDoc;
+      const thisDocumentFocused = targetDoc.hasFocus();
+
+      // 檢查畫面中是否有 Command Palette (.prompt), Quick Switcher, Menu 或 Stacked Modals
+      const ownModalContainer = this.getOwnModalContainer();
+      const overlays = Array.from(
+        targetDoc.querySelectorAll<HTMLElement>(
+          ".modal-container, .modal, .prompt, .prompt-container, .menu"
+        )
+      );
+      const otherModalOpen = overlays.some((el) => {
+        if (ownModalContainer && (el === ownModalContainer || ownModalContainer.contains(el))) {
+          return false;
+        }
+        if (ownRootEl.contains(el)) {
+          return false;
+        }
+        const style = targetDoc.defaultView?.getComputedStyle(el);
+        return (
+          !el.classList.contains("is-hidden") &&
+          style?.display !== "none" &&
+          style?.visibility !== "hidden"
+        );
+      });
+
+      const menuOpen = Boolean(
+        targetDoc.querySelector<HTMLElement>(".menu:not(.is-hidden)")
+      );
       const anyPopupOpen = Array.from(WindowLayoutsModal.activeInstances).some(
         (instance) => !instance.panelMode
       );
-      const shouldHandle = this.panelMode
-        ? focusedInstance === this || (!anyPopupOpen && this.isPanelActive?.() === true)
-        : true;
+      const shouldHandle =
+        eventFromThisWindow &&
+        eventTargetsThisDocument &&
+        thisDocumentFocused &&
+        (this.panelMode
+          ? !otherModalOpen &&
+            !menuOpen &&
+            (focusedInstance === this ||
+              (!anyPopupOpen && this.isPanelActive?.() === true))
+          : !otherModalOpen && !menuOpen);
       if (!shouldHandle) return;
 
       if (event.key === "ArrowDown" || event.key === "ArrowUp") {
@@ -264,7 +341,7 @@ export class WindowLayoutsModal extends Modal {
 
     if (this.initialFocusTimer !== undefined) {
       const timerWindow = this.modalEl?.ownerDocument?.defaultView || window;
-      timerWindow.clearTimeout(this.initialFocusTimer);
+      timerWindow.clearTimeout(this.initialFocusTimer as number);
     }
 
     const focusWindow = this.modalEl?.ownerDocument?.defaultView || window;
@@ -338,7 +415,7 @@ export class WindowLayoutsModal extends Modal {
 
   public showViewOptionsMenu(event: MouseEvent): void {
     const menu = new Menu();
-    const settings = this.plugin.settings;
+    const settings: Partial<WindowSettings> = this.plugin?.settings || {};
     const isGrouped = settings.groupBySection !== false;
     const isShowArchived = settings.showArchived === true;
 
@@ -349,7 +426,7 @@ export class WindowLayoutsModal extends Modal {
         .setIcon(isGrouped ? "check" : "grid")
         .onClick(async () => {
           settings.groupBySection = !isGrouped;
-          await this.plugin.saveSettings();
+          await this.plugin?.saveSettings();
           WindowLayoutsModal.renderAllInstances();
         });
     });
@@ -363,7 +440,7 @@ export class WindowLayoutsModal extends Modal {
         .setIcon(isShowArchived ? "check" : "box")
         .onClick(async () => {
           settings.showArchived = !isShowArchived;
-          await this.plugin.saveSettings();
+          await this.plugin?.saveSettings();
           WindowLayoutsModal.renderAllInstances();
         });
     });
@@ -473,8 +550,8 @@ export class WindowLayoutsModal extends Modal {
         }
 
         const emptyLayout: WindowLayout = {
-          id: typeof (this.plugin.manager as any).generateId === "function"
-            ? (this.plugin.manager as any).generateId()
+          id: typeof this.plugin.manager?.generateId === "function"
+            ? this.plugin.manager.generateId()
             : `layout_${Date.now()}`,
           name: cleanName,
           timestamp: Date.now(),
@@ -496,7 +573,7 @@ export class WindowLayoutsModal extends Modal {
             tabCount: 0,
             splitCount: 0,
             createdAt: new Date().toISOString(),
-            obsidianVersion: (this.app as any).version || "unknown",
+            obsidianVersion: (this.app as unknown as { version?: string }).version || "unknown",
             pluginVersion: this.plugin?.manifest?.version || "1.0.0",
           },
         };
@@ -545,9 +622,10 @@ export class WindowLayoutsModal extends Modal {
       }
       this.selectedIndex = 0;
       WindowLayoutsModal.renderAllInstances();
-    } catch (err: any) {
+    } catch (err: unknown) {
       this.closeHost();
-      new Notice(err?.message || String(err));
+      const message = err instanceof Error ? err.message : String(err);
+      new Notice(message);
     }
   }
 
@@ -562,7 +640,7 @@ export class WindowLayoutsModal extends Modal {
     const rawQuery = this.searchInput?.value.trim() || "";
     const query = rawQuery.toLowerCase();
     const allSpaces = this.plugin?.manager?.getSavedLayouts() || [];
-    const settings = this.plugin?.settings || {};
+    const settings: Partial<WindowSettings> = this.plugin?.settings || {};
     const showArchived = settings.showArchived === true;
     const groupBySection = settings.groupBySection !== false;
 
@@ -825,15 +903,15 @@ export class WindowLayoutsModal extends Modal {
 
     this.setFilesTooltipForLayout(layoutEl, layout);
 
-    let holdTimer: any = null;
+    let holdTimer: number | ReturnType<typeof window.setTimeout> | null = null;
     let isLongPress = false;
 
     const isActionButtonTarget = (target: EventTarget | null): boolean =>
       Boolean((target as HTMLElement | null)?.closest?.("button"));
 
     const cancelHold = () => {
-      if (holdTimer) {
-        clearTimeout(holdTimer);
+      if (holdTimer !== null) {
+        window.clearTimeout(holdTimer as number);
         holdTimer = null;
       }
     };
@@ -900,7 +978,7 @@ export class WindowLayoutsModal extends Modal {
     restoreButton.addEventListener("mousedown", (e: MouseEvent) => {
       if (e.button !== 0) return;
       isLongPress = false;
-      holdTimer = setTimeout(() => {
+      holdTimer = window.setTimeout(() => {
         isLongPress = true;
         void this.restoreLayout(layout, false);
       }, 450);
@@ -917,7 +995,7 @@ export class WindowLayoutsModal extends Modal {
     };
 
     const moreButton = actionsEl.createEl("button", {
-      cls: "clickable-icon layout-more-btn",
+      cls: "layout-more-btn mod-cta",
     });
     setIcon(moreButton, "chevron-down");
     setTooltip(moreButton, t("manageModal.actions"));
@@ -943,8 +1021,9 @@ export class WindowLayoutsModal extends Modal {
         forceReload: !forceNewWindow,
         focusExistingWindow: true,
       });
-    } catch (error: any) {
-      new Notice(`${t("errors.failedToRestore")}: ${error?.message || error}`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      new Notice(`${t("errors.failedToRestore")}: ${message}`);
     }
   }
 
@@ -1017,14 +1096,14 @@ export class WindowLayoutsModal extends Modal {
         new Notice(t("notifications.layoutRenamed"));
       };
 
-      saveButton.onclick = submit;
+      saveButton.onclick = () => void submit();
     };
     modal.onClose = () => modal.contentEl.empty();
     modal.open();
   }
 
   private showDeleteDialog(layout: WindowLayout): void {
-    this.showConfirmDialog(
+    void this.showConfirmDialog(
       `${t("manageModal.confirmDeleteMessage")}\n\n${layout.name}`,
       t("manageModal.confirmDeleteTitle")
     ).then(async (confirmed) => {
@@ -1033,8 +1112,9 @@ export class WindowLayoutsModal extends Modal {
       try {
         await this.plugin.manager.deleteLayout(layout.id);
         WindowLayoutsModal.renderAllInstances();
-      } catch (error: any) {
-        new Notice(`${t("errors.failedToDelete")}: ${error?.message || error}`);
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        new Notice(`${t("errors.failedToDelete")}: ${message}`);
       }
     });
   }
@@ -1074,11 +1154,11 @@ export class WindowLayoutsModal extends Modal {
   }
 
   private setFilesTooltipForLayout(element: HTMLElement, layout: WindowLayout): void {
-    const leaves = this.plugin.manager.getSavedViewStates(layout);
+    const leaves = this.plugin?.manager ? this.plugin.manager.getSavedViewStates(layout) : [];
     const files: string[] = [];
 
     leaves.forEach((leaf: ViewState) => {
-      const filePath = this.plugin.manager.getFilePathFromLeafState(leaf);
+      const filePath = this.plugin?.manager ? this.plugin.manager.getFilePathFromLeafState(leaf) : null;
       if (filePath) {
         const fileName = filePath.split("/").pop() || filePath;
         if (!files.includes(fileName)) {
@@ -1102,7 +1182,7 @@ export class WindowLayoutsModal extends Modal {
 
   public showSortMenu(event: MouseEvent): void {
     const menu = new Menu();
-    const currentSort = this.plugin.settings.sortBy || "updated-desc";
+    const currentSort = this.plugin?.settings?.sortBy || "updated-desc";
 
     const addSortItem = (
       id: "updated-desc" | "updated-asc" | "created-desc" | "created-asc" | "name-asc" | "name-desc",
@@ -1136,7 +1216,12 @@ export class WindowLayoutsModal extends Modal {
     const menu = new Menu();
     const openPanel = (location: "left" | "right" | "tab") => {
       this.closeHost();
-      void this.plugin.openWindowLayoutsPanel(location);
+      const targetWin =
+        this.targetWindow ||
+        (typeof this.plugin.manager?.getActiveWindow === "function"
+          ? this.plugin.manager.getActiveWindow()
+          : undefined);
+      void this.plugin.openWindowLayoutsPanel(location, targetWin);
     };
 
     // 與命令面板的開啟命令共用相同名稱，確保兩處內容一致。
@@ -1147,7 +1232,12 @@ export class WindowLayoutsModal extends Modal {
     menu.addItem((item) => {
       item.setTitle(t("commands.openLayouts")).setIcon("layout").onClick(() => {
         this.closeHost();
-        this.plugin.openWindowLayoutsModal();
+        const targetWin =
+          this.targetWindow ||
+          (typeof this.plugin.manager?.getActiveWindow === "function"
+            ? this.plugin.manager.getActiveWindow()
+            : undefined);
+        this.plugin.openWindowLayoutsModal(targetWin);
       });
     });
     menu.addItem((item) => {
@@ -1241,7 +1331,7 @@ export class WindowLayoutsModal extends Modal {
 
     if (this.initialFocusTimer !== undefined) {
       const timerWindow = this.modalEl?.ownerDocument?.defaultView || window;
-      timerWindow.clearTimeout(this.initialFocusTimer);
+      timerWindow.clearTimeout(this.initialFocusTimer as number);
       this.initialFocusTimer = undefined;
     }
 
@@ -1260,3 +1350,4 @@ export class WindowLayoutsModal extends Modal {
 
 
 }
+

@@ -1,13 +1,18 @@
 import { App, PluginSettingTab, Setting, Notice, Modal } from "obsidian";
 import { t } from "./i18n";
+import WindowSpacesPlugin from "./main";
 
 export class WindowSpacesSettingTab extends PluginSettingTab {
-  private plugin: any;
-  private autoSaveTimeout: NodeJS.Timeout | null = null;
+  private plugin: WindowSpacesPlugin;
+  private autoSaveTimeout: number | ReturnType<typeof window.setTimeout> | null = null;
 
-  constructor(app: App, plugin: any) {
+  constructor(app: App, plugin: WindowSpacesPlugin) {
     super(app, plugin);
     this.plugin = plugin;
+  }
+
+  getSettingDefinitions(): unknown[] {
+    return [];
   }
 
   display(): void {
@@ -116,16 +121,16 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
     this.plugin.registerEvent(
       this.app.workspace.on("layout-change", () => {
         if (this.plugin.settings.autoSave) {
-          if (this.autoSaveTimeout) {
-            clearTimeout(this.autoSaveTimeout);
+          if (this.autoSaveTimeout !== null) {
+            window.clearTimeout(this.autoSaveTimeout as number);
           }
-          this.autoSaveTimeout = setTimeout(async () => {
+          this.autoSaveTimeout = window.setTimeout(async () => {
             try {
               const layout = await this.plugin.manager.captureCurrentLayout({
                 name: t("settings.autoSaveEnabled"),
               });
               await this.plugin.manager.saveLayout(layout);
-            } catch (error) {
+            } catch (error: unknown) {
               console.warn("Auto save failed:", error);
             }
           }, 2000);
@@ -135,8 +140,8 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
   }
 
   private removeAutoSave() {
-    if (this.autoSaveTimeout) {
-      clearTimeout(this.autoSaveTimeout);
+    if (this.autoSaveTimeout !== null) {
+      window.clearTimeout(this.autoSaveTimeout as number);
       this.autoSaveTimeout = null;
     }
   }
@@ -175,3 +180,4 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
     });
   }
 }
+

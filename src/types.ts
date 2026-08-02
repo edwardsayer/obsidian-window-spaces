@@ -1,3 +1,5 @@
+import { WorkspaceLeaf } from "obsidian";
+
 export interface WindowLayout {
   id: string;
   name: string;
@@ -32,8 +34,56 @@ export interface WorkspaceState {
 export interface ViewState {
   id: string;
   type: string;
-  state: any;
+  state: Record<string, unknown>;
   pinned?: boolean;
+}
+
+export interface ExtendedWorkspaceLeaf extends WorkspaceLeaf {
+  id?: string;
+  containerEl: HTMLElement;
+  getViewState(): ViewState;
+  setViewState(state: { type: string; state?: Record<string, unknown> }): Promise<void>;
+  rebuildView?(): void;
+}
+
+export interface WorkspaceItem {
+  id?: string;
+  type?: string;
+  children?: WorkspaceItem[];
+  leaves?: ExtendedWorkspaceLeaf[];
+  win?: Window;
+  doc?: Document;
+  containerEl?: HTMLElement;
+}
+
+export interface WorkspaceSplit extends WorkspaceItem {
+  direction?: string;
+}
+
+export interface WorkspaceWindow {
+  win: Window;
+  children?: WorkspaceItem[];
+  getLayout(): Record<string, unknown>;
+}
+
+export interface ExtendedWorkspace {
+  leftSplit?: WorkspaceSplit;
+  rightSplit?: WorkspaceSplit;
+  rootSplit?: WorkspaceSplit;
+  floatingSplit?: {
+    children?: WorkspaceWindow[];
+  };
+  activeLeaf: WorkspaceLeaf | null;
+  iterateAllLeaves(callback: (leaf: WorkspaceLeaf) => void | boolean): void;
+  getLeftLeaf(split: boolean): WorkspaceLeaf;
+  getRightLeaf(split: boolean): WorkspaceLeaf;
+  getLeaf(type?: string): WorkspaceLeaf;
+  setActiveLeaf(leaf: WorkspaceLeaf, params?: { focus?: boolean }): void;
+  revealLeaf(leaf: WorkspaceLeaf): Promise<void>;
+  on(name: "window-open" | "window-close", callback: (workspaceWindow: unknown, window: Window) => void): any;
+  on(name: "layout-change" | "active-leaf-change", callback: () => void): any;
+  getLayout(): Record<string, unknown>;
+  changeLayout(layout: Record<string, unknown>): Promise<void>;
 }
 
 export interface LayoutMetadata {
@@ -81,3 +131,4 @@ export interface RestoreLayoutOptions {
    */
   focusExistingWindow?: boolean;
 }
+
