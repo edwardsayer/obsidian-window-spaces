@@ -4,6 +4,8 @@ import {
   WindowSettings,
   ExtendedWorkspace,
   ExtendedWorkspaceLeaf,
+  WorkspaceParent,
+  WorkspaceSplit,
 } from "./types";
 import { WindowLayoutManager } from "./manager";
 import { SaveLayoutModal } from "./modals/saveModal";
@@ -270,7 +272,7 @@ export default class WindowSpacesPlugin extends Plugin {
     }
 
     // 處理在 Main Window 開啟
-    let root: any;
+    let root: WorkspaceSplit | undefined;
     if (location === "left") {
       root = workspace.leftSplit;
     } else if (location === "right") {
@@ -361,9 +363,9 @@ export default class WindowSpacesPlugin extends Plugin {
       }
 
       const targetNode = getTopLevelNodeInWindow(editorLeaf) || editorLeaf;
-      const isParentNode = targetNode !== editorLeaf && Boolean((targetNode as any).children);
+      const isParentNode = targetNode !== editorLeaf && Boolean((targetNode as WorkspaceParent).children);
       const before = location === "left" ? !isParentNode : isParentNode;
-      const panelLeaf = workspace.createLeafBySplit(targetNode, "vertical", before);
+      const panelLeaf = workspace.createLeafBySplit(targetNode as unknown as WorkspaceLeaf, "vertical", before);
 
       await panelLeaf.setViewState({
         type: WINDOW_LAYOUTS_VIEW_TYPE,
@@ -381,7 +383,7 @@ export default class WindowSpacesPlugin extends Plugin {
     // location === "tab" (在 Popout 編輯器中央區域開啟/切換)
     const allPanes = columns.reduce((acc, col) => acc.concat(col.panes), [] as PopoutPane[]);
     const targetPane = pickCenterPopoutPane(allPanes, win);
-    const targetTabs = targetPane ? targetPane.tabs : (this.getActiveLeafInWindow(win)?.parent as any);
+    const targetTabs = targetPane ? targetPane.tabs : ((this.getActiveLeafInWindow(win) as unknown as ExtendedWorkspaceLeaf | null)?.parent);
 
     if (targetTabs) {
       const existingInTarget = findLeafInTabs(targetTabs, WINDOW_LAYOUTS_VIEW_TYPE);
@@ -436,7 +438,7 @@ export default class WindowSpacesPlugin extends Plugin {
       return leaf;
     }
 
-    const tabs = baseLeaf.parent as any;
+    const tabs = (baseLeaf as unknown as ExtendedWorkspaceLeaf).parent;
     if (tabs) {
       const existingInTabs = findLeafInTabs(tabs, WINDOW_LAYOUTS_VIEW_TYPE);
       if (existingInTabs) {
@@ -448,7 +450,7 @@ export default class WindowSpacesPlugin extends Plugin {
     return this.openPanelInTabs(tabs);
   }
 
-  private async openPanelInTabs(tabs: any): Promise<WorkspaceLeaf> {
+  private async openPanelInTabs(tabs: WorkspaceParent | null | undefined): Promise<WorkspaceLeaf> {
     const workspace = this.app.workspace;
     const children = (tabs?.children ?? []) as WorkspaceLeaf[];
 
@@ -460,7 +462,7 @@ export default class WindowSpacesPlugin extends Plugin {
       }
     }
 
-    const leaf = workspace.createLeafInParent(tabs, children.length);
+    const leaf = workspace.createLeafInParent(tabs as unknown as Parameters<typeof workspace.createLeafInParent>[0], children.length);
     await leaf.setViewState({
       type: WINDOW_LAYOUTS_VIEW_TYPE,
       active: true,
@@ -501,14 +503,15 @@ export default class WindowSpacesPlugin extends Plugin {
   }
 
   private collectPopoutPanes(win: Window): PopoutPane[] {
-    const tabsSet = new Set<any>();
+    const tabsSet = new Set<WorkspaceParent>();
 
     this.app.workspace.iterateAllLeaves((leaf: WorkspaceLeaf) => {
       if (getWindowOfLeaf(leaf) !== win) {
         return;
       }
-      if (leaf.parent) {
-        tabsSet.add(leaf.parent);
+      const parent = (leaf as unknown as ExtendedWorkspaceLeaf).parent;
+      if (parent) {
+        tabsSet.add(parent);
       }
     });
 
@@ -525,7 +528,9 @@ export default class WindowSpacesPlugin extends Plugin {
   }
 
   private getActiveLeafInWindow(win: Window): WorkspaceLeaf | null {
-    const activeLeaf = this.app.workspace.activeLeaf;
+    const activeLeaf = typeof this.app.workspace.getMostRecentLeaf === "function"
+      ? this.app.workspace.getMostRecentLeaf()
+      : (this.app.workspace as ExtendedWorkspace).activeLeaf;
     return activeLeaf && getWindowOfLeaf(activeLeaf) === win ? activeLeaf : null;
   }
 
@@ -598,7 +603,7 @@ export default class WindowSpacesPlugin extends Plugin {
 }
 
 interface PopoutPane {
-  tabs: any;
+  tabs: WorkspaceParent;
   left: number;
   width?: number;
   center: number;
@@ -613,15 +618,16 @@ interface PopoutColumn {
 const INITIAL_SPLIT_RATIO = 0.34;
 
 function getWindowOfLeaf(leaf: WorkspaceLeaf): Window | null {
-  const container = (leaf.view as any)?.containerEl;
+  const extLeaf = leaf as unknown as ExtendedWorkspaceLeaf;
+  const container = extLeaf.containerEl || (leaf.view as { containerEl?: HTMLElement } | null)?.containerEl;
   return container?.ownerDocument?.defaultView ?? null;
 }
 
-function getTopLevelNodeInWindow(leaf: WorkspaceLeaf): any {
-  let curr: any = leaf;
-  while (curr && curr.parent) {
-    const parent = curr.parent;
-    if (!parent.parent || parent.type === "root" || parent.isRoot || parent.kind === "root") {
+function getTopLevelNodeInWindow(leaf: WorkspaceLeaf): WorkspaceLeaf | WorkspaceParent {
+  let curr: WorkspaceLeaf | WorkspaceParent = leaf;
+  while (curr && (curr as WorkspaceParent).parent) {
+    const parent = (curr as WorkspaceParent).parent;
+    if (!parent || !parent.parent || parent.type === "root" || parent.isRoot || parent.kind === "root") {
       return curr;
     }
     curr = parent;
@@ -629,7 +635,7 @@ function getTopLevelNodeInWindow(leaf: WorkspaceLeaf): any {
   return curr;
 }
 
-function getPaneRect(tabs: any): DOMRect | null {
+function getPaneRect(tabs: WorkspaceParent): DOMRect | null {
   const container = tabs?.containerEl;
   if (container instanceof HTMLElement) {
     const rect = container.getBoundingClientRect();
@@ -637,7 +643,8 @@ function getPaneRect(tabs: any): DOMRect | null {
   }
   const children = (tabs?.children ?? []) as WorkspaceLeaf[];
   for (const leaf of children) {
-    const leafContainer = (leaf.view as any)?.containerEl;
+    const extLeaf = leaf as unknown as ExtendedWorkspaceLeaf;
+    const leafContainer = extLeaf.containerEl || (leaf.view as { containerEl?: HTMLElement } | null)?.containerEl;
     if (leafContainer instanceof HTMLElement) {
       const rect = leafContainer.getBoundingClientRect();
       if (rect.width > 0 && rect.height > 0) return rect;
@@ -648,7 +655,7 @@ function getPaneRect(tabs: any): DOMRect | null {
 
 interface SidebarInfo {
   pane: PopoutPane;
-  tabs: any;
+  tabs: WorkspaceParent;
 }
 
 function findTrueLeftSidebar(win: Window, columns: PopoutColumn[]): SidebarInfo | null {
@@ -688,7 +695,6 @@ function findTrueRightSidebar(win: Window, columns: PopoutColumn[]): SidebarInfo
 
   return { pane, tabs: pane.tabs };
 }
-
 
 function pickCenterPopoutPane(panes: PopoutPane[], win: Window): PopoutPane | null {
   const firstPane = panes[0];
@@ -736,12 +742,26 @@ function applyInitialSplitSizing(
   const editorPane = getDirectSplitChild(split, editorContainer);
   if (!panelPane || !editorPane || panelPane === editorPane) return;
 
-  panelPane.style.flex = `0 0 ${INITIAL_SPLIT_RATIO * 100}%`;
-  editorPane.style.flex = "1 1 0%";
+  setElementCssStyles(panelPane, { flex: `0 0 ${INITIAL_SPLIT_RATIO * 100}%` });
+  setElementCssStyles(editorPane, { flex: "1 1 0%" });
+}
+
+function setElementCssStyles(el: HTMLElement, styles: Record<string, string>): void {
+  const customEl = el as unknown as { setCssStyles?: (styles: Record<string, string>) => void; setCssProps?: (props: Record<string, string>) => void };
+  if (typeof customEl.setCssStyles === "function") {
+    customEl.setCssStyles(styles);
+  } else if (typeof customEl.setCssProps === "function") {
+    customEl.setCssProps(styles);
+  } else {
+    for (const [key, value] of Object.entries(styles)) {
+      el.style.setProperty(key, value);
+    }
+  }
 }
 
 function getViewContainer(leaf: WorkspaceLeaf): HTMLElement | null {
-  const container = (leaf.view as any)?.containerEl;
+  const extLeaf = leaf as unknown as ExtendedWorkspaceLeaf;
+  const container = extLeaf.containerEl || (leaf.view as { containerEl?: HTMLElement } | null)?.containerEl;
   return container instanceof HTMLElement ? container : null;
 }
 
@@ -753,7 +773,7 @@ function getDirectSplitChild(split: HTMLElement, element: HTMLElement): HTMLElem
   return current;
 }
 
-function findLeafInTabs(tabs: any, viewType: string): WorkspaceLeaf | null {
+function findLeafInTabs(tabs: WorkspaceParent | null | undefined, viewType: string): WorkspaceLeaf | null {
   const children = (tabs?.children ?? []) as WorkspaceLeaf[];
   for (const leaf of children) {
     if (leaf.getViewState()?.type === viewType) {
@@ -763,12 +783,13 @@ function findLeafInTabs(tabs: any, viewType: string): WorkspaceLeaf | null {
   return null;
 }
 
-function findLeafInRoot(workspace: any, root: any, viewType: string): WorkspaceLeaf | null {
+function findLeafInRoot(workspace: ExtendedWorkspace, root: WorkspaceSplit | undefined, viewType: string): WorkspaceLeaf | null {
   if (!root) return null;
   let found: WorkspaceLeaf | null = null;
   workspace.iterateAllLeaves((leaf: WorkspaceLeaf) => {
     if (found) return;
-    if ((leaf as any).getRoot?.() === root && leaf.getViewState()?.type === viewType) {
+    const extLeaf = leaf as unknown as ExtendedWorkspaceLeaf;
+    if (extLeaf.getRoot?.() === root && leaf.getViewState()?.type === viewType) {
       found = leaf;
     }
   });

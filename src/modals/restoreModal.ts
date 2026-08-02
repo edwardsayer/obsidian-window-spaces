@@ -20,7 +20,7 @@ export class WindowLayoutsModal extends Modal {
   private panelRootEl?: HTMLElement;
   private panelMode = false;
   private externalHostClose?: () => void;
-  private initialFocusTimer?: number | ReturnType<typeof window.setTimeout>;
+  private initialFocusTimer?: number;
   private initialSearchQuery?: string;
   private clearSearchBtn?: HTMLElement;
 
@@ -213,20 +213,20 @@ export class WindowLayoutsModal extends Modal {
     const instructionsEl = contentEl.createDiv("prompt-instructions window-layouts-instructions");
 
     const navInst = instructionsEl.createDiv("prompt-instruction");
-    navInst.createEl("span", { text: "↑ ↓", cls: "prompt-instruction-command" });
-    navInst.createEl("span", { text: t("instructions.navigate") });
+    navInst.createSpan({ text: "↑ ↓", cls: "prompt-instruction-command" });
+    navInst.createSpan({ text: t("instructions.navigate") });
 
     const useInst = instructionsEl.createDiv("prompt-instruction");
-    useInst.createEl("span", { text: "Shift ↵", cls: "prompt-instruction-command" });
-    useInst.createEl("span", { text: t("instructions.use") });
+    useInst.createSpan({ text: "Shift ↵", cls: "prompt-instruction-command" });
+    useInst.createSpan({ text: t("instructions.use") });
 
     const newWinInst = instructionsEl.createDiv("prompt-instruction");
-    newWinInst.createEl("span", { text: "↵", cls: "prompt-instruction-command" });
-    newWinInst.createEl("span", { text: t("instructions.useNewWindow") });
+    newWinInst.createSpan({ text: "↵", cls: "prompt-instruction-command" });
+    newWinInst.createSpan({ text: t("instructions.useNewWindow") });
 
     const dismissInst = instructionsEl.createDiv("prompt-instruction");
-    dismissInst.createEl("span", { text: "esc", cls: "prompt-instruction-command" });
-    dismissInst.createEl("span", { text: t("instructions.dismiss") });
+    dismissInst.createSpan({ text: "esc", cls: "prompt-instruction-command" });
+    dismissInst.createSpan({ text: t("instructions.dismiss") });
 
     const targetDoc = contentEl.ownerDocument || document;
     const targetWindow = targetDoc.defaultView || window;
@@ -341,7 +341,7 @@ export class WindowLayoutsModal extends Modal {
 
     if (this.initialFocusTimer !== undefined) {
       const timerWindow = this.modalEl?.ownerDocument?.defaultView || window;
-      timerWindow.clearTimeout(this.initialFocusTimer as number);
+      timerWindow.clearTimeout(this.initialFocusTimer);
     }
 
     const focusWindow = this.modalEl?.ownerDocument?.defaultView || window;
@@ -409,6 +409,7 @@ export class WindowLayoutsModal extends Modal {
    * toolbar actions as the persistent panels.
    */
   public mountHeaderActions(titleEl: HTMLElement): void {
+    titleEl.classList.add("has-header-actions");
     if (titleEl.querySelector(".window-layouts-header-actions")) return;
     this.createHeaderActions(titleEl);
   }
@@ -673,7 +674,7 @@ export class WindowLayoutsModal extends Modal {
         title.createSpan({ text: rawQuery });
 
         const aux = createItem.createDiv("suggestion-aux qsp-aux");
-        aux.createEl("span", {
+        aux.createSpan({
           text: t("manageModal.enterToCreate") || "Enter to create",
           cls: "suggestion-flair",
         });
@@ -903,7 +904,7 @@ export class WindowLayoutsModal extends Modal {
 
     this.setFilesTooltipForLayout(layoutEl, layout);
 
-    let holdTimer: number | ReturnType<typeof window.setTimeout> | null = null;
+    let holdTimer: number | null = null;
     let isLongPress = false;
 
     const isActionButtonTarget = (target: EventTarget | null): boolean =>
@@ -911,7 +912,7 @@ export class WindowLayoutsModal extends Modal {
 
     const cancelHold = () => {
       if (holdTimer !== null) {
-        window.clearTimeout(holdTimer as number);
+        window.clearTimeout(holdTimer);
         holdTimer = null;
       }
     };
@@ -948,11 +949,11 @@ export class WindowLayoutsModal extends Modal {
     const i18n = getI18n();
     const pathEl = noteEl.createDiv("qsp-path");
 
-    pathEl.createEl("span", {
+    pathEl.createSpan({
       text: `${t("manageModal.updatedDate")}: ${i18n.formatDate(new Date(layout.updatedAt || layout.timestamp || layout.createdAt || Date.now()))}`,
       cls: "layout-date",
     });
-    pathEl.createEl("span", {
+    pathEl.createSpan({
       text: `${t("manageModal.fileCount")}: ${layout.metadata?.fileCount || 0}`,
       cls: "layout-files",
     });
@@ -962,7 +963,7 @@ export class WindowLayoutsModal extends Modal {
       : null;
 
     if (openWin) {
-      pathEl.createEl("span", {
+      pathEl.createSpan({
         text: `🟢 ${t("manageModal.windowOpenBadge") || "視窗開啟中"}`,
         cls: "layout-open-status",
       });

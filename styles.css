@@ -437,7 +437,7 @@
 }
 
 /* Hide standard view-header for Window Spaces leaves in both tab and sidebar, matching File Explorer */
-.workspace-leaf:has([data-type="window-spaces-layouts"]) .view-header,
+.workspace-leaf.mod-window-spaces-leaf .view-header,
 .workspace-leaf-content[data-type="window-spaces-layouts"] ~ .view-header,
 .workspace-leaf-content[data-type="window-spaces-layouts"] .view-header {
   display: none !important;
@@ -885,12 +885,12 @@
 
 /* Reserve the native close-button zone when header actions are present so
    the panel menu button never sits underneath the X in popup windows. */
-.window-layouts-modal .modal-title:has(.window-layouts-header-actions) {
+.window-layouts-modal .modal-title.has-header-actions {
   padding-right: 32px;
 }
 
 /* Keep the native close X and the Window Spaces actions as separate controls. */
-.window-layouts-popout-modal .modal-title:has(.window-layouts-header-actions) {
+.window-layouts-popout-modal .modal-title.has-header-actions {
   padding-right: 0;
 }
 

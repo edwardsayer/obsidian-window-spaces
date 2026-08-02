@@ -7,6 +7,7 @@ import {
   RestoreLayoutOptions,
   ExtendedWorkspace,
   ExtendedWorkspaceLeaf,
+  WorkspaceItem,
   WindowSettings,
 } from "./types";
 import { t, tWithParams, getI18n } from "./i18n";
@@ -164,7 +165,7 @@ export class WindowLayoutManager {
     const existing = body.querySelector<HTMLElement>(`.${className}`);
     if (existing) return existing;
 
-    const element = body.createEl("div", { cls: className });
+    const element = body.createDiv({ cls: className });
     return element;
   }
 
@@ -175,18 +176,18 @@ export class WindowLayoutManager {
   ): void {
     let iconElement = element.querySelector<HTMLElement>(".window-spaces-layout-icon");
     if (!iconElement) {
-      iconElement = element.createEl("span", { cls: "window-spaces-layout-icon" });
+      iconElement = element.createSpan({ cls: "window-spaces-layout-icon" });
       setIcon(iconElement, "history");
     }
 
     let nameElement = element.querySelector<HTMLElement>(".window-spaces-layout-name");
     if (!nameElement) {
-      nameElement = element.createEl("span", { cls: "window-spaces-layout-name" });
+      nameElement = element.createSpan({ cls: "window-spaces-layout-name" });
     }
 
     let actionsElement = element.querySelector<HTMLElement>(".window-spaces-layout-actions");
     if (!actionsElement) {
-      actionsElement = element.createEl("div", { cls: "window-spaces-layout-actions" });
+      actionsElement = element.createDiv({ cls: "window-spaces-layout-actions" });
     }
 
     const ensureActionButton = (
@@ -195,9 +196,9 @@ export class WindowLayoutManager {
       label: string,
       onClick: (e: MouseEvent) => void
     ): HTMLButtonElement => {
-      let button = actionsElement!.querySelector<HTMLButtonElement>(`.${className}`);
-      if (!button) {
-        button = actionsElement!.createEl("button", {
+      let button = actionsElement ? actionsElement.querySelector<HTMLButtonElement>(`.${className}`) : null;
+      if (!button && actionsElement) {
+        button = actionsElement.createEl("button", {
           cls: `window-spaces-layout-action ${className} clickable-icon`,
           attr: { type: "button" },
         });
@@ -331,7 +332,7 @@ export class WindowLayoutManager {
     }
   }
 
-  private autoSaveTimers = new Map<Window, number | ReturnType<typeof window.setTimeout>>();
+  private autoSaveTimers = new Map<Window, number>();
   private lastValidSnapshots = new Map<Window, WindowLayout>();
 
   /**
@@ -355,7 +356,7 @@ export class WindowLayoutManager {
         // 2. 設置 5 秒 Debounce 定時器
         const existingTimer = this.autoSaveTimers.get(targetWin);
         if (existingTimer !== undefined) {
-          window.clearTimeout(existingTimer as number);
+          window.clearTimeout(existingTimer);
         }
 
         const timer = window.setTimeout(() => {
@@ -429,7 +430,7 @@ export class WindowLayoutManager {
     // 1. 若有待發動的 5 秒 Debounce 定時器，將其清除
     const timer = this.autoSaveTimers.get(targetWin);
     if (timer !== undefined) {
-      window.clearTimeout(timer as number);
+      window.clearTimeout(timer);
       this.autoSaveTimers.delete(targetWin);
     }
 
@@ -525,7 +526,9 @@ export class WindowLayoutManager {
           targetLeaf = preferredLeaf;
         } else {
           // 若無指定 preferredLeaf，優先保留當前視窗原有的 activeLeaf
-          const activeLeaf = this.app.workspace.activeLeaf;
+          const activeLeaf = typeof this.app.workspace.getMostRecentLeaf === "function"
+            ? this.app.workspace.getMostRecentLeaf()
+            : (this.app.workspace as ExtendedWorkspace).activeLeaf;
           if (activeLeaf && freshLeaves.includes(activeLeaf)) {
             targetLeaf = activeLeaf;
           } else {
@@ -1213,8 +1216,9 @@ export class WindowLayoutManager {
    */
   getLivePopoutWindows(): Window[] {
     const wins: Window[] = [];
-    (this.app.workspace as any).iterateAllLeaves((leaf: WorkspaceLeaf) => {
-      const win = (leaf as any).containerEl?.ownerDocument?.defaultView as Window | undefined;
+    (this.app.workspace as ExtendedWorkspace).iterateAllLeaves((leaf: WorkspaceLeaf) => {
+      const extLeaf = leaf as unknown as ExtendedWorkspaceLeaf;
+      const win = extLeaf.containerEl?.ownerDocument?.defaultView;
       if (win && this.isPopoutDocument(win.document) && !wins.includes(win)) {
         wins.push(win);
       }
@@ -1227,9 +1231,10 @@ export class WindowLayoutManager {
    */
   getActiveWindow(): Window {
     const activeLeaf = this.getActiveLeafForCurrentWindow();
-    if (activeLeaf && (activeLeaf as any).containerEl) {
-      const ownerDocument = (activeLeaf as any).containerEl.ownerDocument;
-      if (ownerDocument && ownerDocument.defaultView) {
+    if (activeLeaf) {
+      const extLeaf = activeLeaf as unknown as ExtendedWorkspaceLeaf;
+      const ownerDocument = extLeaf.containerEl?.ownerDocument;
+      if (ownerDocument?.defaultView) {
         return ownerDocument.defaultView;
       }
     }
@@ -1243,9 +1248,10 @@ export class WindowLayoutManager {
     const activeLeaf = this.getActiveLeafForCurrentWindow();
     let currentWindow = typeof activeWindow !== "undefined" ? activeWindow : window;
 
-    if (activeLeaf && (activeLeaf as any).containerEl) {
-      const ownerDocument = (activeLeaf as any).containerEl.ownerDocument;
-      if (ownerDocument && ownerDocument.defaultView) {
+    if (activeLeaf) {
+      const extLeaf = activeLeaf as unknown as ExtendedWorkspaceLeaf;
+      const ownerDocument = extLeaf.containerEl?.ownerDocument;
+      if (ownerDocument?.defaultView) {
         currentWindow = ownerDocument.defaultView;
       }
     }
@@ -1407,14 +1413,15 @@ export class WindowLayoutManager {
     const windowLeaves = this.getLeavesForWindow(targetWin);
 
     for (const leaf of windowLeaves) {
-      const root = typeof (leaf as any).getRoot === "function"
-        ? (leaf as any).getRoot()
+      const extLeaf = leaf as unknown as ExtendedWorkspaceLeaf;
+      const root = typeof extLeaf.getRoot === "function"
+        ? (extLeaf.getRoot() as WorkspaceItem | null)
         : null;
-      const rootLayout = root && typeof root.getLayout === "function"
-        ? root.getLayout()
+      const rootLayout = root && typeof (root as { getLayout?: () => WorkspaceItem }).getLayout === "function"
+        ? (root as { getLayout: () => WorkspaceItem }).getLayout()
         : null;
       const rootIds = new Set(
-        [(root as any)?.id, rootLayout?.id].filter((id): id is string => !!id)
+        [root?.id, rootLayout?.id].filter((id): id is string => !!id)
       );
       if (rootIds.size === 0) continue;
 

@@ -152,6 +152,8 @@ agents/
 .claude/
 .gemini/
 .brain/
+.codewhale/
+.crush/
 .idea/
 .vscode/
 

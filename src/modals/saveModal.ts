@@ -54,7 +54,7 @@ export class SaveLayoutModal extends Modal {
     // 佈局資訊顯示
     const i18n = getI18n();
     const infoEl = contentEl.createDiv();
-    infoEl.createEl("div", {
+    infoEl.createDiv({
       text: t("saveModal.infoSection"),
       cls: "setting-item-name ws-info-title",
     });

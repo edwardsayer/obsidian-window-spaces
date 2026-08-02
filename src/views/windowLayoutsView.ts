@@ -38,6 +38,7 @@ export class WindowLayoutsView extends ItemView {
   }
 
   async onOpen(): Promise<void> {
+    this.containerEl.closest(".workspace-leaf")?.classList.add("mod-window-spaces-leaf");
     this.contentController = new WindowLayoutsModal(this.app, this.plugin);
     // The panel is considered active when Obsidian marks its leaf as the
     // active leaf. Clicking the panel (or its tab) and opening it via a

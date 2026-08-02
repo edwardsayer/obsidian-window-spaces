@@ -4,7 +4,7 @@ import WindowSpacesPlugin from "./main";
 
 export class WindowSpacesSettingTab extends PluginSettingTab {
   private plugin: WindowSpacesPlugin;
-  private autoSaveTimeout: number | ReturnType<typeof window.setTimeout> | null = null;
+  private autoSaveTimeout: number | null = null;
 
   constructor(app: App, plugin: WindowSpacesPlugin) {
     super(app, plugin);
@@ -122,7 +122,7 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
       this.app.workspace.on("layout-change", () => {
         if (this.plugin.settings.autoSave) {
           if (this.autoSaveTimeout !== null) {
-            window.clearTimeout(this.autoSaveTimeout as number);
+            window.clearTimeout(this.autoSaveTimeout);
           }
           this.autoSaveTimeout = window.setTimeout(async () => {
             try {
@@ -141,7 +141,7 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
 
   private removeAutoSave() {
     if (this.autoSaveTimeout !== null) {
-      window.clearTimeout(this.autoSaveTimeout as number);
+      window.clearTimeout(this.autoSaveTimeout);
       this.autoSaveTimeout = null;
     }
   }

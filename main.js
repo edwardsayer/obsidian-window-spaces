@@ -887,17 +887,17 @@ class WindowLayoutsModal extends obsidian.Modal {
         this.renderLayouts();
         const instructionsEl = contentEl.createDiv("prompt-instructions window-layouts-instructions");
         const navInst = instructionsEl.createDiv("prompt-instruction");
-        navInst.createEl("span", { text: "↑ ↓", cls: "prompt-instruction-command" });
-        navInst.createEl("span", { text: t("instructions.navigate") });
+        navInst.createSpan({ text: "↑ ↓", cls: "prompt-instruction-command" });
+        navInst.createSpan({ text: t("instructions.navigate") });
         const useInst = instructionsEl.createDiv("prompt-instruction");
-        useInst.createEl("span", { text: "Shift ↵", cls: "prompt-instruction-command" });
-        useInst.createEl("span", { text: t("instructions.use") });
+        useInst.createSpan({ text: "Shift ↵", cls: "prompt-instruction-command" });
+        useInst.createSpan({ text: t("instructions.use") });
         const newWinInst = instructionsEl.createDiv("prompt-instruction");
-        newWinInst.createEl("span", { text: "↵", cls: "prompt-instruction-command" });
-        newWinInst.createEl("span", { text: t("instructions.useNewWindow") });
+        newWinInst.createSpan({ text: "↵", cls: "prompt-instruction-command" });
+        newWinInst.createSpan({ text: t("instructions.useNewWindow") });
         const dismissInst = instructionsEl.createDiv("prompt-instruction");
-        dismissInst.createEl("span", { text: "esc", cls: "prompt-instruction-command" });
-        dismissInst.createEl("span", { text: t("instructions.dismiss") });
+        dismissInst.createSpan({ text: "esc", cls: "prompt-instruction-command" });
+        dismissInst.createSpan({ text: t("instructions.dismiss") });
         const targetDoc = contentEl.ownerDocument || document;
         const targetWindow = targetDoc.defaultView || window;
         this.removeKeydownListener();
@@ -1054,6 +1054,7 @@ class WindowLayoutsModal extends obsidian.Modal {
      * toolbar actions as the persistent panels.
      */
     mountHeaderActions(titleEl) {
+        titleEl.classList.add("has-header-actions");
         if (titleEl.querySelector(".window-layouts-header-actions"))
             return;
         this.createHeaderActions(titleEl);
@@ -1316,7 +1317,7 @@ class WindowLayoutsModal extends obsidian.Modal {
                 const title = content.createDiv("suggestion-title qsp-title");
                 title.createSpan({ text: rawQuery });
                 const aux = createItem.createDiv("suggestion-aux qsp-aux");
-                aux.createEl("span", {
+                aux.createSpan({
                     text: t("manageModal.enterToCreate") || "Enter to create",
                     cls: "suggestion-flair",
                 });
@@ -1552,11 +1553,11 @@ class WindowLayoutsModal extends obsidian.Modal {
         const noteEl = itemContentEl.createDiv("suggestion-note qsp-note");
         const i18n = getI18n();
         const pathEl = noteEl.createDiv("qsp-path");
-        pathEl.createEl("span", {
+        pathEl.createSpan({
             text: `${t("manageModal.updatedDate")}: ${i18n.formatDate(new Date(layout.updatedAt || layout.timestamp || layout.createdAt || Date.now()))}`,
             cls: "layout-date",
         });
-        pathEl.createEl("span", {
+        pathEl.createSpan({
             text: `${t("manageModal.fileCount")}: ${((_a = layout.metadata) === null || _a === void 0 ? void 0 : _a.fileCount) || 0}`,
             cls: "layout-files",
         });
@@ -1564,7 +1565,7 @@ class WindowLayoutsModal extends obsidian.Modal {
             ? this.plugin.manager.getOpenWindowForLayout(layout)
             : null;
         if (openWin) {
-            pathEl.createEl("span", {
+            pathEl.createSpan({
                 text: `🟢 ${t("manageModal.windowOpenBadge") || "視窗開啟中"}`,
                 cls: "layout-open-status",
             });
@@ -2019,26 +2020,26 @@ class WindowLayoutManager {
         const existing = body.querySelector(`.${className}`);
         if (existing)
             return existing;
-        const element = body.createEl("div", { cls: className });
+        const element = body.createDiv({ cls: className });
         return element;
     }
     updateLayoutLabelElement(element, layoutName, targetWin) {
         let iconElement = element.querySelector(".window-spaces-layout-icon");
         if (!iconElement) {
-            iconElement = element.createEl("span", { cls: "window-spaces-layout-icon" });
+            iconElement = element.createSpan({ cls: "window-spaces-layout-icon" });
             obsidian.setIcon(iconElement, "history");
         }
         let nameElement = element.querySelector(".window-spaces-layout-name");
         if (!nameElement) {
-            nameElement = element.createEl("span", { cls: "window-spaces-layout-name" });
+            nameElement = element.createSpan({ cls: "window-spaces-layout-name" });
         }
         let actionsElement = element.querySelector(".window-spaces-layout-actions");
         if (!actionsElement) {
-            actionsElement = element.createEl("div", { cls: "window-spaces-layout-actions" });
+            actionsElement = element.createDiv({ cls: "window-spaces-layout-actions" });
         }
         const ensureActionButton = (className, icon, label, onClick) => {
-            let button = actionsElement.querySelector(`.${className}`);
-            if (!button) {
+            let button = actionsElement ? actionsElement.querySelector(`.${className}`) : null;
+            if (!button && actionsElement) {
                 button = actionsElement.createEl("button", {
                     cls: `window-spaces-layout-action ${className} clickable-icon`,
                     attr: { type: "button" },
@@ -2321,7 +2322,9 @@ class WindowLayoutManager {
                 }
                 else {
                     // 若無指定 preferredLeaf，優先保留當前視窗原有的 activeLeaf
-                    const activeLeaf = this.app.workspace.activeLeaf;
+                    const activeLeaf = typeof this.app.workspace.getMostRecentLeaf === "function"
+                        ? this.app.workspace.getMostRecentLeaf()
+                        : this.app.workspace.activeLeaf;
                     if (activeLeaf && freshLeaves.includes(activeLeaf)) {
                         targetLeaf = activeLeaf;
                     }
@@ -2947,7 +2950,8 @@ class WindowLayoutManager {
         const wins = [];
         this.app.workspace.iterateAllLeaves((leaf) => {
             var _a, _b;
-            const win = (_b = (_a = leaf.containerEl) === null || _a === void 0 ? void 0 : _a.ownerDocument) === null || _b === void 0 ? void 0 : _b.defaultView;
+            const extLeaf = leaf;
+            const win = (_b = (_a = extLeaf.containerEl) === null || _a === void 0 ? void 0 : _a.ownerDocument) === null || _b === void 0 ? void 0 : _b.defaultView;
             if (win && this.isPopoutDocument(win.document) && !wins.includes(win)) {
                 wins.push(win);
             }
@@ -2958,10 +2962,12 @@ class WindowLayoutManager {
      * 獲取當前活發對應的 DOM Window (包含當前命令發起所在 Popout 視窗)
      */
     getActiveWindow() {
+        var _a;
         const activeLeaf = this.getActiveLeafForCurrentWindow();
-        if (activeLeaf && activeLeaf.containerEl) {
-            const ownerDocument = activeLeaf.containerEl.ownerDocument;
-            if (ownerDocument && ownerDocument.defaultView) {
+        if (activeLeaf) {
+            const extLeaf = activeLeaf;
+            const ownerDocument = (_a = extLeaf.containerEl) === null || _a === void 0 ? void 0 : _a.ownerDocument;
+            if (ownerDocument === null || ownerDocument === void 0 ? void 0 : ownerDocument.defaultView) {
                 return ownerDocument.defaultView;
             }
         }
@@ -2971,11 +2977,13 @@ class WindowLayoutManager {
      * 獲取當前視窗狀態
      */
     getCurrentWindowState() {
+        var _a;
         const activeLeaf = this.getActiveLeafForCurrentWindow();
         let currentWindow = typeof activeWindow !== "undefined" ? activeWindow : window;
-        if (activeLeaf && activeLeaf.containerEl) {
-            const ownerDocument = activeLeaf.containerEl.ownerDocument;
-            if (ownerDocument && ownerDocument.defaultView) {
+        if (activeLeaf) {
+            const extLeaf = activeLeaf;
+            const ownerDocument = (_a = extLeaf.containerEl) === null || _a === void 0 ? void 0 : _a.ownerDocument;
+            if (ownerDocument === null || ownerDocument === void 0 ? void 0 : ownerDocument.defaultView) {
                 currentWindow = ownerDocument.defaultView;
             }
         }
@@ -3119,8 +3127,9 @@ class WindowLayoutManager {
     findFloatingWindowIndexForWindow(targetWin, floatingWindows) {
         const windowLeaves = this.getLeavesForWindow(targetWin);
         for (const leaf of windowLeaves) {
-            const root = typeof leaf.getRoot === "function"
-                ? leaf.getRoot()
+            const extLeaf = leaf;
+            const root = typeof extLeaf.getRoot === "function"
+                ? extLeaf.getRoot()
                 : null;
             const rootLayout = root && typeof root.getLayout === "function"
                 ? root.getLayout()
@@ -3691,7 +3700,7 @@ class SaveLayoutModal extends obsidian.Modal {
         // 佈局資訊顯示
         const i18n = getI18n();
         const infoEl = contentEl.createDiv();
-        infoEl.createEl("div", {
+        infoEl.createDiv({
             text: t("saveModal.infoSection"),
             cls: "setting-item-name ws-info-title",
         });
@@ -4049,7 +4058,9 @@ class WindowLayoutsView extends obsidian.ItemView {
         return "layout";
     }
     onOpen() {
+        var _a;
         return __awaiter(this, void 0, void 0, function* () {
+            (_a = this.containerEl.closest(".workspace-leaf")) === null || _a === void 0 ? void 0 : _a.classList.add("mod-window-spaces-leaf");
             this.contentController = new WindowLayoutsModal(this.app, this.plugin);
             // The panel is considered active when Obsidian marks its leaf as the
             // active leaf. Clicking the panel (or its tab) and opening it via a
@@ -4390,7 +4401,7 @@ class WindowSpacesPlugin extends obsidian.Plugin {
             // location === "tab" (在 Popout 編輯器中央區域開啟/切換)
             const allPanes = columns.reduce((acc, col) => acc.concat(col.panes), []);
             const targetPane = pickCenterPopoutPane(allPanes, win);
-            const targetTabs = targetPane ? targetPane.tabs : (_b = this.getActiveLeafInWindow(win)) === null || _b === void 0 ? void 0 : _b.parent;
+            const targetTabs = targetPane ? targetPane.tabs : ((_b = this.getActiveLeafInWindow(win)) === null || _b === void 0 ? void 0 : _b.parent);
             if (targetTabs) {
                 const existingInTarget = findLeafInTabs(targetTabs, WINDOW_LAYOUTS_VIEW_TYPE);
                 if (existingInTarget) {
@@ -4511,8 +4522,9 @@ class WindowSpacesPlugin extends obsidian.Plugin {
             if (getWindowOfLeaf(leaf) !== win) {
                 return;
             }
-            if (leaf.parent) {
-                tabsSet.add(leaf.parent);
+            const parent = leaf.parent;
+            if (parent) {
+                tabsSet.add(parent);
             }
         });
         const panes = [];
@@ -4526,7 +4538,9 @@ class WindowSpacesPlugin extends obsidian.Plugin {
         return panes;
     }
     getActiveLeafInWindow(win) {
-        const activeLeaf = this.app.workspace.activeLeaf;
+        const activeLeaf = typeof this.app.workspace.getMostRecentLeaf === "function"
+            ? this.app.workspace.getMostRecentLeaf()
+            : this.app.workspace.activeLeaf;
         return activeLeaf && getWindowOfLeaf(activeLeaf) === win ? activeLeaf : null;
     }
     getLastLeafInWindow(win) {
@@ -4581,14 +4595,15 @@ class WindowSpacesPlugin extends obsidian.Plugin {
 const INITIAL_SPLIT_RATIO = 0.34;
 function getWindowOfLeaf(leaf) {
     var _a, _b, _c;
-    const container = (_a = leaf.view) === null || _a === void 0 ? void 0 : _a.containerEl;
+    const extLeaf = leaf;
+    const container = extLeaf.containerEl || ((_a = leaf.view) === null || _a === void 0 ? void 0 : _a.containerEl);
     return (_c = (_b = container === null || container === void 0 ? void 0 : container.ownerDocument) === null || _b === void 0 ? void 0 : _b.defaultView) !== null && _c !== void 0 ? _c : null;
 }
 function getTopLevelNodeInWindow(leaf) {
     let curr = leaf;
     while (curr && curr.parent) {
         const parent = curr.parent;
-        if (!parent.parent || parent.type === "root" || parent.isRoot || parent.kind === "root") {
+        if (!parent || !parent.parent || parent.type === "root" || parent.isRoot || parent.kind === "root") {
             return curr;
         }
         curr = parent;
@@ -4605,7 +4620,8 @@ function getPaneRect(tabs) {
     }
     const children = ((_a = tabs === null || tabs === void 0 ? void 0 : tabs.children) !== null && _a !== void 0 ? _a : []);
     for (const leaf of children) {
-        const leafContainer = (_b = leaf.view) === null || _b === void 0 ? void 0 : _b.containerEl;
+        const extLeaf = leaf;
+        const leafContainer = extLeaf.containerEl || ((_b = leaf.view) === null || _b === void 0 ? void 0 : _b.containerEl);
         if (leafContainer instanceof HTMLElement) {
             const rect = leafContainer.getBoundingClientRect();
             if (rect.width > 0 && rect.height > 0)
@@ -4687,12 +4703,27 @@ function applyInitialSplitSizing(panelLeaf, editorLeaf) {
     const editorPane = getDirectSplitChild(split, editorContainer);
     if (!panelPane || !editorPane || panelPane === editorPane)
         return;
-    panelPane.style.flex = `0 0 ${INITIAL_SPLIT_RATIO * 100}%`;
-    editorPane.style.flex = "1 1 0%";
+    setElementCssStyles(panelPane, { flex: `0 0 ${INITIAL_SPLIT_RATIO * 100}%` });
+    setElementCssStyles(editorPane, { flex: "1 1 0%" });
+}
+function setElementCssStyles(el, styles) {
+    const customEl = el;
+    if (typeof customEl.setCssStyles === "function") {
+        customEl.setCssStyles(styles);
+    }
+    else if (typeof customEl.setCssProps === "function") {
+        customEl.setCssProps(styles);
+    }
+    else {
+        for (const [key, value] of Object.entries(styles)) {
+            el.style.setProperty(key, value);
+        }
+    }
 }
 function getViewContainer(leaf) {
     var _a;
-    const container = (_a = leaf.view) === null || _a === void 0 ? void 0 : _a.containerEl;
+    const extLeaf = leaf;
+    const container = extLeaf.containerEl || ((_a = leaf.view) === null || _a === void 0 ? void 0 : _a.containerEl);
     return container instanceof HTMLElement ? container : null;
 }
 function getDirectSplitChild(split, element) {
@@ -4717,10 +4748,11 @@ function findLeafInRoot(workspace, root, viewType) {
         return null;
     let found = null;
     workspace.iterateAllLeaves((leaf) => {
-        var _a, _b, _c;
+        var _a, _b;
         if (found)
             return;
-        if (((_b = (_a = leaf).getRoot) === null || _b === void 0 ? void 0 : _b.call(_a)) === root && ((_c = leaf.getViewState()) === null || _c === void 0 ? void 0 : _c.type) === viewType) {
+        const extLeaf = leaf;
+        if (((_a = extLeaf.getRoot) === null || _a === void 0 ? void 0 : _a.call(extLeaf)) === root && ((_b = leaf.getViewState()) === null || _b === void 0 ? void 0 : _b.type) === viewType) {
             found = leaf;
         }
     });

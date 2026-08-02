@@ -1,8 +1,8 @@
 {
 	"id": "window-spaces",
 	"name": "Window Spaces",
-	"version": "1.0.6",
-	"minAppVersion": "1.5.0",
+	"version": "1.0.7",
+	"minAppVersion": "1.7.2",
 	"description": "Save and restore window layouts for popout windows. Seamlessly manage multi-window popout workspaces.",
 	"author": "edwardsayer",
 	"authorUrl": "https://github.com/edwardsayer",
