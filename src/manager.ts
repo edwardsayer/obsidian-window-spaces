@@ -244,6 +244,7 @@ export class WindowLayoutManager {
 
     this.refreshLayoutStatusBar(targetWin);
     this.hookPopoutWindowTitle(targetWin);
+    this.plugin.activityBars?.renderWindow(targetWin);
 
     // 延遲再次觸發標題寫入，確保與 Obsidian 異步載入的 View 標題完成同步
     targetWin.setTimeout(() => this.hookPopoutWindowTitle(targetWin), 50);
@@ -497,6 +498,8 @@ export class WindowLayoutManager {
 
       if (existing) {
         layout.autoSave = existing.autoSave;
+        layout.icon = existing.icon;
+        layout.color = existing.color;
       }
 
       this.plugin.openSaveLayoutModal(layout);
@@ -565,6 +568,8 @@ export class WindowLayoutManager {
           captured.autoSave = true;
           captured.id = existing.id;
           captured.includeGeometry = existing.includeGeometry;
+          captured.icon = existing.icon;
+          captured.color = existing.color;
           this.lastValidSnapshots.set(targetWin, captured);
         }
       } catch {
@@ -928,8 +933,16 @@ export class WindowLayoutManager {
       const existingLayout = this.plugin.settings?.spaces?.find(
         (l: WindowLayout) => l.name === capturedLayout.name
       );
-      if (existingLayout && existingLayout.includeGeometry !== undefined) {
-        capturedLayout.includeGeometry = existingLayout.includeGeometry;
+      if (existingLayout) {
+        if (existingLayout.includeGeometry !== undefined) {
+          capturedLayout.includeGeometry = existingLayout.includeGeometry;
+        }
+        if (existingLayout.icon !== undefined) {
+          capturedLayout.icon = existingLayout.icon;
+        }
+        if (existingLayout.color !== undefined) {
+          capturedLayout.color = existingLayout.color;
+        }
       }
 
       // 紀錄該視窗目前隱藏的側欄/分頁群組（Activity Bar 與 Pane 隱藏功能持久化）
@@ -1292,6 +1305,11 @@ export class WindowLayoutManager {
 
       const sourceWindow = this.getWindowForLayout(layout);
       this.setLayoutLabelForWindow(sourceWindow, layout.name);
+      if (sourceWindow) {
+        this.plugin.activityBars?.renderWindow(sourceWindow);
+      } else {
+        this.plugin.activityBars?.refreshAll();
+      }
 
       if (this.plugin.settings.showNotifications !== false) {
         const noticeMsg = isOverwrite

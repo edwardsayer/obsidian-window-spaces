@@ -140,26 +140,29 @@ export class PopoutActivityBarManager {
 
   getLayoutForWindow(win: Window): WindowLayout | null {
     if (!win || win.closed) return null;
+
+    // 1. 優先依 explicit _windowSpacesLayoutId 尋找
     const explicitId = (win as unknown as { _windowSpacesLayoutId?: string })._windowSpacesLayoutId;
     if (explicitId) {
       const found = this.settings.spaces.find((s) => s.id === explicitId);
       if (found) return found;
     }
-    const leafEls = Array.from(win.document.querySelectorAll(".workspace-leaf"));
-    if (leafEls.length === 0) return null;
 
+    // 2. 依 manager 的 layoutNames (視窗名) 尋找對應 space
+    const manager = (this.plugin as unknown as { manager?: { getLayoutNameForWindow?: (w: Window) => string | null; layoutWindows?: WeakMap<WindowLayout, Window> } }).manager;
+    const name = manager?.getLayoutNameForWindow?.(win);
+    if (name) {
+      const found = this.settings.spaces.find((s) => s.name === name);
+      if (found) return found;
+    }
+
+    // 3. 依 manager 的 layoutWindows 記憶體 map 反向比對
     for (const space of this.settings.spaces) {
-      const leaves = space.workspace?.leaves || [];
-      const spaceLeafIds = new Set(leaves.map((l) => l.id));
-      if (space.windowInfo?.firstLeafId) spaceLeafIds.add(space.windowInfo.firstLeafId);
-
-      for (const el of leafEls) {
-        const leafId = el.getAttribute("data-id") || (el as unknown as { id?: string }).id;
-        if (leafId && spaceLeafIds.has(leafId)) {
-          return space;
-        }
+      if (manager?.layoutWindows?.get(space) === win) {
+        return space;
       }
     }
+
     return null;
   }
 
@@ -173,10 +176,15 @@ export class PopoutActivityBarManager {
     const icon = layout?.icon || this.settings.defaultIcon || "layout";
     const color = layout?.color;
 
-    if (color) {
-      win.document.body.style.setProperty("--window-space-color", color);
-    } else {
-      win.document.body.style.removeProperty("--window-space-color");
+    const body = win.document?.body;
+    if (body) {
+      if (color) {
+        body.style.setProperty("--window-space-color", color);
+        body.classList.add("has-window-space-color");
+      } else {
+        body.style.removeProperty("--window-space-color");
+        body.classList.remove("has-window-space-color");
+      }
     }
 
     const isEmoji = /\p{Extended_Pictographic}/u.test(icon) || !/^[a-zA-Z0-9-]+$/.test(icon);

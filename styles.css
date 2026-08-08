@@ -1068,10 +1068,10 @@ body.is-popout-window.window-spaces-has-right-activity .workspace-split.mod-root
 }
 
 /* Popout 視窗自訂主題顏色邊框 (inset box-shadow 確保 0px layout 偏移) */
-body.is-popout-window[style*="--window-space-color"] {
+body.is-popout-window.has-window-space-color {
   box-shadow: inset 0 0 0 3px var(--window-space-color) !important;
 }
-body.is-popout-window[style*="--window-space-color"] .window-spaces-activity-left {
+body.is-popout-window.has-window-space-color .window-spaces-activity-left {
   border-left: 2px solid var(--window-space-color);
 }
 

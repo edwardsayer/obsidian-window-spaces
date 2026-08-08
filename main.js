@@ -2620,6 +2620,7 @@ class WindowLayoutManager {
      * 並呼叫 hookPopoutWindowTitle 覆寫視窗標題。
      */
     setLayoutLabelForWindow(targetWin, layoutName) {
+        var _a;
         if (!targetWin || !(layoutName === null || layoutName === void 0 ? void 0 : layoutName.trim()))
             return;
         this.registerPopoutWindow(targetWin);
@@ -2632,6 +2633,7 @@ class WindowLayoutManager {
         }
         this.refreshLayoutStatusBar(targetWin);
         this.hookPopoutWindowTitle(targetWin);
+        (_a = this.plugin.activityBars) === null || _a === void 0 ? void 0 : _a.renderWindow(targetWin);
         // 延遲再次觸發標題寫入，確保與 Obsidian 異步載入的 View 標題完成同步
         targetWin.setTimeout(() => this.hookPopoutWindowTitle(targetWin), 50);
         targetWin.setTimeout(() => this.hookPopoutWindowTitle(targetWin), 200);
@@ -2823,6 +2825,8 @@ class WindowLayoutManager {
                 const layout = yield this.captureCurrentLayout({ name: layoutName }, targetWin);
                 if (existing) {
                     layout.autoSave = existing.autoSave;
+                    layout.icon = existing.icon;
+                    layout.color = existing.color;
                 }
                 this.plugin.openSaveLayoutModal(layout);
             }
@@ -2886,6 +2890,8 @@ class WindowLayoutManager {
                         captured.autoSave = true;
                         captured.id = existing.id;
                         captured.includeGeometry = existing.includeGeometry;
+                        captured.icon = existing.icon;
+                        captured.color = existing.color;
                         this.lastValidSnapshots.set(targetWin, captured);
                     }
                 }
@@ -3220,8 +3226,16 @@ class WindowLayoutManager {
                     },
                 };
                 const existingLayout = (_k = (_j = this.plugin.settings) === null || _j === void 0 ? void 0 : _j.spaces) === null || _k === void 0 ? void 0 : _k.find((l) => l.name === capturedLayout.name);
-                if (existingLayout && existingLayout.includeGeometry !== undefined) {
-                    capturedLayout.includeGeometry = existingLayout.includeGeometry;
+                if (existingLayout) {
+                    if (existingLayout.includeGeometry !== undefined) {
+                        capturedLayout.includeGeometry = existingLayout.includeGeometry;
+                    }
+                    if (existingLayout.icon !== undefined) {
+                        capturedLayout.icon = existingLayout.icon;
+                    }
+                    if (existingLayout.color !== undefined) {
+                        capturedLayout.color = existingLayout.color;
+                    }
                 }
                 // 紀錄該視窗目前隱藏的側欄/分頁群組（Activity Bar 與 Pane 隱藏功能持久化）
                 try {
@@ -3500,6 +3514,7 @@ class WindowLayoutManager {
      * 保存新佈局或覆蓋既有佈局
      */
     saveLayout(layout) {
+        var _a, _b;
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 const settings = this.plugin.settings;
@@ -3536,6 +3551,12 @@ class WindowLayoutManager {
                 WindowLayoutsModal.renderAllInstances();
                 const sourceWindow = this.getWindowForLayout(layout);
                 this.setLayoutLabelForWindow(sourceWindow, layout.name);
+                if (sourceWindow) {
+                    (_a = this.plugin.activityBars) === null || _a === void 0 ? void 0 : _a.renderWindow(sourceWindow);
+                }
+                else {
+                    (_b = this.plugin.activityBars) === null || _b === void 0 ? void 0 : _b.refreshAll();
+                }
                 if (this.plugin.settings.showNotifications !== false) {
                     const noticeMsg = isOverwrite
                         ? `${t("notifications.layoutOverwritten")}: ${layout.name}`
@@ -5968,30 +5989,31 @@ class PopoutActivityBarManager {
         var _a, _b;
         if (!win || win.closed)
             return null;
+        // 1. 優先依 explicit _windowSpacesLayoutId 尋找
         const explicitId = win._windowSpacesLayoutId;
         if (explicitId) {
             const found = this.settings.spaces.find((s) => s.id === explicitId);
             if (found)
                 return found;
         }
-        const leafEls = Array.from(win.document.querySelectorAll(".workspace-leaf"));
-        if (leafEls.length === 0)
-            return null;
+        // 2. 依 manager 的 layoutNames (視窗名) 尋找對應 space
+        const manager = this.plugin.manager;
+        const name = (_a = manager === null || manager === void 0 ? void 0 : manager.getLayoutNameForWindow) === null || _a === void 0 ? void 0 : _a.call(manager, win);
+        if (name) {
+            const found = this.settings.spaces.find((s) => s.name === name);
+            if (found)
+                return found;
+        }
+        // 3. 依 manager 的 layoutWindows 記憶體 map 反向比對
         for (const space of this.settings.spaces) {
-            const leaves = ((_a = space.workspace) === null || _a === void 0 ? void 0 : _a.leaves) || [];
-            const spaceLeafIds = new Set(leaves.map((l) => l.id));
-            if ((_b = space.windowInfo) === null || _b === void 0 ? void 0 : _b.firstLeafId)
-                spaceLeafIds.add(space.windowInfo.firstLeafId);
-            for (const el of leafEls) {
-                const leafId = el.getAttribute("data-id") || el.id;
-                if (leafId && spaceLeafIds.has(leafId)) {
-                    return space;
-                }
+            if (((_b = manager === null || manager === void 0 ? void 0 : manager.layoutWindows) === null || _b === void 0 ? void 0 : _b.get(space)) === win) {
+                return space;
             }
         }
         return null;
     }
     updateDragHandleIcon(bars, win) {
+        var _a;
         const drag = bars.left.querySelector(".window-spaces-activity-drag");
         if (!drag)
             return;
@@ -5999,11 +6021,16 @@ class PopoutActivityBarManager {
         const layout = this.getLayoutForWindow(win);
         const icon = (layout === null || layout === void 0 ? void 0 : layout.icon) || this.settings.defaultIcon || "layout";
         const color = layout === null || layout === void 0 ? void 0 : layout.color;
-        if (color) {
-            win.document.body.style.setProperty("--window-space-color", color);
-        }
-        else {
-            win.document.body.style.removeProperty("--window-space-color");
+        const body = (_a = win.document) === null || _a === void 0 ? void 0 : _a.body;
+        if (body) {
+            if (color) {
+                body.style.setProperty("--window-space-color", color);
+                body.classList.add("has-window-space-color");
+            }
+            else {
+                body.style.removeProperty("--window-space-color");
+                body.classList.remove("has-window-space-color");
+            }
         }
         const isEmoji = /\p{Extended_Pictographic}/u.test(icon) || !/^[a-zA-Z0-9-]+$/.test(icon);
         if (isEmoji) {
