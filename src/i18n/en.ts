@@ -27,10 +27,14 @@ export const en: TranslationStrings = {
 
   commands: {
     saveLayout: "Save current Space",
-    openLayouts: "Open as popup window",
+    openLayouts: "Open switcher",
+    openLayoutsRibbon: "Open Window Spaces switcher",
     openLayoutsPanel: "Open as tab panel",
     openLayoutsPanelLeft: "Open in left sidebar",
     openLayoutsPanelRight: "Open in right sidebar",
+    toggleLeftActivityBar: "Toggle left Activity Bar",
+    toggleRightActivityBar: "Toggle right Activity Bar",
+    toggleCurrentPaneGroup: "Toggle current pane group",
   },
 
   saveModal: {
@@ -81,6 +85,7 @@ export const en: TranslationStrings = {
     createdDate: "Created",
     updatedDate: "Updated",
     fileCount: "Files",
+    tabCount: "Tabs",
     actions: "Actions",
     renameButton: "Rename",
     deleteButton: "Delete",
@@ -141,6 +146,22 @@ export const en: TranslationStrings = {
     resetConfirmMessage:
       "Are you sure you want to reset all settings? This will not delete your saved spaces.",
     resetSuccess: "Settings reset successfully",
+    popoutSidebarSection: "Popout Window Sidebars",
+    enableInterceptor: "Route sidebar views to popout windows",
+    enableInterceptorDesc:
+      "When opening a sidebar view in a popout window (via command palette, hotkey, activity bar, or third-party plugins), route it to the popout's sidebar instead of opening in the main window.",
+    activityBarSection: "Activity Bars",
+    enableActivityBars: "Show Activity Bars in Popout windows",
+    enableActivityBarsDesc:
+      "Display a vertical quick-access bar on the left and right edges of every Popout window",
+    leftBar: "Left Activity Bar",
+    rightBar: "Right Activity Bar",
+    addView: "Add view",
+    removeView: "Remove",
+    viewTypePlaceholder: "View type (e.g. file-explorer)",
+    pickIcon: "Choose icon",
+    restoreDefaultButtons: "Restore default buttons",
+    restoreDefaultIcon: "Restore default icon",
   },
 
   notifications: {
@@ -174,5 +195,13 @@ export const en: TranslationStrings = {
     use: "to use",
     useNewWindow: "in new window",
     dismiss: "to dismiss",
+  },
+
+  activityBar: {
+    toggleColumn: "Toggle sidebar",
+    toggleGroup: "Toggle current pane group",
+    cannotHideLastPane: "Cannot hide the last visible pane",
+    onlyInPopout: "This command only works inside a Popout window",
+    openSettings: "Open Window Spaces settings",
   },
 };

@@ -3,6 +3,7 @@ import { WindowLayoutsModal } from "../src/modals/restoreModal";
 import WindowSpacesPlugin from "../src/main";
 import { WindowLayout } from "../src/types";
 import { initI18n } from "../src/i18n";
+import { collectPopoutColumns, PopoutLayoutEngine } from "../src/popout/popoutLayout";
 
 initI18n("en");
 
@@ -691,6 +692,7 @@ describe("WindowLayoutsModal restore target", () => {
     const plugin = Object.assign(Object.create(WindowSpacesPlugin.prototype), {
       app,
       manager: { getActiveWindow: () => popoutWin },
+      popoutLayout: new PopoutLayoutEngine(app as any),
     });
 
     const leaf = await plugin.openWindowLayoutsPanel("left", popoutWin);
@@ -717,6 +719,27 @@ describe("WindowLayoutsModal restore target", () => {
       },
     } as any;
 
+    // 建立結構化 DOM：root split -> [leftTabs, rightTabs]，模擬第一/最後頂層欄位為側欄
+    const rootEl = document.createElement("div");
+    rootEl.classList.add("workspace-split", "mod-root");
+    const leftTabsEl = document.createElement("div");
+    leftTabsEl.classList.add("workspace-tabs");
+    const leftContentEl = document.createElement("div");
+    leftTabsEl.appendChild(leftContentEl);
+    rootEl.appendChild(leftTabsEl);
+    const rightTabsEl = document.createElement("div");
+    rightTabsEl.classList.add("workspace-tabs");
+    const rightContentEl = document.createElement("div");
+    rightTabsEl.appendChild(rightContentEl);
+    rootEl.appendChild(rightTabsEl);
+    document.body.appendChild(rootEl);
+
+    // 讓 DOM leaf 的 ownerDocument 指向 popoutWin（getWindowOfLeaf 依此判定視窗）
+    const overrideOwner = (el: HTMLElement) =>
+      Object.defineProperty(el, "ownerDocument", { value: { defaultView: popoutWin }, configurable: true });
+    overrideOwner(leftContentEl);
+    overrideOwner(rightContentEl);
+
     const leftTabs = { children: [] as any[] };
     const rightTabs = { children: [] as any[] };
 
@@ -724,9 +747,19 @@ describe("WindowLayoutsModal restore target", () => {
       setViewState: vi.fn().mockResolvedValue(undefined),
       getViewState: () => ({ type: "window-spaces-layouts" }),
       parent: leftTabs,
-      view: { containerEl: { ownerDocument: { defaultView: popoutWin } } },
+      containerEl: leftContentEl,
+      view: { containerEl: leftContentEl },
     };
     leftTabs.children.push(leftPanelLeaf);
+
+    const rightLeaf = {
+      setViewState: vi.fn().mockResolvedValue(undefined),
+      getViewState: () => ({ type: "markdown" }),
+      parent: rightTabs,
+      containerEl: rightContentEl,
+      view: { containerEl: rightContentEl },
+    };
+    rightTabs.children.push(rightLeaf);
 
     const revealLeaf = vi.fn().mockResolvedValue(undefined);
     const setActiveLeaf = vi.fn();
@@ -746,6 +779,7 @@ describe("WindowLayoutsModal restore target", () => {
         activeLeaf: leftPanelLeaf,
         iterateAllLeaves: (cb: any) => {
           cb(leftPanelLeaf);
+          cb(rightLeaf);
         },
         revealLeaf,
         setActiveLeaf,
@@ -756,10 +790,7 @@ describe("WindowLayoutsModal restore target", () => {
     const plugin = Object.assign(Object.create(WindowSpacesPlugin.prototype), {
       app,
       manager: { getActiveWindow: () => popoutWin },
-      collectPopoutPanes: () => [
-        { tabs: leftTabs, left: 0, center: 100 },
-        { tabs: rightTabs, left: 300, center: 400 },
-      ],
+      popoutLayout: new PopoutLayoutEngine(app as any),
     });
 
     // 1. 開啟在 Left Sidebar -> 已有 leftPanelLeaf 在 leftTabs 中，重用該 panel
@@ -767,11 +798,14 @@ describe("WindowLayoutsModal restore target", () => {
     expect(leafLeft).toBe(leftPanelLeaf);
     expect(revealLeaf).toHaveBeenCalledWith(leftPanelLeaf);
 
-    // 2. 開啟在 Right Sidebar -> rightTabs 中尚無 panel，在新 split (rightTabs) 建立 panel
+    // 2. 開啟在 Right Sidebar -> rightTabs 中尚無 window-spaces panel，在 rightTabs 建立 panel
     const leafRight = await plugin.openWindowLayoutsPanel("right", popoutWin);
-    expect(createLeafInParent).toHaveBeenCalledWith(rightTabs, 0);
+    expect(createLeafInParent).toHaveBeenCalledTimes(1);
+    expect(createLeafInParent.mock.calls[0][0]).toBe(rightTabs);
     expect(leafRight).not.toBe(leftPanelLeaf);
     expect(revealLeaf).toHaveBeenCalledWith(leafRight);
+
+    document.body.removeChild(rootEl);
   });
 
   test("collectPopoutColumns groups vertically stacked panes into a single column", () => {
@@ -779,15 +813,11 @@ describe("WindowLayoutsModal restore target", () => {
     const bottomTabs = { children: [] };
     const rightTabs = { children: [] };
 
-    const plugin = Object.assign(Object.create(WindowSpacesPlugin.prototype), {
-      collectPopoutPanes: () => [
-        { tabs: topTabs, left: 0, width: 400, center: 200 },
-        { tabs: bottomTabs, left: 0, width: 400, center: 200 },
-        { tabs: rightTabs, left: 400, width: 400, center: 600 },
-      ],
-    });
-
-    const columns = (plugin as any).collectPopoutColumns({} as any);
+    const columns = collectPopoutColumns([
+      { tabs: topTabs, left: 0, width: 400, center: 200 },
+      { tabs: bottomTabs, left: 0, width: 400, center: 200 },
+      { tabs: rightTabs, left: 400, width: 400, center: 600 },
+    ]);
     expect(columns.length).toBe(2);
     expect(columns[0].panes.length).toBe(2); // topTabs & bottomTabs grouped in column 0
     expect(columns[1].panes.length).toBe(1); // rightTabs in column 1

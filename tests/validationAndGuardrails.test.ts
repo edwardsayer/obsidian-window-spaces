@@ -2,6 +2,7 @@ import { describe, test, expect, beforeEach, vi } from "vitest";
 import { WindowLayoutManager } from "../src/manager";
 import { WindowLayout } from "../src/types";
 import { initI18n } from "../src/i18n";
+import * as obsidianModule from "obsidian";
 
 describe("Validation & Auto-Save Guardrails (validationAndGuardrails.test.ts)", () => {
   let manager: WindowLayoutManager;
@@ -24,7 +25,6 @@ describe("Validation & Auto-Save Guardrails (validationAndGuardrails.test.ts)", 
     expect((manager as any).validateLayout(null as any)).toBe(false);
     expect((manager as any).validateLayout({} as any)).toBe(false);
     expect((manager as any).validateLayout({ name: "Test" } as any)).toBe(false);
-
     const valid: WindowLayout = {
       id: "v-1",
       name: "Valid Layout",
@@ -34,6 +34,38 @@ describe("Validation & Auto-Save Guardrails (validationAndGuardrails.test.ts)", 
       metadata: { fileCount: 1, tabCount: 1, splitCount: 0 },
     };
     expect((manager as any).validateLayout(valid)).toBe(true);
+  });
+
+  test("ensureViewRendered rebuilds only when content is empty and view is not a file view", () => {
+    const contentEl = document.createElement("div");
+    contentEl.classList.add("view-content");
+    const leafEl = document.createElement("div");
+    leafEl.appendChild(contentEl);
+
+    const leaf = {
+      containerEl: leafEl,
+      view: { containerEl: leafEl, file: undefined },
+      rebuildView: vi.fn(),
+      getViewState: () => ({ type: "file-explorer", state: {} }),
+      setViewState: vi.fn().mockResolvedValue(undefined),
+    };
+
+    // 未渲染（.view-content 無子元素）→ 強制 rebuildView
+    manager.ensureViewRendered(leaf as any);
+    expect(leaf.rebuildView).toHaveBeenCalled();
+
+    // 已渲染 → 不重建
+    leaf.rebuildView.mockClear();
+    contentEl.appendChild(document.createElement("span"));
+    manager.ensureViewRendered(leaf as any);
+    expect(leaf.rebuildView).not.toHaveBeenCalled();
+
+    // 檔案類 view（.file 存在）→ 即使空白也不重建
+    leaf.rebuildView.mockClear();
+    contentEl.innerHTML = "";
+    (leaf as any).view.file = { path: "a.md" };
+    manager.ensureViewRendered(leaf as any);
+    expect(leaf.rebuildView).not.toHaveBeenCalled();
   });
 
   test("openNewPopoutWindow waits for the leaf view before resolving its Window", async () => {
@@ -646,5 +678,26 @@ describe("Validation & Auto-Save Guardrails (validationAndGuardrails.test.ts)", 
 
     await manager.toggleArchiveSpace("s-arch");
     expect(mockPlugin.settings.spaces[0].archived).toBe(false);
+  });
+
+  test("suppresses restore notifications when showNotifications is false", async () => {
+    const noticeSpy = vi.spyOn(obsidianModule, "Notice");
+    mockPlugin.settings.showNotifications = false;
+
+    const layout: WindowLayout = {
+      id: "no-notice-layout",
+      name: "No Notice Space",
+      timestamp: 1000,
+      windowState: { size: { width: 1000, height: 800 } },
+      workspace: { layout: {}, leaves: [] },
+      metadata: { fileCount: 0, tabCount: 0, splitCount: 0 },
+    };
+
+    vi.spyOn(manager as any, "restoreLayoutInternal").mockResolvedValue(undefined);
+
+    await manager.restoreLayout(layout);
+
+    expect(noticeSpy).not.toHaveBeenCalled();
+    noticeSpy.mockRestore();
   });
 });

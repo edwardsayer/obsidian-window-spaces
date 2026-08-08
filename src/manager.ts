@@ -9,6 +9,7 @@ import {
   ExtendedWorkspaceLeaf,
   WorkspaceItem,
   WindowSettings,
+  PopoutHiddenState,
 } from "./types";
 import { t, tWithParams, getI18n } from "./i18n";
 import { WindowLayoutsModal } from "./modals/restoreModal";
@@ -39,17 +40,31 @@ export class WindowLayoutManager {
     this.app = plugin.app;
   }
 
-  /** 記錄 Obsidian 建立的 Popout，供 label 生命週期管理使用。 */
+  /** 記錄 Obsidian 建立的 Popout，供 label 與 title 生命週期管理使用。 */
   registerPopoutWindow(targetWin: Window): void {
     if (!targetWin) return;
 
     this.popoutWindows.add(targetWin);
     this.refreshLayoutStatusBar(targetWin);
+    this.hookPopoutWindowTitle(targetWin);
 
-    // window-open 觸發時 Popout DOM 可能仍在建立中，再補兩次確保狀態列 100% 出現。
-    targetWin.setTimeout(() => this.refreshLayoutStatusBar(targetWin), 0);
-    targetWin.setTimeout(() => this.refreshLayoutStatusBar(targetWin), 100);
-    targetWin.setTimeout(() => this.refreshLayoutStatusBar(targetWin), 300);
+    // window-open 觸發時 Popout DOM 可能仍在建立中，再補多次確保狀態列與視窗標題 100% 正確反映。
+    targetWin.setTimeout(() => {
+      this.refreshLayoutStatusBar(targetWin);
+      this.hookPopoutWindowTitle(targetWin);
+    }, 0);
+    targetWin.setTimeout(() => {
+      this.refreshLayoutStatusBar(targetWin);
+      this.hookPopoutWindowTitle(targetWin);
+    }, 100);
+    targetWin.setTimeout(() => {
+      this.refreshLayoutStatusBar(targetWin);
+      this.hookPopoutWindowTitle(targetWin);
+    }, 300);
+    targetWin.setTimeout(() => {
+      this.refreshLayoutStatusBar(targetWin);
+      this.hookPopoutWindowTitle(targetWin);
+    }, 800);
   }
 
   /** 插件重新載入時，補註冊已經存在的 Popout。 */
@@ -67,13 +82,16 @@ export class WindowLayoutManager {
   unregisterPopoutWindow(targetWin: Window): void {
     if (!targetWin) return;
 
+    this.unhookPopoutWindowTitle(targetWin);
     this.removeLayoutLabel(targetWin);
     this.popoutWindows.delete(targetWin);
+    this.layoutNames.delete(targetWin);
   }
 
-  /** Plugin 卸載時清除所有由本 plugin 建立的 Popout label。 */
+  /** Plugin 卸載時清除所有由本 plugin 建立的 Popout label 與 Title hook。 */
   clearLayoutLabels(): void {
     for (const [targetWin, labels] of this.layoutLabels) {
+      this.unhookPopoutWindowTitle(targetWin);
       labels.statusBar?.remove();
       this.popoutWindows.delete(targetWin);
     }
@@ -83,8 +101,133 @@ export class WindowLayoutManager {
   }
 
   /**
-   * 在指定 Popout 的內容區顯示目前套用的 layout 名稱。
-   * 不修改 document.title，也不寫入 Obsidian layout tree。
+   * 針對 Popout 視窗進行標題 Hook（雙重防護：DOM document.title setter 劫持 + WorkspaceWindow.setTitle）
+   */
+  hookPopoutWindowTitle(targetWin: Window): void {
+    if (!targetWin || !targetWin.document) return;
+
+    const targetDoc = targetWin.document;
+    const docRecord = targetDoc as unknown as Record<string, unknown>;
+
+    // 1. DOM document.title Setter 劫持
+    if (!docRecord._hasWindowSpacesTitlePatch) {
+      const originalDescriptor =
+        Object.getOwnPropertyDescriptor(Document.prototype, "title") ||
+        Object.getOwnPropertyDescriptor(targetDoc, "title");
+
+      if (originalDescriptor && originalDescriptor.set) {
+        const originalSet = originalDescriptor.set;
+        const originalGet = originalDescriptor.get;
+        const self = this;
+
+        docRecord._hasWindowSpacesTitlePatch = true;
+        docRecord._originalTitleSet = originalSet;
+
+        Object.defineProperty(targetDoc, "title", {
+          configurable: true,
+          enumerable: true,
+          get() {
+            return originalGet ? originalGet.call(targetDoc) : "";
+          },
+          set(newTitle: string) {
+            const spaceName = self.getLayoutNameForWindow(targetWin);
+            if (spaceName) {
+              let formattedTitle = newTitle;
+              if (newTitle && !newTitle.startsWith(spaceName)) {
+                formattedTitle = `${spaceName} - ${newTitle}`;
+              } else if (!newTitle) {
+                formattedTitle = spaceName;
+              }
+              originalSet.call(targetDoc, formattedTitle);
+            } else {
+              originalSet.call(targetDoc, newTitle);
+            }
+          },
+        });
+      }
+    }
+
+    // 2. 針對 WorkspaceWindow 實例上的 setTitle API 劫持（若存在）
+    const extApp = this.app as unknown as { workspace: ExtendedWorkspace };
+    const floatingSplit = extApp.workspace?.floatingSplit;
+    const workspaceWindow = floatingSplit?.children?.find(
+      (child) => child.win === targetWin
+    );
+
+    if (workspaceWindow && typeof workspaceWindow.setTitle === "function") {
+      if (!workspaceWindow._originalSetTitle) {
+        workspaceWindow._originalSetTitle = workspaceWindow.setTitle;
+        const self = this;
+
+        workspaceWindow.setTitle = function (originalTitle: string) {
+          const spaceName = self.getLayoutNameForWindow(targetWin);
+          const origFn = this._originalSetTitle;
+
+          if (spaceName && typeof origFn === "function") {
+            let formattedTitle = originalTitle;
+            if (originalTitle && !originalTitle.startsWith(spaceName)) {
+              formattedTitle = `${spaceName} - ${originalTitle}`;
+            } else if (!originalTitle) {
+              formattedTitle = spaceName;
+            }
+            return origFn.call(this, formattedTitle);
+          }
+
+          if (typeof origFn === "function") {
+            return origFn.call(this, originalTitle);
+          }
+        };
+      }
+    }
+
+    // 3. 若已有名稱，主動觸發標題寫入以更新 DOM
+    const spaceName = this.getLayoutNameForWindow(targetWin);
+    if (spaceName && targetDoc.title) {
+      const currentTitle = targetDoc.title;
+      targetDoc.title = currentTitle;
+    }
+  }
+
+  private unhookPopoutWindowTitle(targetWin: Window): void {
+    if (!targetWin || !targetWin.document) return;
+
+    const targetDoc = targetWin.document;
+    const docRecord = targetDoc as unknown as Record<string, unknown>;
+
+    // 還原 document.title
+    if (docRecord._hasWindowSpacesTitlePatch && typeof docRecord._originalTitleSet === "function") {
+      const originalSet = docRecord._originalTitleSet as (title: string) => void;
+      delete docRecord._hasWindowSpacesTitlePatch;
+      delete docRecord._originalTitleSet;
+
+      Object.defineProperty(targetDoc, "title", {
+        configurable: true,
+        enumerable: true,
+        get() {
+          return Object.getOwnPropertyDescriptor(Document.prototype, "title")?.get?.call(targetDoc) ?? "";
+        },
+        set(newTitle: string) {
+          originalSet.call(targetDoc, newTitle);
+        },
+      });
+    }
+
+    // 還原 WorkspaceWindow.setTitle
+    const extApp = this.app as unknown as { workspace: ExtendedWorkspace };
+    const floatingSplit = extApp.workspace?.floatingSplit;
+    const workspaceWindow = floatingSplit?.children?.find(
+      (child) => child.win === targetWin
+    );
+
+    if (workspaceWindow && workspaceWindow._originalSetTitle) {
+      workspaceWindow.setTitle = workspaceWindow._originalSetTitle;
+      delete workspaceWindow._originalSetTitle;
+    }
+  }
+
+  /**
+   * 在指定 Popout 的內容區顯示目前套用的 layout 名稱，
+   * 並呼叫 hookPopoutWindowTitle 覆寫視窗標題。
    */
   setLayoutLabelForWindow(targetWin: Window | null, layoutName: string): void {
     if (!targetWin || !layoutName?.trim()) return;
@@ -100,6 +243,12 @@ export class WindowLayoutManager {
     }
 
     this.refreshLayoutStatusBar(targetWin);
+    this.hookPopoutWindowTitle(targetWin);
+
+    // 延遲再次觸發標題寫入，確保與 Obsidian 異步載入的 View 標題完成同步
+    targetWin.setTimeout(() => this.hookPopoutWindowTitle(targetWin), 50);
+    targetWin.setTimeout(() => this.hookPopoutWindowTitle(targetWin), 200);
+    targetWin.setTimeout(() => this.hookPopoutWindowTitle(targetWin), 500);
   }
 
   getLayoutNameForWindow(targetWin: Window): string | null {
@@ -258,12 +407,38 @@ export class WindowLayoutManager {
     ensureActionButton(
       "window-spaces-layout-open",
       "layout",
-      t("commands.openLayouts"),
+      t("commands.openLayoutsRibbon"),
       () => this.plugin.openWindowLayoutsModal(targetWin)
+    );
+
+    ensureActionButton(
+      "window-spaces-layout-settings",
+      "settings",
+      t("activityBar.openSettings"),
+      () => this.openPluginSettings()
     );
     element.setAttribute("aria-label", `${t("common.layoutLabel")}: ${layoutName}`);
     element.setAttribute("title", layoutName);
     element.dataset.layoutName = layoutName;
+  }
+
+  /** 開啟 Window Spaces 設定頁面。 */
+  private openPluginSettings(): void {
+    void (async () => {
+      try {
+        const setting = (this.app as unknown as { setting?: { open?: () => Promise<void>; openTabById?: (id: string) => void } }).setting;
+        if (!setting) return;
+        // 需先開啟設定 Modal，再切換到指定 tab（obsidian 內部 API）
+        if (typeof setting.open === "function") {
+          await setting.open();
+        }
+        if (typeof setting.openTabById === "function") {
+          setting.openTabById("window-spaces");
+        }
+      } catch (e) {
+        console.warn("Failed to open Window Spaces settings:", e);
+      }
+    })();
   }
 
 
@@ -757,6 +932,13 @@ export class WindowLayoutManager {
         capturedLayout.includeGeometry = existingLayout.includeGeometry;
       }
 
+      // 紀錄該視窗目前隱藏的側欄/分頁群組（Activity Bar 與 Pane 隱藏功能持久化）
+      try {
+        capturedLayout.hidden = this.plugin.popoutLayout.captureHiddenState(currentWin);
+      } catch {
+        capturedLayout.hidden = undefined;
+      }
+
       // 儲存對話框開啟後 activeWindow 可能已經切回主視窗，
       // 因此保存 capture 當下的 DOM Window，供 saveLayout 使用。
       this.layoutWindows.set(capturedLayout, currentWin);
@@ -1009,9 +1191,15 @@ export class WindowLayoutManager {
       this.setLayoutLabelForWindow(targetWin, layout.name);
       this.restorePreservedWindowLabels(preservedWindowLayouts, targetWin);
       this.refreshLayoutLabels();
+
+      // 於 restore 完成後重新套用隱藏的側欄/分頁群組
+      if (targetWin && layout.hidden) {
+        this.applyHiddenStateAfterRestore(targetWin, layout.hidden);
+      }
+
       WindowLayoutsModal.renderAllInstances();
 
-      if (options.showNotifications !== false) {
+      if (options.showNotifications !== false && this.plugin.settings.showNotifications !== false) {
         if (missingFiles.length > 0) {
           const missingList = missingFiles.slice(0, 3).join(", ") + (missingFiles.length > 3 ? "..." : "");
           new Notice(`⚠️ ${t("notifications.layoutRestored")}: ${layout.name} (${t("notifications.missingFilesNotice")}: ${missingList})`, 8000);
@@ -1654,10 +1842,65 @@ export class WindowLayoutManager {
   }
 
   /**
-   * 根據 Pinned 檔案、Active 檔案與檔案數量自動產生智慧佈局名稱 (UX-006)
+   * 嘗試從 FolderSpaces View 提取資料夾名稱 (最高優先級)
+   */
+  public getFolderSpaceNameFromLeaf(leaf: ViewState): string | null {
+    if (!leaf) return null;
+    const typeStr = leaf.type ? String(leaf.type).toLowerCase() : "";
+    const isFolderSpaceView =
+      typeStr === "folder-space-explorer" ||
+      typeStr === "folder-space" ||
+      typeStr === "folder-spaces" ||
+      typeStr.includes("folder-space") ||
+      typeStr.includes("folderspace");
+
+    const stateObj = leaf.state as Record<string, unknown> | undefined;
+    if (!stateObj && !isFolderSpaceView) return null;
+
+    let rawFolderPath: string | null = null;
+
+    if (typeof stateObj?.folder === "string") {
+      rawFolderPath = stateObj.folder;
+    } else if (typeof stateObj?.folderPath === "string") {
+      rawFolderPath = stateObj.folderPath;
+    } else if (typeof stateObj?.path === "string" && (isFolderSpaceView || !stateObj.file)) {
+      rawFolderPath = stateObj.path;
+    } else if (stateObj?.state && typeof stateObj.state === "object") {
+      const innerState = stateObj.state as Record<string, unknown>;
+      if (typeof innerState.folder === "string") {
+        rawFolderPath = innerState.folder;
+      } else if (typeof innerState.folderPath === "string") {
+        rawFolderPath = innerState.folderPath;
+      } else if (typeof innerState.path === "string" && (isFolderSpaceView || !innerState.file)) {
+        rawFolderPath = innerState.path;
+      }
+    }
+
+    if (!rawFolderPath && !isFolderSpaceView) return null;
+
+    if (!rawFolderPath || rawFolderPath === "/" || rawFolderPath === ".") {
+      return this.app.vault.getName();
+    }
+
+    const normalized = rawFolderPath.replace(/\\/g, "/").replace(/\/+$/, "");
+    const lastFolder = normalized.split("/").pop() || normalized;
+    return lastFolder.trim() || this.app.vault.getName();
+  }
+
+  /**
+   * 根據 Folder Space Explorer、Pinned 檔案、Active 檔案與數量自動產生智慧佈局名稱 (UX-006)
    */
   generateSmartLayoutName(layout: WindowLayout): string {
     const leaves = this.getSavedViewStates(layout);
+
+    // 最高優先級：若包含 Folder Space Explorer，取第一個 Folder Space Explorer 的資料夾名稱
+    for (const leaf of leaves) {
+      const folderSpaceName = this.getFolderSpaceNameFromLeaf(leaf);
+      if (folderSpaceName) {
+        return folderSpaceName;
+      }
+    }
+
     const activeFile = layout.workspace?.activeFile;
 
     const pinnedFileNames: string[] = [];
@@ -1789,16 +2032,28 @@ export class WindowLayoutManager {
     const totalFiles = leaves.filter((l) => !!this.getFilePathFromLeafState(l)).length;
 
     let progressNotice: Notice | null = null;
-    if (totalFiles > 1) {
+    if (totalFiles > 1 && this.plugin.settings.showNotifications !== false) {
       progressNotice = new Notice(`🔄 ${t("restoreModal.restoringLayout")}... (0/${totalFiles})`, 0);
     }
 
     let processedCount = 0;
+    const activeLeafForWindow = this.getActiveLeafForCurrentWindow(currentWin);
 
     for (let i = 0; i < leaves.length; i++) {
       const leafState = leaves[i];
       const filePath = this.getFilePathFromLeafState(leafState);
-      if (!filePath) continue;
+
+      if (!filePath) {
+        // 非檔案 leaf（file-explorer / search / tag / outline / bookmarks 等）：
+        // changeLayout 建立 leaf 後部分核心側欄 view 內容不會自動渲染（僅顯示 tab 標題）。
+        // 以「已渲染 flag」檢查 + 延遲重試強制重新渲染。
+        const targetLeaf = leavesById.get(leafState.id) ||
+          (i < windowLeaves.length ? windowLeaves[i] : null);
+        if (targetLeaf && targetLeaf !== activeLeafForWindow) {
+          this.ensureViewRenderedWithRetries(currentWin, targetLeaf);
+        }
+        continue;
+      }
 
       processedCount++;
       if (progressNotice) {
@@ -1989,6 +2244,85 @@ export class WindowLayoutManager {
     if (windowState.position && typeof targetWin.moveTo === "function") {
       targetWin.moveTo(windowState.position.x, windowState.position.y);
     }
+  }
+
+  /** changeLayout 重建期間 DOM 尚未穩定，以延遲重試方式套用隱藏狀態。 */
+  private applyHiddenStateAfterRestore(targetWin: Window, hidden: PopoutHiddenState): void {
+    const engine = this.plugin.popoutLayout;
+    const apply = (): void => {
+      try {
+        engine.applyHiddenState(targetWin, hidden);
+      } catch {
+        // DOM 尚未就緒，交由後續 setTimeout 重試
+      }
+    };
+    apply();
+    targetWin.setTimeout(apply, 100);
+    targetWin.setTimeout(apply, 300);
+    targetWin.setTimeout(apply, 800);
+  }
+
+  /** 是否為檔案類 view（markdown / pdf / 圖片等），此類 view 不參與強制渲染。 */
+  private isFileView(leaf: WorkspaceLeaf | null): boolean {
+    return !!leaf && !!(leaf.view as { file?: unknown } | null)?.file;
+  }
+
+  /** 檢查 leaf 的 `.view-content` 是否已渲染出實際內容。 */
+  private hasRenderedContent(leaf: WorkspaceLeaf | null): boolean {
+    if (!leaf) return false;
+    const leafEl = (leaf as unknown as ExtendedWorkspaceLeaf).containerEl ||
+      (leaf.view as { containerEl?: HTMLElement } | null)?.containerEl;
+    if (!(leafEl instanceof HTMLElement)) return false;
+    const content = leafEl.querySelector<HTMLElement>(".view-content");
+    if (!content) return false;
+    return content.children.length > 0;
+  }
+
+  /** 強制重新渲染 leaf 的 view（重建視圖，重新執行 onOpen）。 */
+  private forceRenderView(leaf: WorkspaceLeaf): void {
+    const extLeaf = leaf as unknown as ExtendedWorkspaceLeaf;
+    if (typeof extLeaf.rebuildView === "function") {
+      try {
+        extLeaf.rebuildView();
+        return;
+      } catch (e) {
+        console.warn("rebuildView failed, falling back to setViewState:", e);
+      }
+    }
+
+    // fallback：同型別 setViewState 只會呼叫 setState，不會重建視圖；
+    // 先切成 empty 再切回目標型別以強制重建。
+    const current = typeof extLeaf.getViewState === "function" ? extLeaf.getViewState() : null;
+    const type = current?.type;
+    if (!type) return;
+    void (async () => {
+      try {
+        await extLeaf.setViewState({ type: "empty", active: false, state: {} });
+        await extLeaf.setViewState({ type, active: false, state: current.state || {} });
+      } catch (e) {
+        console.warn("Failed to force render view:", e);
+      }
+    })();
+  }
+
+  /** 單次檢查：若 view 未渲染內容則強制重新渲染。 */
+  ensureViewRendered(leaf: WorkspaceLeaf | null): void {
+    if (!leaf || this.isFileView(leaf)) return;
+    if (this.hasRenderedContent(leaf)) return;
+    this.forceRenderView(leaf);
+  }
+
+  /** 以延遲重試方式確保非檔案 view 已渲染（restore 後 DOM 尚未穩定）。 */
+  private ensureViewRenderedWithRetries(targetWin: Window, leaf: WorkspaceLeaf): void {
+    const check = (): void => {
+      if (!leaf || !(leaf as unknown as ExtendedWorkspaceLeaf).containerEl?.isConnected) return;
+      if (this.hasRenderedContent(leaf)) return;
+      this.forceRenderView(leaf);
+    };
+    check();
+    targetWin.setTimeout(check, 150);
+    targetWin.setTimeout(check, 400);
+    targetWin.setTimeout(check, 900);
   }
 
   /**

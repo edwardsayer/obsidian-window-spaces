@@ -2,6 +2,26 @@
 
 var obsidian = require('obsidian');
 
+function _interopNamespace(e) {
+    if (e && e.__esModule) return e;
+    var n = Object.create(null);
+    if (e) {
+        Object.keys(e).forEach(function (k) {
+            if (k !== 'default') {
+                var d = Object.getOwnPropertyDescriptor(e, k);
+                Object.defineProperty(n, k, d.get ? d : {
+                    enumerable: true,
+                    get: function () { return e[k]; }
+                });
+            }
+        });
+    }
+    n["default"] = e;
+    return Object.freeze(n);
+}
+
+var obsidian__namespace = /*#__PURE__*/_interopNamespace(obsidian);
+
 /******************************************************************************
 Copyright (c) Microsoft Corporation.
 
@@ -58,10 +78,14 @@ const en = {
     },
     commands: {
         saveLayout: "Save current Space",
-        openLayouts: "Open as popup window",
+        openLayouts: "Open switcher",
+        openLayoutsRibbon: "Open Window Spaces switcher",
         openLayoutsPanel: "Open as tab panel",
         openLayoutsPanelLeft: "Open in left sidebar",
         openLayoutsPanelRight: "Open in right sidebar",
+        toggleLeftActivityBar: "Toggle left Activity Bar",
+        toggleRightActivityBar: "Toggle right Activity Bar",
+        toggleCurrentPaneGroup: "Toggle current pane group",
     },
     saveModal: {
         title: "Save Space",
@@ -109,6 +133,7 @@ const en = {
         createdDate: "Created",
         updatedDate: "Updated",
         fileCount: "Files",
+        tabCount: "Tabs",
         actions: "Actions",
         renameButton: "Rename",
         deleteButton: "Delete",
@@ -165,6 +190,20 @@ const en = {
         resetConfirmTitle: "Confirm Reset",
         resetConfirmMessage: "Are you sure you want to reset all settings? This will not delete your saved spaces.",
         resetSuccess: "Settings reset successfully",
+        popoutSidebarSection: "Popout Window Sidebars",
+        enableInterceptor: "Route sidebar views to popout windows",
+        enableInterceptorDesc: "When opening a sidebar view in a popout window (via command palette, hotkey, activity bar, or third-party plugins), route it to the popout's sidebar instead of opening in the main window.",
+        activityBarSection: "Activity Bars",
+        enableActivityBars: "Show Activity Bars in Popout windows",
+        enableActivityBarsDesc: "Display a vertical quick-access bar on the left and right edges of every Popout window",
+        leftBar: "Left Activity Bar",
+        rightBar: "Right Activity Bar",
+        addView: "Add view",
+        removeView: "Remove",
+        viewTypePlaceholder: "View type (e.g. file-explorer)",
+        pickIcon: "Choose icon",
+        restoreDefaultButtons: "Restore default buttons",
+        restoreDefaultIcon: "Restore default icon",
     },
     notifications: {
         layoutSaved: "Space saved successfully",
@@ -196,6 +235,13 @@ const en = {
         useNewWindow: "in new window",
         dismiss: "to dismiss",
     },
+    activityBar: {
+        toggleColumn: "Toggle sidebar",
+        toggleGroup: "Toggle current pane group",
+        cannotHideLastPane: "Cannot hide the last visible pane",
+        onlyInPopout: "This command only works inside a Popout window",
+        openSettings: "Open Window Spaces settings",
+    },
 };
 
 /**
@@ -224,10 +270,14 @@ const zhTW = {
     },
     commands: {
         saveLayout: "儲存目前空間",
-        openLayouts: "開啟為彈出視窗",
+        openLayouts: "開啟切換器",
+        openLayoutsRibbon: "開啟 Window Spaces 切換器",
         openLayoutsPanel: "開啟為標籤面板",
         openLayoutsPanelLeft: "開啟在左側邊欄",
         openLayoutsPanelRight: "開啟在右側邊欄",
+        toggleLeftActivityBar: "切換左側 Activity Bar",
+        toggleRightActivityBar: "切換右側 Activity Bar",
+        toggleCurrentPaneGroup: "切換目前分頁群組",
     },
     saveModal: {
         title: "儲存空間",
@@ -275,6 +325,7 @@ const zhTW = {
         createdDate: "建立時間",
         updatedDate: "更新時間",
         fileCount: "檔案數",
+        tabCount: "分頁數",
         actions: "操作",
         renameButton: "重命名",
         deleteButton: "刪除",
@@ -331,6 +382,20 @@ const zhTW = {
         resetConfirmTitle: "確認重設",
         resetConfirmMessage: "您確定要重設所有設定嗎？這不會刪除您已儲存的空間。",
         resetSuccess: "設定重設成功",
+        popoutSidebarSection: "Popout 視窗側欄設定",
+        enableInterceptor: "將側欄視圖路由至 Popout 視窗",
+        enableInterceptorDesc: "當在 Popout 視窗觸發開啟側欄視圖（透過指令、熱鍵、Activity Bar 或第三方外掛）時，將視圖開啟於該 Popout 的側欄，而非跳回主視窗。",
+        activityBarSection: "Activity Bars",
+        enableActivityBars: "在 Popout 視窗顯示 Activity Bars",
+        enableActivityBarsDesc: "在每個 Popout 視窗左右邊緣顯示垂直的快速存取工具列",
+        leftBar: "左側 Activity Bar",
+        rightBar: "右側 Activity Bar",
+        addView: "新增 View",
+        removeView: "移除",
+        viewTypePlaceholder: "View type（例如 file-explorer）",
+        pickIcon: "選擇圖示",
+        restoreDefaultButtons: "還原預設按鈕",
+        restoreDefaultIcon: "還原預設圖示",
     },
     notifications: {
         layoutSaved: "空間儲存成功",
@@ -362,6 +427,13 @@ const zhTW = {
         useNewWindow: "在新視窗開啟",
         dismiss: "關閉",
     },
+    activityBar: {
+        toggleColumn: "切換側欄",
+        toggleGroup: "切換目前分頁群組",
+        cannotHideLastPane: "無法隱藏最後一個可見的分頁",
+        onlyInPopout: "此命令僅可在 Popout 視窗內使用",
+        openSettings: "開啟 Window Spaces 設定",
+    },
 };
 
 /**
@@ -390,10 +462,14 @@ const zhCN = {
     },
     commands: {
         saveLayout: "保存当前空间",
-        openLayouts: "作为弹出窗口打开",
+        openLayouts: "打开切换器",
+        openLayoutsRibbon: "打开 Window Spaces 切换器",
         openLayoutsPanel: "作为标签页面板打开",
         openLayoutsPanelLeft: "在左侧边栏打开",
         openLayoutsPanelRight: "在右侧边栏打开",
+        toggleLeftActivityBar: "切换左侧 Activity Bar",
+        toggleRightActivityBar: "切换右侧 Activity Bar",
+        toggleCurrentPaneGroup: "切换当前标签组",
     },
     saveModal: {
         title: "保存空间",
@@ -441,6 +517,7 @@ const zhCN = {
         createdDate: "创建时间",
         updatedDate: "更新时间",
         fileCount: "文件数",
+        tabCount: "标签页数",
         actions: "操作",
         renameButton: "重命名",
         deleteButton: "删除",
@@ -497,6 +574,20 @@ const zhCN = {
         resetConfirmTitle: "确认重置",
         resetConfirmMessage: "您确定要重置所有设置吗？这不会删除您已保存的空间。",
         resetSuccess: "设置重置成功",
+        popoutSidebarSection: "Popout 窗口侧栏设置",
+        enableInterceptor: "将侧栏视图路由至 Popout 窗口",
+        enableInterceptorDesc: "当在 Popout 窗口触发打开侧栏视图（通过命令、快捷键、Activity Bar 或第三方插件）时，将视图打开于该 Popout 的侧栏，而非跳回主窗口。",
+        activityBarSection: "Activity Bars",
+        enableActivityBars: "在 Popout 窗口显示 Activity Bars",
+        enableActivityBarsDesc: "在每个 Popout 窗口左右边缘显示垂直的快速访问工具栏",
+        leftBar: "左侧 Activity Bar",
+        rightBar: "右侧 Activity Bar",
+        addView: "添加 View",
+        removeView: "移除",
+        viewTypePlaceholder: "View type（例如 file-explorer）",
+        pickIcon: "选择图标",
+        restoreDefaultButtons: "还原默认按钮",
+        restoreDefaultIcon: "还原默认图标",
     },
     notifications: {
         layoutSaved: "空间保存成功",
@@ -527,6 +618,13 @@ const zhCN = {
         use: "应用",
         useNewWindow: "在新窗口打开",
         dismiss: "关闭",
+    },
+    activityBar: {
+        toggleColumn: "切换侧栏",
+        toggleGroup: "切换当前标签组",
+        cannotHideLastPane: "无法隐藏最后一个可见的标签",
+        onlyInPopout: "此命令只能在 Popout 窗口内使用",
+        openSettings: "打开 Window Spaces 设置",
     },
 };
 
@@ -1264,7 +1362,9 @@ class WindowLayoutsModal extends obsidian.Modal {
                         this.closeHost();
                     }
                 }
-                new obsidian.Notice(`${t("saveModal.saveSuccess")}: ${cleanName}`);
+                if (this.plugin.settings.showNotifications !== false) {
+                    new obsidian.Notice(`${t("saveModal.saveSuccess")}: ${cleanName}`);
+                }
                 if (this.searchInput) {
                     this.searchInput.value = "";
                 }
@@ -1503,7 +1603,7 @@ class WindowLayoutsModal extends obsidian.Modal {
         };
     }
     renderLayoutItem(containerEl, layout) {
-        var _a, _b;
+        var _a, _b, _c, _d;
         const layoutEl = containerEl.createDiv("suggestion-item window-layout-item");
         const itemIndex = this.renderedLayoutEntries.length;
         this.renderedLayoutEntries.push({ layout, element: layoutEl });
@@ -1557,11 +1657,12 @@ class WindowLayoutsModal extends obsidian.Modal {
             text: `${t("manageModal.updatedDate")}: ${i18n.formatDate(new Date(layout.updatedAt || layout.timestamp || layout.createdAt || Date.now()))}`,
             cls: "layout-date",
         });
+        const totalTabs = ((_a = layout.metadata) === null || _a === void 0 ? void 0 : _a.tabCount) || ((_c = (_b = layout.workspace) === null || _b === void 0 ? void 0 : _b.leaves) === null || _c === void 0 ? void 0 : _c.length) || 0;
         pathEl.createSpan({
-            text: `${t("manageModal.fileCount")}: ${((_a = layout.metadata) === null || _a === void 0 ? void 0 : _a.fileCount) || 0}`,
+            text: `${t("manageModal.tabCount")}: ${totalTabs}`,
             cls: "layout-files",
         });
-        const openWin = typeof ((_b = this.plugin.manager) === null || _b === void 0 ? void 0 : _b.getOpenWindowForLayout) === "function"
+        const openWin = typeof ((_d = this.plugin.manager) === null || _d === void 0 ? void 0 : _d.getOpenWindowForLayout) === "function"
             ? this.plugin.manager.getOpenWindowForLayout(layout)
             : null;
         if (openWin) {
@@ -1684,7 +1785,9 @@ class WindowLayoutsModal extends obsidian.Modal {
                 yield this.plugin.saveSettings();
                 modal.close();
                 WindowLayoutsModal.renderAllInstances();
-                new obsidian.Notice(t("notifications.layoutRenamed"));
+                if (this.plugin.settings.showNotifications !== false) {
+                    new obsidian.Notice(t("notifications.layoutRenamed"));
+                }
             });
             saveButton.onclick = () => void submit();
         };
@@ -1829,9 +1932,11 @@ class WindowLayoutsModal extends obsidian.Modal {
                 .onClick(() => __awaiter(this, void 0, void 0, function* () {
                 layout.autoSave = !layout.autoSave;
                 yield this.plugin.saveSettings();
-                new obsidian.Notice(layout.autoSave
-                    ? `${layout.name}: ${t("manageModal.autoSaveEnabled")}`
-                    : `${layout.name}: ${t("manageModal.autoSaveDisabled")}`);
+                if (this.plugin.settings.showNotifications !== false) {
+                    new obsidian.Notice(layout.autoSave
+                        ? `${layout.name}: ${t("manageModal.autoSaveEnabled")}`
+                        : `${layout.name}: ${t("manageModal.autoSaveDisabled")}`);
+                }
                 WindowLayoutsModal.renderAllInstances();
             }));
         });
@@ -1915,16 +2020,30 @@ class WindowLayoutManager {
         this.plugin = plugin;
         this.app = plugin.app;
     }
-    /** 記錄 Obsidian 建立的 Popout，供 label 生命週期管理使用。 */
+    /** 記錄 Obsidian 建立的 Popout，供 label 與 title 生命週期管理使用。 */
     registerPopoutWindow(targetWin) {
         if (!targetWin)
             return;
         this.popoutWindows.add(targetWin);
         this.refreshLayoutStatusBar(targetWin);
-        // window-open 觸發時 Popout DOM 可能仍在建立中，再補兩次確保狀態列 100% 出現。
-        targetWin.setTimeout(() => this.refreshLayoutStatusBar(targetWin), 0);
-        targetWin.setTimeout(() => this.refreshLayoutStatusBar(targetWin), 100);
-        targetWin.setTimeout(() => this.refreshLayoutStatusBar(targetWin), 300);
+        this.hookPopoutWindowTitle(targetWin);
+        // window-open 觸發時 Popout DOM 可能仍在建立中，再補多次確保狀態列與視窗標題 100% 正確反映。
+        targetWin.setTimeout(() => {
+            this.refreshLayoutStatusBar(targetWin);
+            this.hookPopoutWindowTitle(targetWin);
+        }, 0);
+        targetWin.setTimeout(() => {
+            this.refreshLayoutStatusBar(targetWin);
+            this.hookPopoutWindowTitle(targetWin);
+        }, 100);
+        targetWin.setTimeout(() => {
+            this.refreshLayoutStatusBar(targetWin);
+            this.hookPopoutWindowTitle(targetWin);
+        }, 300);
+        targetWin.setTimeout(() => {
+            this.refreshLayoutStatusBar(targetWin);
+            this.hookPopoutWindowTitle(targetWin);
+        }, 800);
     }
     /** 插件重新載入時，補註冊已經存在的 Popout。 */
     registerExistingPopoutWindows() {
@@ -1941,13 +2060,16 @@ class WindowLayoutManager {
     unregisterPopoutWindow(targetWin) {
         if (!targetWin)
             return;
+        this.unhookPopoutWindowTitle(targetWin);
         this.removeLayoutLabel(targetWin);
         this.popoutWindows.delete(targetWin);
+        this.layoutNames.delete(targetWin);
     }
-    /** Plugin 卸載時清除所有由本 plugin 建立的 Popout label。 */
+    /** Plugin 卸載時清除所有由本 plugin 建立的 Popout label 與 Title hook。 */
     clearLayoutLabels() {
         var _a;
         for (const [targetWin, labels] of this.layoutLabels) {
+            this.unhookPopoutWindowTitle(targetWin);
             (_a = labels.statusBar) === null || _a === void 0 ? void 0 : _a.remove();
             this.popoutWindows.delete(targetWin);
         }
@@ -1956,8 +2078,118 @@ class WindowLayoutManager {
         this.popoutWindows.clear();
     }
     /**
-     * 在指定 Popout 的內容區顯示目前套用的 layout 名稱。
-     * 不修改 document.title，也不寫入 Obsidian layout tree。
+     * 針對 Popout 視窗進行標題 Hook（雙重防護：DOM document.title setter 劫持 + WorkspaceWindow.setTitle）
+     */
+    hookPopoutWindowTitle(targetWin) {
+        var _a, _b;
+        if (!targetWin || !targetWin.document)
+            return;
+        const targetDoc = targetWin.document;
+        const docRecord = targetDoc;
+        // 1. DOM document.title Setter 劫持
+        if (!docRecord._hasWindowSpacesTitlePatch) {
+            const originalDescriptor = Object.getOwnPropertyDescriptor(Document.prototype, "title") ||
+                Object.getOwnPropertyDescriptor(targetDoc, "title");
+            if (originalDescriptor && originalDescriptor.set) {
+                const originalSet = originalDescriptor.set;
+                const originalGet = originalDescriptor.get;
+                const self = this;
+                docRecord._hasWindowSpacesTitlePatch = true;
+                docRecord._originalTitleSet = originalSet;
+                Object.defineProperty(targetDoc, "title", {
+                    configurable: true,
+                    enumerable: true,
+                    get() {
+                        return originalGet ? originalGet.call(targetDoc) : "";
+                    },
+                    set(newTitle) {
+                        const spaceName = self.getLayoutNameForWindow(targetWin);
+                        if (spaceName) {
+                            let formattedTitle = newTitle;
+                            if (newTitle && !newTitle.startsWith(spaceName)) {
+                                formattedTitle = `${spaceName} - ${newTitle}`;
+                            }
+                            else if (!newTitle) {
+                                formattedTitle = spaceName;
+                            }
+                            originalSet.call(targetDoc, formattedTitle);
+                        }
+                        else {
+                            originalSet.call(targetDoc, newTitle);
+                        }
+                    },
+                });
+            }
+        }
+        // 2. 針對 WorkspaceWindow 實例上的 setTitle API 劫持（若存在）
+        const extApp = this.app;
+        const floatingSplit = (_a = extApp.workspace) === null || _a === void 0 ? void 0 : _a.floatingSplit;
+        const workspaceWindow = (_b = floatingSplit === null || floatingSplit === void 0 ? void 0 : floatingSplit.children) === null || _b === void 0 ? void 0 : _b.find((child) => child.win === targetWin);
+        if (workspaceWindow && typeof workspaceWindow.setTitle === "function") {
+            if (!workspaceWindow._originalSetTitle) {
+                workspaceWindow._originalSetTitle = workspaceWindow.setTitle;
+                const self = this;
+                workspaceWindow.setTitle = function (originalTitle) {
+                    const spaceName = self.getLayoutNameForWindow(targetWin);
+                    const origFn = this._originalSetTitle;
+                    if (spaceName && typeof origFn === "function") {
+                        let formattedTitle = originalTitle;
+                        if (originalTitle && !originalTitle.startsWith(spaceName)) {
+                            formattedTitle = `${spaceName} - ${originalTitle}`;
+                        }
+                        else if (!originalTitle) {
+                            formattedTitle = spaceName;
+                        }
+                        return origFn.call(this, formattedTitle);
+                    }
+                    if (typeof origFn === "function") {
+                        return origFn.call(this, originalTitle);
+                    }
+                };
+            }
+        }
+        // 3. 若已有名稱，主動觸發標題寫入以更新 DOM
+        const spaceName = this.getLayoutNameForWindow(targetWin);
+        if (spaceName && targetDoc.title) {
+            const currentTitle = targetDoc.title;
+            targetDoc.title = currentTitle;
+        }
+    }
+    unhookPopoutWindowTitle(targetWin) {
+        var _a, _b;
+        if (!targetWin || !targetWin.document)
+            return;
+        const targetDoc = targetWin.document;
+        const docRecord = targetDoc;
+        // 還原 document.title
+        if (docRecord._hasWindowSpacesTitlePatch && typeof docRecord._originalTitleSet === "function") {
+            const originalSet = docRecord._originalTitleSet;
+            delete docRecord._hasWindowSpacesTitlePatch;
+            delete docRecord._originalTitleSet;
+            Object.defineProperty(targetDoc, "title", {
+                configurable: true,
+                enumerable: true,
+                get() {
+                    var _a, _b, _c;
+                    return (_c = (_b = (_a = Object.getOwnPropertyDescriptor(Document.prototype, "title")) === null || _a === void 0 ? void 0 : _a.get) === null || _b === void 0 ? void 0 : _b.call(targetDoc)) !== null && _c !== void 0 ? _c : "";
+                },
+                set(newTitle) {
+                    originalSet.call(targetDoc, newTitle);
+                },
+            });
+        }
+        // 還原 WorkspaceWindow.setTitle
+        const extApp = this.app;
+        const floatingSplit = (_a = extApp.workspace) === null || _a === void 0 ? void 0 : _a.floatingSplit;
+        const workspaceWindow = (_b = floatingSplit === null || floatingSplit === void 0 ? void 0 : floatingSplit.children) === null || _b === void 0 ? void 0 : _b.find((child) => child.win === targetWin);
+        if (workspaceWindow && workspaceWindow._originalSetTitle) {
+            workspaceWindow.setTitle = workspaceWindow._originalSetTitle;
+            delete workspaceWindow._originalSetTitle;
+        }
+    }
+    /**
+     * 在指定 Popout 的內容區顯示目前套用的 layout 名稱，
+     * 並呼叫 hookPopoutWindowTitle 覆寫視窗標題。
      */
     setLayoutLabelForWindow(targetWin, layoutName) {
         if (!targetWin || !(layoutName === null || layoutName === void 0 ? void 0 : layoutName.trim()))
@@ -1971,6 +2203,11 @@ class WindowLayoutManager {
             body.querySelectorAll(".window-spaces-layout-label").forEach((element) => element.remove());
         }
         this.refreshLayoutStatusBar(targetWin);
+        this.hookPopoutWindowTitle(targetWin);
+        // 延遲再次觸發標題寫入，確保與 Obsidian 異步載入的 View 標題完成同步
+        targetWin.setTimeout(() => this.hookPopoutWindowTitle(targetWin), 50);
+        targetWin.setTimeout(() => this.hookPopoutWindowTitle(targetWin), 200);
+        targetWin.setTimeout(() => this.hookPopoutWindowTitle(targetWin), 500);
     }
     getLayoutNameForWindow(targetWin) {
         var _a, _b;
@@ -2081,10 +2318,31 @@ class WindowLayoutManager {
         else {
             autoSaveBtn.classList.remove("is-active");
         }
-        ensureActionButton("window-spaces-layout-open", "layout", t("commands.openLayouts"), () => this.plugin.openWindowLayoutsModal(targetWin));
+        ensureActionButton("window-spaces-layout-open", "layout", t("commands.openLayoutsRibbon"), () => this.plugin.openWindowLayoutsModal(targetWin));
+        ensureActionButton("window-spaces-layout-settings", "settings", t("activityBar.openSettings"), () => this.openPluginSettings());
         element.setAttribute("aria-label", `${t("common.layoutLabel")}: ${layoutName}`);
         element.setAttribute("title", layoutName);
         element.dataset.layoutName = layoutName;
+    }
+    /** 開啟 Window Spaces 設定頁面。 */
+    openPluginSettings() {
+        void (() => __awaiter(this, void 0, void 0, function* () {
+            try {
+                const setting = this.app.setting;
+                if (!setting)
+                    return;
+                // 需先開啟設定 Modal，再切換到指定 tab（obsidian 內部 API）
+                if (typeof setting.open === "function") {
+                    yield setting.open();
+                }
+                if (typeof setting.openTabById === "function") {
+                    setting.openTabById("window-spaces");
+                }
+            }
+            catch (e) {
+                console.warn("Failed to open Window Spaces settings:", e);
+            }
+        }))();
     }
     /** 開啟全新的 Popout 視窗（等待 leaf 與 DOM 都完成掛載後再回傳視窗物件） */
     openNewPopoutWindow() {
@@ -2537,6 +2795,13 @@ class WindowLayoutManager {
                 if (existingLayout && existingLayout.includeGeometry !== undefined) {
                     capturedLayout.includeGeometry = existingLayout.includeGeometry;
                 }
+                // 紀錄該視窗目前隱藏的側欄/分頁群組（Activity Bar 與 Pane 隱藏功能持久化）
+                try {
+                    capturedLayout.hidden = this.plugin.popoutLayout.captureHiddenState(currentWin);
+                }
+                catch (_l) {
+                    capturedLayout.hidden = undefined;
+                }
                 // 儲存對話框開啟後 activeWindow 可能已經切回主視窗，
                 // 因此保存 capture 當下的 DOM Window，供 saveLayout 使用。
                 this.layoutWindows.set(capturedLayout, currentWin);
@@ -2754,8 +3019,12 @@ class WindowLayoutManager {
                 this.setLayoutLabelForWindow(targetWin, layout.name);
                 this.restorePreservedWindowLabels(preservedWindowLayouts, targetWin);
                 this.refreshLayoutLabels();
+                // 於 restore 完成後重新套用隱藏的側欄/分頁群組
+                if (targetWin && layout.hidden) {
+                    this.applyHiddenStateAfterRestore(targetWin, layout.hidden);
+                }
                 WindowLayoutsModal.renderAllInstances();
-                if (options.showNotifications !== false) {
+                if (options.showNotifications !== false && this.plugin.settings.showNotifications !== false) {
                     if (missingFiles.length > 0) {
                         const missingList = missingFiles.slice(0, 3).join(", ") + (missingFiles.length > 3 ? "..." : "");
                         new obsidian.Notice(`⚠️ ${t("notifications.layoutRestored")}: ${layout.name} (${t("notifications.missingFilesNotice")}: ${missingList})`, 8000);
@@ -3317,11 +3586,64 @@ class WindowLayoutManager {
         return leaves;
     }
     /**
-     * 根據 Pinned 檔案、Active 檔案與檔案數量自動產生智慧佈局名稱 (UX-006)
+     * 嘗試從 FolderSpaces View 提取資料夾名稱 (最高優先級)
+     */
+    getFolderSpaceNameFromLeaf(leaf) {
+        if (!leaf)
+            return null;
+        const typeStr = leaf.type ? String(leaf.type).toLowerCase() : "";
+        const isFolderSpaceView = typeStr === "folder-space-explorer" ||
+            typeStr === "folder-space" ||
+            typeStr === "folder-spaces" ||
+            typeStr.includes("folder-space") ||
+            typeStr.includes("folderspace");
+        const stateObj = leaf.state;
+        if (!stateObj && !isFolderSpaceView)
+            return null;
+        let rawFolderPath = null;
+        if (typeof (stateObj === null || stateObj === void 0 ? void 0 : stateObj.folder) === "string") {
+            rawFolderPath = stateObj.folder;
+        }
+        else if (typeof (stateObj === null || stateObj === void 0 ? void 0 : stateObj.folderPath) === "string") {
+            rawFolderPath = stateObj.folderPath;
+        }
+        else if (typeof (stateObj === null || stateObj === void 0 ? void 0 : stateObj.path) === "string" && (isFolderSpaceView || !stateObj.file)) {
+            rawFolderPath = stateObj.path;
+        }
+        else if ((stateObj === null || stateObj === void 0 ? void 0 : stateObj.state) && typeof stateObj.state === "object") {
+            const innerState = stateObj.state;
+            if (typeof innerState.folder === "string") {
+                rawFolderPath = innerState.folder;
+            }
+            else if (typeof innerState.folderPath === "string") {
+                rawFolderPath = innerState.folderPath;
+            }
+            else if (typeof innerState.path === "string" && (isFolderSpaceView || !innerState.file)) {
+                rawFolderPath = innerState.path;
+            }
+        }
+        if (!rawFolderPath && !isFolderSpaceView)
+            return null;
+        if (!rawFolderPath || rawFolderPath === "/" || rawFolderPath === ".") {
+            return this.app.vault.getName();
+        }
+        const normalized = rawFolderPath.replace(/\\/g, "/").replace(/\/+$/, "");
+        const lastFolder = normalized.split("/").pop() || normalized;
+        return lastFolder.trim() || this.app.vault.getName();
+    }
+    /**
+     * 根據 Folder Space Explorer、Pinned 檔案、Active 檔案與數量自動產生智慧佈局名稱 (UX-006)
      */
     generateSmartLayoutName(layout) {
         var _a;
         const leaves = this.getSavedViewStates(layout);
+        // 最高優先級：若包含 Folder Space Explorer，取第一個 Folder Space Explorer 的資料夾名稱
+        for (const leaf of leaves) {
+            const folderSpaceName = this.getFolderSpaceNameFromLeaf(leaf);
+            if (folderSpaceName) {
+                return folderSpaceName;
+            }
+        }
         const activeFile = (_a = layout.workspace) === null || _a === void 0 ? void 0 : _a.activeFile;
         const pinnedFileNames = [];
         const activeFileName = [];
@@ -3448,15 +3770,25 @@ class WindowLayoutManager {
             let targetActiveLeaf = null;
             const totalFiles = leaves.filter((l) => !!this.getFilePathFromLeafState(l)).length;
             let progressNotice = null;
-            if (totalFiles > 1) {
+            if (totalFiles > 1 && this.plugin.settings.showNotifications !== false) {
                 progressNotice = new obsidian.Notice(`🔄 ${t("restoreModal.restoringLayout")}... (0/${totalFiles})`, 0);
             }
             let processedCount = 0;
+            const activeLeafForWindow = this.getActiveLeafForCurrentWindow(currentWin);
             for (let i = 0; i < leaves.length; i++) {
                 const leafState = leaves[i];
                 const filePath = this.getFilePathFromLeafState(leafState);
-                if (!filePath)
+                if (!filePath) {
+                    // 非檔案 leaf（file-explorer / search / tag / outline / bookmarks 等）：
+                    // changeLayout 建立 leaf 後部分核心側欄 view 內容不會自動渲染（僅顯示 tab 標題）。
+                    // 以「已渲染 flag」檢查 + 延遲重試強制重新渲染。
+                    const targetLeaf = leavesById.get(leafState.id) ||
+                        (i < windowLeaves.length ? windowLeaves[i] : null);
+                    if (targetLeaf && targetLeaf !== activeLeafForWindow) {
+                        this.ensureViewRenderedWithRetries(currentWin, targetLeaf);
+                    }
                     continue;
+                }
                 processedCount++;
                 if (progressNotice) {
                     progressNotice.setMessage(`🔄 ${t("restoreModal.restoringLayout")}... (${processedCount}/${totalFiles})`);
@@ -3617,6 +3949,92 @@ class WindowLayoutManager {
             targetWin.moveTo(windowState.position.x, windowState.position.y);
         }
     }
+    /** changeLayout 重建期間 DOM 尚未穩定，以延遲重試方式套用隱藏狀態。 */
+    applyHiddenStateAfterRestore(targetWin, hidden) {
+        const engine = this.plugin.popoutLayout;
+        const apply = () => {
+            try {
+                engine.applyHiddenState(targetWin, hidden);
+            }
+            catch (_a) {
+                // DOM 尚未就緒，交由後續 setTimeout 重試
+            }
+        };
+        apply();
+        targetWin.setTimeout(apply, 100);
+        targetWin.setTimeout(apply, 300);
+        targetWin.setTimeout(apply, 800);
+    }
+    /** 是否為檔案類 view（markdown / pdf / 圖片等），此類 view 不參與強制渲染。 */
+    isFileView(leaf) {
+        var _a;
+        return !!leaf && !!((_a = leaf.view) === null || _a === void 0 ? void 0 : _a.file);
+    }
+    /** 檢查 leaf 的 `.view-content` 是否已渲染出實際內容。 */
+    hasRenderedContent(leaf) {
+        var _a;
+        if (!leaf)
+            return false;
+        const leafEl = leaf.containerEl ||
+            ((_a = leaf.view) === null || _a === void 0 ? void 0 : _a.containerEl);
+        if (!(leafEl instanceof HTMLElement))
+            return false;
+        const content = leafEl.querySelector(".view-content");
+        if (!content)
+            return false;
+        return content.children.length > 0;
+    }
+    /** 強制重新渲染 leaf 的 view（重建視圖，重新執行 onOpen）。 */
+    forceRenderView(leaf) {
+        const extLeaf = leaf;
+        if (typeof extLeaf.rebuildView === "function") {
+            try {
+                extLeaf.rebuildView();
+                return;
+            }
+            catch (e) {
+                console.warn("rebuildView failed, falling back to setViewState:", e);
+            }
+        }
+        // fallback：同型別 setViewState 只會呼叫 setState，不會重建視圖；
+        // 先切成 empty 再切回目標型別以強制重建。
+        const current = typeof extLeaf.getViewState === "function" ? extLeaf.getViewState() : null;
+        const type = current === null || current === void 0 ? void 0 : current.type;
+        if (!type)
+            return;
+        void (() => __awaiter(this, void 0, void 0, function* () {
+            try {
+                yield extLeaf.setViewState({ type: "empty", active: false, state: {} });
+                yield extLeaf.setViewState({ type, active: false, state: current.state || {} });
+            }
+            catch (e) {
+                console.warn("Failed to force render view:", e);
+            }
+        }))();
+    }
+    /** 單次檢查：若 view 未渲染內容則強制重新渲染。 */
+    ensureViewRendered(leaf) {
+        if (!leaf || this.isFileView(leaf))
+            return;
+        if (this.hasRenderedContent(leaf))
+            return;
+        this.forceRenderView(leaf);
+    }
+    /** 以延遲重試方式確保非檔案 view 已渲染（restore 後 DOM 尚未穩定）。 */
+    ensureViewRenderedWithRetries(targetWin, leaf) {
+        const check = () => {
+            var _a;
+            if (!leaf || !((_a = leaf.containerEl) === null || _a === void 0 ? void 0 : _a.isConnected))
+                return;
+            if (this.hasRenderedContent(leaf))
+                return;
+            this.forceRenderView(leaf);
+        };
+        check();
+        targetWin.setTimeout(check, 150);
+        targetWin.setTimeout(check, 400);
+        targetWin.setTimeout(check, 900);
+    }
     /**
      * 根據 ID 查找 leaf
      */
@@ -3671,7 +4089,7 @@ class SaveLayoutModal extends obsidian.Modal {
         this.onSubmit = onSubmit;
     }
     onOpen() {
-        var _a, _b, _c, _d;
+        var _a, _b, _c, _d, _e, _f, _g;
         this.setTitle(t("saveModal.title"));
         const { contentEl } = this;
         contentEl.empty();
@@ -3705,8 +4123,9 @@ class SaveLayoutModal extends obsidian.Modal {
             cls: "setting-item-name ws-info-title",
         });
         const infoList = infoEl.createEl("ul");
+        const totalTabs = ((_b = this.layout.metadata) === null || _b === void 0 ? void 0 : _b.tabCount) || ((_d = (_c = this.layout.workspace) === null || _c === void 0 ? void 0 : _c.leaves) === null || _d === void 0 ? void 0 : _d.length) || 0;
         infoList.createEl("li", {
-            text: `${t("manageModal.fileCount")}: ${this.layout.metadata.fileCount}`,
+            text: `${t("manageModal.tabCount")}: ${totalTabs}`,
         });
         infoList.createEl("li", {
             text: `${t("manageModal.createdDate")}: ${i18n.formatDate(new Date(this.layout.timestamp))}`,
@@ -3715,10 +4134,10 @@ class SaveLayoutModal extends obsidian.Modal {
             text: `${t("saveModal.windowSize")}: ${this.layout.windowState.size.width} x ${this.layout.windowState.size.height}`,
         });
         // 選項
-        let includeGeometry = (_b = this.layout.includeGeometry) !== null && _b !== void 0 ? _b : (this.layout.windowState.position !== undefined ||
+        let includeGeometry = (_e = this.layout.includeGeometry) !== null && _e !== void 0 ? _e : (this.layout.windowState.position !== undefined ||
             (this.layout.windowState.size && this.layout.windowState.size.width > 0));
         let geometryToggleComponent = null;
-        let archived = (_c = this.layout.archived) !== null && _c !== void 0 ? _c : false;
+        let archived = (_f = this.layout.archived) !== null && _f !== void 0 ? _f : false;
         new obsidian.Setting(contentEl)
             .setName(t("saveModal.includeGeometry"))
             .setDesc(t("saveModal.includeGeometryDesc"))
@@ -3751,7 +4170,7 @@ class SaveLayoutModal extends obsidian.Modal {
         // 獲取目前全域已存在的所有 Sections
         const allSpaces = this.plugin.manager.getSavedLayouts();
         const existingSectionsSet = new Set();
-        (((_d = this.plugin.settings) === null || _d === void 0 ? void 0 : _d.sectionsOrder) || []).forEach((s) => existingSectionsSet.add(s));
+        (((_g = this.plugin.settings) === null || _g === void 0 ? void 0 : _g.sectionsOrder) || []).forEach((s) => existingSectionsSet.add(s));
         allSpaces.forEach((s) => (s.sections || []).forEach((sec) => existingSectionsSet.add(sec)));
         const existingSections = Array.from(existingSectionsSet);
         // 1. 上方 Setting 列：左側 Sections 標籤，右側 新標籤輸入欄 (對齊 Space Name 樣式與大小)
@@ -3880,6 +4299,411 @@ class SaveLayoutModal extends obsidian.Modal {
     }
 }
 
+/**
+ * View type 列舉與解析工具。
+ *
+ * 三層組合（設計書 §4.3）：
+ * 1. 內建精選清單（固定、可離線）。
+ * 2. 防禦式讀取 `app.viewRegistry.viewByType`（非公開 API，try/catch）。
+ * 3. 自訂 type 輸入（由設定頁處理）。
+ */
+/** 內建側欄可用的精選 View（icon 為 Lucide icon 名稱）。 */
+const BUILTIN_SIDEBAR_VIEWS = [
+    { viewType: "file-explorer", label: "File explorer", icon: "folder", side: "left" },
+    { viewType: "search", label: "Search", icon: "search", side: "left" },
+    { viewType: "outline", label: "Outline", icon: "list-tree", side: "left" },
+    { viewType: "window-spaces-layouts", label: "Window Spaces", icon: "layout", side: "left" },
+    { viewType: "bookmarks", label: "Bookmarks", icon: "bookmark", side: "right" },
+    { viewType: "backlink", label: "Backlinks", icon: "link", side: "right" },
+    { viewType: "tag", label: "Tags", icon: "tag", side: "right" },
+    { viewType: "all-properties", label: "Properties", icon: "list", side: "right" },
+    { viewType: "canvas", label: "Canvas", icon: "frame", side: "right" },
+];
+/** 已知非側欄可嵌入的 View type（列舉時排除）。 */
+const EXCLUDED_VIEW_TYPES = new Set([
+    "empty",
+    "markdown",
+    "pdf",
+    "image",
+    "audio",
+    "video",
+    "release-notes",
+    "sync",
+]);
+function getViewRegistry(app) {
+    var _a;
+    return (_a = app === null || app === void 0 ? void 0 : app.viewRegistry) !== null && _a !== void 0 ? _a : {};
+}
+/** 從 viewRegistry 動態取得 view type 清單（防禦式）。 */
+function getRegistryViewTypes(app) {
+    try {
+        const registry = getViewRegistry(app);
+        const viewByType = registry.viewByType;
+        if (!viewByType || typeof viewByType !== "object")
+            return [];
+        return Object.keys(viewByType).filter((type) => !EXCLUDED_VIEW_TYPES.has(type));
+    }
+    catch (_a) {
+        return [];
+    }
+}
+/** 設定 icon 並驗證是否成功渲染（無效名稱會產生空 svg）。 */
+function setIconWithCheck(el, name) {
+    try {
+        el.empty();
+        obsidian.setIcon(el, name);
+        const svg = el.querySelector("svg");
+        return !!svg && svg.children.length > 0;
+    }
+    catch (_a) {
+        return false;
+    }
+}
+/** 檔案類型 view 的固定 icon（Obsidian 無公開的文件類型 icon API）。 */
+const FILE_VIEW_ICONS = {
+    markdown: "file-text",
+    pdf: "file-text",
+    image: "image",
+    audio: "audio",
+    video: "video",
+    canvas: "frame",
+};
+/** 取得某 view type 的 icon（檔案固定 icon → 快取 → 內建清單 → fallback）。 */
+function resolveViewIcon(_app, viewType) {
+    var _a, _b;
+    const fixedFileIcon = FILE_VIEW_ICONS[viewType];
+    if (fixedFileIcon)
+        return fixedFileIcon;
+    const cached = iconCache.get(viewType);
+    if (cached === null || cached === void 0 ? void 0 : cached.icon)
+        return cached.icon;
+    const builtin = BUILTIN_SIDEBAR_VIEWS.find((item) => item.viewType === viewType);
+    const icon = (_a = builtin === null || builtin === void 0 ? void 0 : builtin.icon) !== null && _a !== void 0 ? _a : null;
+    iconCache.set(viewType, { icon, dynamicAttempted: (_b = cached === null || cached === void 0 ? void 0 : cached.dynamicAttempted) !== null && _b !== void 0 ? _b : false });
+    return icon !== null && icon !== void 0 ? icon : "layout";
+}
+/**
+ * 把 view 的 icon 套用到按鈕上：
+ * - 0：檔案類型 view 使用固定 icon。
+ * - 快取/內建硬編碼 icon。
+ * - 兜底："layout"。
+ * 若 `opts.allowDynamicIcon`（activity bar 中的 view 且無自訂 icon），在一般路徑都找不到
+ * icon 時，會以非同步觸發動態偵測（掃描全部視窗已開啟的 leaf → 動態建立不可見實體），
+ * 找到後直接更新按鈕。
+ */
+function applyViewIcon(btn, app, viewType, opts) {
+    var _a, _b, _c;
+    // 0：檔案類型 view 使用固定 icon
+    const fixedFileIcon = FILE_VIEW_ICONS[viewType];
+    if (fixedFileIcon && setIconWithCheck(btn, fixedFileIcon))
+        return;
+    const cached = iconCache.get(viewType);
+    const icon = (_c = (_a = cached === null || cached === void 0 ? void 0 : cached.icon) !== null && _a !== void 0 ? _a : (_b = BUILTIN_SIDEBAR_VIEWS.find((item) => item.viewType === viewType)) === null || _b === void 0 ? void 0 : _b.icon) !== null && _c !== void 0 ? _c : null;
+    if (icon) {
+        setIconWithCheck(btn, icon);
+    }
+    else {
+        obsidian.setIcon(btn, "layout");
+    }
+    // 動態偵測（gated）：僅在「無固定/內建 icon」且「此 view 位於 activity bar」且「尚未嘗試過」時進行，
+    // 避免為無關 view 浪費掃描 / 建立實體的開銷。
+    if (!icon && (opts === null || opts === void 0 ? void 0 : opts.allowDynamicIcon) && !(cached === null || cached === void 0 ? void 0 : cached.dynamicAttempted)) {
+        iconCache.set(viewType, { icon: null, dynamicAttempted: true });
+        void detectViewIcon(app, viewType).then((dynamicIcon) => {
+            if (!dynamicIcon)
+                return;
+            iconCache.set(viewType, { icon: dynamicIcon, dynamicAttempted: true });
+            if (btn.isConnected)
+                setIconWithCheck(btn, dynamicIcon);
+        });
+    }
+}
+/**
+ * 套用 ActivityBarItem 的 icon：若有自訂 icon 先用自訂，否則走 applyViewIcon
+ * （並允許動態偵測，因為這是 activity bar 中已設定的 view）。
+ */
+function applyItemIcon(btn, app, item) {
+    if (item.icon && setIconWithCheck(btn, item.icon))
+        return;
+    applyViewIcon(btn, app, item.viewType, { allowDynamicIcon: true });
+}
+const iconCache = new Map();
+/** 掃描全部視窗已開啟的 leaf，找該 view 的實體並取其 `view.getIcon()`。 */
+function findIconFromOpenLeaves(app, viewType) {
+    let found = null;
+    const ws = app.workspace;
+    if (typeof ws.iterateAllLeaves !== "function")
+        return null;
+    ws.iterateAllLeaves((leaf) => {
+        if (found)
+            return;
+        const view = leaf === null || leaf === void 0 ? void 0 : leaf.view;
+        if (!view)
+            return;
+        try {
+            const vt = typeof view.getViewType === "function" ? view.getViewType() : "";
+            if (vt !== viewType)
+                return;
+            const icon = typeof view.getIcon === "function" ? view.getIcon() : "";
+            if (icon && typeof icon === "string")
+                found = icon;
+        }
+        catch (_a) {
+            // skip this leaf
+        }
+    });
+    return found;
+}
+/** 以多種內部存取方式取得 view creator（registry 方法 → entry 欄位）。 */
+function getViewCreatorForType(app, viewType) {
+    var _a;
+    const registry = getViewRegistry(app);
+    let creator = null;
+    if (typeof registry.getViewCreator === "function") {
+        const c = registry.getViewCreator(viewType);
+        if (typeof c === "function")
+            creator = c;
+    }
+    if (!creator) {
+        const entry = ((_a = registry.viewByType) !== null && _a !== void 0 ? _a : {})[viewType];
+        // 情況 A：viewByType[type] 本身就是 view creator function
+        if (typeof entry === "function") {
+            creator = entry;
+        }
+        else if (entry && typeof entry === "object") {
+            // 情況 B：entry 物件內含 creator 欄位
+            for (const key of ["creator", "view", "viewCreator"]) {
+                const candidate = entry[key];
+                if (typeof candidate === "function") {
+                    creator = candidate;
+                    break;
+                }
+            }
+        }
+    }
+    return creator;
+}
+/** 嘗試直接呼叫 registry entry 上的 getIcon（若 Obsidian 內部有提供）。 */
+function getIconFromRegistryEntry(app, viewType) {
+    var _a;
+    const entry = (_a = getViewRegistry(app).viewByType) === null || _a === void 0 ? void 0 : _a[viewType];
+    if (entry && typeof entry.getIcon === "function") {
+        try {
+            const icon = entry.getIcon();
+            if (icon && typeof icon === "string")
+                return icon;
+        }
+        catch (_b) {
+            // fallthrough
+        }
+    }
+    return null;
+}
+/** 動態建立該 view 的一個不可見實體（detached container）並取其 `getIcon()`。 */
+function getIconFromEphemeralView(app, viewType) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const creator = getViewCreatorForType(app, viewType);
+        if (!creator)
+            return null;
+        const host = document.createElement("div");
+        host.style.display = "none";
+        try {
+            document.body.appendChild(host);
+            // 提供完整點的 fake leaf（Obsidian View 建構子會讀 leaf.app / viewState / history 等）
+            const leaf = {
+                app,
+                containerEl: host,
+                view: null,
+                viewState: { type: viewType, state: {}, eState: {} },
+                // View 基底建構子建立導覽按鈕時會讀 leaf.history.backHistory / forwardHistory
+                history: { backHistory: [], forwardHistory: [] },
+                parent: null,
+                getViewState: () => ({ type: viewType, state: {}, eState: {} }),
+                setViewState: () => Promise.resolve(),
+                getRoot: () => null,
+                detach: () => undefined,
+            };
+            const view = creator(leaf);
+            leaf.view = view;
+            const icon = typeof view.getIcon === "function" ? view.getIcon() : "";
+            return icon && typeof icon === "string" ? icon : null;
+        }
+        catch (error) {
+            console.debug(`[Window Spaces] Ephemeral view creation failed for "${viewType}"`, error);
+            return null;
+        }
+        finally {
+            host.remove();
+        }
+    });
+}
+/** 以真實 leaf（getLeaf + setViewState）建立實體取 icon，讀取後立即 detach。 */
+function getIconFromRealLeaf(app, viewType) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const workspace = app.workspace;
+        if (typeof workspace.getLeaf !== "function")
+            return null;
+        let leaf = null;
+        try {
+            leaf = workspace.getLeaf("tab");
+            // 先隱藏 leaf 容器再開 view，避免 tab 開啟觸發版面計算（forced reflow）
+            const container = leaf.containerEl;
+            if (container instanceof HTMLElement) {
+                container.style.display = "none";
+            }
+            yield leaf.setViewState({ type: viewType, active: false, state: {} });
+            const view = leaf.view;
+            const icon = view && typeof view.getIcon === "function" ? view.getIcon() : "";
+            return icon && typeof icon === "string" ? icon : null;
+        }
+        catch (_a) {
+            return null;
+        }
+        finally {
+            if (leaf && typeof leaf.detach === "function") {
+                try {
+                    leaf.detach();
+                }
+                catch (_b) {
+                    // ignore
+                }
+            }
+        }
+    });
+}
+/** 動態偵測 view icon：掃全部視窗 → registry entry → 不可見實體 → 真實 leaf 兜底。 */
+function detectViewIcon(app, viewType) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const openIcon = findIconFromOpenLeaves(app, viewType);
+        if (openIcon)
+            return openIcon;
+        const entryIcon = getIconFromRegistryEntry(app, viewType);
+        if (entryIcon)
+            return entryIcon;
+        const ephemeralIcon = yield getIconFromEphemeralView(app, viewType);
+        if (ephemeralIcon)
+            return ephemeralIcon;
+        return getIconFromRealLeaf(app, viewType);
+    });
+}
+/**
+ * 重新進行動態 icon 偵測（掃描全部視窗 + 動態建立不可見實體）。
+ * 用於使用者從 View type list 選定新的 view、且該 view 尚未解析到 icon 時。
+ * 已有 icon 時直接回傳快取結果。
+ */
+function ensureViewIcon(app, viewType) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const cached = iconCache.get(viewType);
+        if (cached === null || cached === void 0 ? void 0 : cached.icon)
+            return cached.icon;
+        const icon = yield detectViewIcon(app, viewType);
+        iconCache.set(viewType, { icon, dynamicAttempted: true });
+        return icon;
+    });
+}
+/** 設定頁 icon 選擇器提供的候選 icon 清單。 */
+const ICON_CHOICES = [
+    "folder", "search", "list-tree", "bookmark", "link", "tag", "list",
+    "layout", "frame", "canvas", "history", "star", "hash", "file-text",
+    "image", "audio", "video", "calendar", "mail", "message-square",
+    "command", "terminal", "code", "pen", "pencil", "note", "copy",
+    "settings", "sliders-horizontal", "filter", "globe", "eye",
+    "eye-off", "check", "x", "plus", "minus", "arrow-right", "arrow-left",
+    "arrow-up", "arrow-down", "chevron-up", "chevron-down", "chevron-left",
+    "chevron-right", "panel-left", "panel-right", "panel-top", "panel-bottom",
+    "columns", "rows", "layout-grid", "layout-list", "grid", "inbox",
+    "archive", "trash", "refresh-cw", "more-horizontal", "more-vertical",
+];
+/**
+ * 將 viewType ID 美化為標題大小寫（如 "folder-spaces-explorer" -> "Folder Spaces Explorer"）。
+ */
+function formatViewTypeId(viewType) {
+    if (!viewType)
+        return "";
+    return viewType
+        .split(/[-_]+/)
+        .filter(Boolean)
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" ");
+}
+/** 取得某 view type 的顯示名稱（registry → 內建清單 → 美化 viewType）。 */
+function resolveViewLabel(app, viewType) {
+    // 1. 優先取 view 自己在 viewRegistry 註冊的 display text
+    try {
+        const registry = getViewRegistry(app);
+        const label = typeof registry.getDisplayText === "function" ? registry.getDisplayText(viewType) : "";
+        if (label)
+            return label;
+    }
+    catch (_a) {
+        // fallthrough
+    }
+    // 2. 取內建清單
+    const builtin = BUILTIN_SIDEBAR_VIEWS.find((item) => item.viewType === viewType);
+    if (builtin === null || builtin === void 0 ? void 0 : builtin.label)
+        return builtin.label;
+    // 3. Fallback：純粹將 ID 的 '-' 替換為空格，單詞首字母大寫
+    return formatViewTypeId(viewType);
+}
+/**
+ * 將內建精選 + 動態 registry view 合併為「可用 view type」清單（去重）。
+ * 回傳 items 已依照 `side` 分派至 left / right。
+ */
+function enumerateAvailableViews(app) {
+    const seen = new Set();
+    const left = [];
+    const right = [];
+    const push = (item) => {
+        if (seen.has(item.viewType))
+            return;
+        seen.add(item.viewType);
+        if (item.side === "right")
+            right.push(item);
+        else
+            left.push(item);
+    };
+    BUILTIN_SIDEBAR_VIEWS.forEach(push);
+    const registryTypes = getRegistryViewTypes(app);
+    for (const type of registryTypes) {
+        if (!seen.has(type)) {
+            push({
+                viewType: type,
+                side: "left",
+            });
+        }
+    }
+    return { left, right };
+}
+
+/** Obsidian `SettingGroup` 建構式（1.12.7+；舊版為 undefined）。 */
+const SettingGroupCtor = obsidian__namespace.SettingGroup;
+/** 多欄 + 捲軸的 icon 選擇器 Modal。 */
+class IconPickerModal extends obsidian.Modal {
+    constructor(app, onSelect) {
+        super(app);
+        this.onSelect = onSelect;
+    }
+    onOpen() {
+        const { contentEl } = this;
+        contentEl.addClass("window-spaces-icon-picker");
+        contentEl.createEl("h3", { text: t("settings.pickIcon") });
+        const grid = contentEl.createDiv({ cls: "window-spaces-icon-grid" });
+        ICON_CHOICES.forEach((iconName) => {
+            const btn = grid.createEl("button", {
+                cls: "clickable-icon",
+                attr: { type: "button", title: iconName },
+            });
+            obsidian.setIcon(btn, iconName);
+            btn.onclick = () => {
+                this.onSelect(iconName);
+                this.close();
+            };
+        });
+    }
+    onClose() {
+        this.contentEl.empty();
+    }
+}
 class WindowSpacesSettingTab extends obsidian.PluginSettingTab {
     constructor(app, plugin) {
         super(app, plugin);
@@ -3889,93 +4713,303 @@ class WindowSpacesSettingTab extends obsidian.PluginSettingTab {
     getSettingDefinitions() {
         return [];
     }
+    /** 建立 SettingGroup（若當前 Obsidian 版本支援）；不支援則回傳 null。 */
+    createGroup(containerEl) {
+        if (SettingGroupCtor) {
+            try {
+                return new SettingGroupCtor(containerEl);
+            }
+            catch (_a) {
+                return null;
+            }
+        }
+        return null;
+    }
+    /** 在 SettingGroup 或 HTMLElement 容器中建立並設定一個 Setting。 */
+    createSettingIn(container, configure) {
+        const group = container;
+        if (group && typeof group.addSetting === "function") {
+            let result = null;
+            group.addSetting((setting) => {
+                result = setting;
+                configure(setting);
+            });
+            return result;
+        }
+        const setting = new obsidian.Setting(container);
+        configure(setting);
+        return setting;
+    }
     display() {
+        var _a, _b, _c;
         const { containerEl } = this;
         containerEl.empty();
         new obsidian.Setting(containerEl).setName(t("settings.title")).setHeading();
-        // 一般設定
-        new obsidian.Setting(containerEl).setName(t("settings.autoSaveSection")).setHeading();
-        new obsidian.Setting(containerEl)
-            .setName(t("settings.showNotifications"))
-            .setDesc(t("settings.showNotificationsDesc"))
-            .addToggle((toggle) => {
-            toggle.setValue(this.plugin.settings.showNotifications !== false);
-            toggle.onChange((value) => __awaiter(this, void 0, void 0, function* () {
-                this.plugin.settings.showNotifications = value;
-                yield this.plugin.saveSettings();
-            }));
-        });
-        new obsidian.Setting(containerEl)
-            .setName(t("settings.autoSaveEnabled"))
-            .setDesc(t("settings.autoSaveDescription"))
-            .addToggle((toggle) => {
-            toggle.setValue(this.plugin.settings.autoSave === true);
-            toggle.onChange((value) => __awaiter(this, void 0, void 0, function* () {
-                this.plugin.settings.autoSave = value;
-                yield this.plugin.saveSettings();
-                if (value) {
-                    this.setupAutoSave();
-                }
-                else {
-                    this.removeAutoSave();
-                }
-            }));
-        });
-        new obsidian.Setting(containerEl).setName(t("settings.layoutDisplaySection")).setHeading();
-        new obsidian.Setting(containerEl)
-            .setName(t("settings.showLayoutStatusBar"))
-            .setDesc(t("settings.showLayoutStatusBarDesc"))
-            .addToggle((toggle) => {
-            toggle.setValue(this.plugin.settings.showLayoutStatusBar === true);
-            toggle.onChange((value) => __awaiter(this, void 0, void 0, function* () {
-                this.plugin.settings.showLayoutStatusBar = value;
-                yield this.plugin.saveSettings();
-                this.plugin.manager.refreshLayoutLabels();
-            }));
-        });
-        new obsidian.Setting(containerEl)
-            .setName(t("settings.showWindowLayoutsRibbonIcon"))
-            .setDesc(t("settings.showWindowLayoutsRibbonIconDesc"))
-            .addToggle((toggle) => {
-            toggle.setValue(this.plugin.settings.showWindowLayoutsRibbonIcon !== false);
-            toggle.onChange((value) => __awaiter(this, void 0, void 0, function* () {
-                this.plugin.settings.showWindowLayoutsRibbonIcon = value;
-                yield this.plugin.saveSettings();
-                this.plugin.refreshRibbonIcons();
-            }));
-        });
-        new obsidian.Setting(containerEl)
-            .setName(t("settings.maxLayouts"))
-            .setDesc(t("settings.maxLayoutsDesc"))
-            .addSlider((slider) => {
-            slider
-                .setLimits(0, 50, 1)
-                .setValue(this.plugin.settings.maxLayouts || 20)
-                .setDynamicTooltip()
-                .onChange((value) => __awaiter(this, void 0, void 0, function* () {
-                this.plugin.settings.maxLayouts = value;
-                yield this.plugin.saveSettings();
-            }));
-        });
-        // 危險操作
-        new obsidian.Setting(containerEl).setName(t("settings.resetSettings")).setHeading();
-        new obsidian.Setting(containerEl)
-            .setName(t("settings.resetSettings"))
-            .setDesc(t("settings.resetSettingsDescription"))
-            .addButton((button) => {
-            button
-                .setButtonText(t("settings.resetButton"))
-                .setWarning()
-                .onClick(() => __awaiter(this, void 0, void 0, function* () {
-                const confirmed = yield this.showConfirmDialog(t("settings.resetConfirmMessage"), t("settings.resetConfirmTitle"));
-                if (confirmed) {
-                    this.plugin.settings.spaces = [];
+        // ===== 一般設定（單一 panel） =====
+        const generalGroup = (_a = this.createGroup(containerEl)) !== null && _a !== void 0 ? _a : containerEl;
+        this.createSettingIn(generalGroup, (s) => s.setName(t("settings.autoSaveSection")).setHeading());
+        this.createSettingIn(generalGroup, (s) => {
+            s.setName(t("settings.showNotifications")).setDesc(t("settings.showNotificationsDesc"));
+            s.addToggle((toggle) => {
+                toggle.setValue(this.plugin.settings.showNotifications !== false);
+                toggle.onChange((value) => __awaiter(this, void 0, void 0, function* () {
+                    this.plugin.settings.showNotifications = value;
                     yield this.plugin.saveSettings();
-                    this.display(); // 重新顯示設定頁面
-                    new obsidian.Notice(t("settings.resetSuccess"));
-                }
-            }));
+                }));
+            });
         });
+        this.createSettingIn(generalGroup, (s) => {
+            s.setName(t("settings.autoSaveEnabled")).setDesc(t("settings.autoSaveDescription"));
+            s.addToggle((toggle) => {
+                toggle.setValue(this.plugin.settings.autoSave === true);
+                toggle.onChange((value) => __awaiter(this, void 0, void 0, function* () {
+                    this.plugin.settings.autoSave = value;
+                    yield this.plugin.saveSettings();
+                    if (value) {
+                        this.setupAutoSave();
+                    }
+                    else {
+                        this.removeAutoSave();
+                    }
+                }));
+            });
+        });
+        // ===== Popout 空間顯示（單一 panel） =====
+        const displayGroup = (_b = this.createGroup(containerEl)) !== null && _b !== void 0 ? _b : containerEl;
+        this.createSettingIn(displayGroup, (s) => s.setName(t("settings.layoutDisplaySection")).setHeading());
+        this.createSettingIn(displayGroup, (s) => {
+            s.setName(t("settings.showLayoutStatusBar")).setDesc(t("settings.showLayoutStatusBarDesc"));
+            s.addToggle((toggle) => {
+                toggle.setValue(this.plugin.settings.showLayoutStatusBar === true);
+                toggle.onChange((value) => __awaiter(this, void 0, void 0, function* () {
+                    this.plugin.settings.showLayoutStatusBar = value;
+                    yield this.plugin.saveSettings();
+                    this.plugin.manager.refreshLayoutLabels();
+                }));
+            });
+        });
+        this.createSettingIn(displayGroup, (s) => {
+            s.setName(t("settings.showWindowLayoutsRibbonIcon")).setDesc(t("settings.showWindowLayoutsRibbonIconDesc"));
+            s.addToggle((toggle) => {
+                toggle.setValue(this.plugin.settings.showWindowLayoutsRibbonIcon !== false);
+                toggle.onChange((value) => __awaiter(this, void 0, void 0, function* () {
+                    this.plugin.settings.showWindowLayoutsRibbonIcon = value;
+                    yield this.plugin.saveSettings();
+                    this.plugin.refreshRibbonIcons();
+                }));
+            });
+        });
+        this.createSettingIn(displayGroup, (s) => {
+            s.setName(t("settings.maxLayouts")).setDesc(t("settings.maxLayoutsDesc"));
+            s.addSlider((slider) => {
+                slider
+                    .setLimits(0, 50, 1)
+                    .setValue(this.plugin.settings.maxLayouts || 20)
+                    .setDynamicTooltip()
+                    .onChange((value) => __awaiter(this, void 0, void 0, function* () {
+                    this.plugin.settings.maxLayouts = value;
+                    yield this.plugin.saveSettings();
+                }));
+            });
+        });
+        // ===== Popout 側欄（Activity Bars） =====
+        this.renderActivityBarSection(containerEl);
+        // ===== 危險操作（單一 panel） =====
+        const dangerGroup = (_c = this.createGroup(containerEl)) !== null && _c !== void 0 ? _c : containerEl;
+        this.createSettingIn(dangerGroup, (s) => s.setName(t("settings.resetSettings")).setHeading());
+        this.createSettingIn(dangerGroup, (s) => {
+            s.setName(t("settings.resetSettings")).setDesc(t("settings.resetSettingsDescription"));
+            s.addButton((button) => {
+                button
+                    .setButtonText(t("settings.resetButton"))
+                    .setWarning()
+                    .onClick(() => __awaiter(this, void 0, void 0, function* () {
+                    const confirmed = yield this.showConfirmDialog(t("settings.resetConfirmMessage"), t("settings.resetConfirmTitle"));
+                    if (confirmed) {
+                        this.plugin.settings.spaces = [];
+                        yield this.plugin.saveSettings();
+                        this.display(); // 重新顯示設定頁面
+                        new obsidian.Notice(t("settings.resetSuccess"));
+                    }
+                }));
+            });
+        });
+    }
+    /** 渲染 Popout 側欄（Activity Bars）設定區塊（每個子區塊各自一個 SettingGroup panel）。 */
+    renderActivityBarSection(section) {
+        var _a;
+        const mainGroup = (_a = this.createGroup(section)) !== null && _a !== void 0 ? _a : section;
+        this.createSettingIn(mainGroup, (s) => s.setName(t("settings.popoutSidebarSection")).setHeading());
+        this.createSettingIn(mainGroup, (s) => {
+            s.setName(t("settings.enableInterceptor")).setDesc(t("settings.enableInterceptorDesc"));
+            s.addToggle((toggle) => {
+                toggle.setValue(this.plugin.settings.workspaceInterceptorEnabled !== false);
+                toggle.onChange((value) => __awaiter(this, void 0, void 0, function* () {
+                    this.plugin.settings.workspaceInterceptorEnabled = value;
+                    this.plugin.workspaceInterceptor.enabled = value;
+                    yield this.plugin.saveSettings();
+                }));
+            });
+        });
+        this.createSettingIn(mainGroup, (s) => {
+            s.setName(t("settings.enableActivityBars")).setDesc(t("settings.enableActivityBarsDesc"));
+            s.addToggle((toggle) => {
+                toggle.setValue(this.plugin.settings.showActivityBars !== false);
+                toggle.onChange((value) => __awaiter(this, void 0, void 0, function* () {
+                    this.plugin.settings.showActivityBars = value;
+                    yield this.plugin.saveSettings();
+                    this.plugin.activityBars.refreshAll();
+                    this.display();
+                }));
+            });
+        });
+        this.renderActivityBarSide(section, "left", t("settings.leftBar"));
+        this.renderActivityBarSide(section, "right", t("settings.rightBar"));
+    }
+    /** 渲染單一側欄 view 項目列，回傳用於 surgical 更新的 handle。 */
+    renderSideItemRow(container, side, item, onChanged) {
+        let iconBtn = null;
+        const row = this.createSettingIn(container, (s) => {
+            const resolvedLabel = resolveViewLabel(this.app, item.viewType);
+            s.setName(item.label || resolvedLabel);
+            s.setDesc(item.viewType);
+            s.addButton((button) => {
+                iconBtn = button;
+                button.setIcon(item.icon || resolveViewIcon(this.app, item.viewType)).setTooltip(t("settings.pickIcon"));
+                button.onClick(() => {
+                    const modal = new IconPickerModal(this.app, (iconName) => {
+                        item.icon = iconName;
+                        void this.plugin.saveSettings().then(() => {
+                            this.plugin.activityBars.refreshAll();
+                            iconBtn === null || iconBtn === void 0 ? void 0 : iconBtn.setIcon(iconName);
+                        });
+                    });
+                    modal.open();
+                });
+            });
+            s.addButton((button) => {
+                button.setIcon("rotate-ccw").setTooltip(t("settings.restoreDefaultIcon"));
+                button.onClick(() => {
+                    item.icon = undefined;
+                    void this.plugin.saveSettings().then(() => {
+                        this.plugin.activityBars.refreshAll();
+                        // 先以既有快取顯示；再重新動態偵測預設 icon（不持久化，維持「還原預設」語義）
+                        iconBtn === null || iconBtn === void 0 ? void 0 : iconBtn.setIcon(resolveViewIcon(this.app, item.viewType));
+                        void ensureViewIcon(this.app, item.viewType).then((icon) => {
+                            if (!icon || item.icon)
+                                return;
+                            iconBtn === null || iconBtn === void 0 ? void 0 : iconBtn.setIcon(icon);
+                        });
+                    });
+                });
+            });
+            s.addButton((button) => {
+                button.setButtonText(t("settings.removeView")).setWarning().onClick(() => {
+                    var _a, _b, _c;
+                    const current = (_b = (_a = this.plugin.settings.activityBars) === null || _a === void 0 ? void 0 : _a[side]) !== null && _b !== void 0 ? _b : [];
+                    const idx = current.indexOf(item);
+                    if (idx >= 0) {
+                        current.splice(idx, 1);
+                        this.plugin.settings.activityBars = (_c = this.plugin.settings.activityBars) !== null && _c !== void 0 ? _c : { left: [], right: [] };
+                        this.plugin.settings.activityBars[side] = current;
+                    }
+                    void this.plugin.saveSettings().then(() => {
+                        this.plugin.activityBars.refreshAll();
+                        row.settingEl.remove();
+                        onChanged === null || onChanged === void 0 ? void 0 : onChanged();
+                    });
+                });
+            });
+        });
+        return { row, updateIcon: (icon) => iconBtn === null || iconBtn === void 0 ? void 0 : iconBtn.setIcon(icon) };
+    }
+    /** 重建「新增 view」下拉選單的選項（排除已加入的 view type）。 */
+    rebuildViewSelect(selectEl, side) {
+        var _a, _b;
+        selectEl.empty();
+        const available = enumerateAvailableViews(this.app);
+        const allTypes = Array.from(new Set([...available.left, ...available.right].map((item) => item.viewType)));
+        const current = (_b = (_a = this.plugin.settings.activityBars) === null || _a === void 0 ? void 0 : _a[side]) !== null && _b !== void 0 ? _b : [];
+        allTypes.forEach((viewType) => {
+            if (current.some((item) => item.viewType === viewType))
+                return;
+            const label = resolveViewLabel(this.app, viewType);
+            const option = selectEl.createEl("option", {
+                value: viewType,
+                text: label,
+            });
+            option.setAttr("data-icon", resolveViewIcon(this.app, viewType));
+        });
+    }
+    renderActivityBarSide(section, side, heading) {
+        var _a, _b, _c, _d;
+        // 每個側欄是一個 SettingGroup（單一 panel）
+        const group = (_a = this.createGroup(section)) !== null && _a !== void 0 ? _a : section;
+        this.createSettingIn(group, (s) => s.setName(heading).setHeading());
+        const items = (_c = (_b = this.plugin.settings.activityBars) === null || _b === void 0 ? void 0 : _b[side]) !== null && _c !== void 0 ? _c : [];
+        if (items.length === 0) {
+            this.createSettingIn(group, (s) => s.setDesc(t("settings.addView")));
+        }
+        // 先建立 add-row（capture selectEl 供 callback 使用），最後再移到底部
+        let selectEl;
+        let customInput;
+        const addRow = this.createSettingIn(group, (s) => {
+            selectEl = s.controlEl.createEl("select", {
+                cls: "dropdown",
+            });
+            customInput = s.controlEl.createEl("input", {
+                type: "text",
+                placeholder: t("settings.viewTypePlaceholder"),
+            });
+            customInput.addClass("window-spaces-view-type-input");
+            s.addButton((button) => {
+                button.setButtonText(t("settings.addView")).onClick(() => {
+                    var _a, _b, _c;
+                    const selected = selectEl.value.trim();
+                    const custom = customInput.value.trim();
+                    const viewType = custom || selected;
+                    if (!viewType)
+                        return;
+                    const current = (_b = (_a = this.plugin.settings.activityBars) === null || _a === void 0 ? void 0 : _a[side]) !== null && _b !== void 0 ? _b : [];
+                    if (current.some((item) => item.viewType === viewType))
+                        return;
+                    const newItem = {
+                        viewType,
+                        side,
+                        label: undefined,
+                        icon: resolveViewIcon(this.app, viewType),
+                    };
+                    current.push(newItem);
+                    this.plugin.settings.activityBars = (_c = this.plugin.settings.activityBars) !== null && _c !== void 0 ? _c : { left: [], right: [] };
+                    this.plugin.settings.activityBars[side] = current;
+                    void this.plugin.saveSettings().then(() => {
+                        this.plugin.activityBars.refreshAll();
+                        // surgical：在 add-row 前插入新列，並重建下拉（移除已加入的 type）
+                        const { row, updateIcon } = this.renderSideItemRow(group, side, newItem);
+                        addRow.settingEl.before(row.settingEl);
+                        customInput.value = "";
+                        refreshSelect();
+                        // 該 view 之前未找到/設定 icon（落入通用 fallback）→ 重新動態偵測並補上真實 icon
+                        if (newItem.icon === "layout") {
+                            void ensureViewIcon(this.app, viewType).then((icon) => {
+                                if (!icon || icon === newItem.icon)
+                                    return;
+                                newItem.icon = icon;
+                                updateIcon(icon);
+                                void this.plugin.saveSettings();
+                            });
+                        }
+                    });
+                });
+            });
+        });
+        const refreshSelect = () => this.rebuildViewSelect(selectEl, side);
+        items.forEach((item) => {
+            this.renderSideItemRow(group, side, item, refreshSelect);
+        });
+        // 把 add-row 移到 items 之後（保持「view 列 → add-row」順序）
+        (_d = addRow.settingEl.parentElement) === null || _d === void 0 ? void 0 : _d.appendChild(addRow.settingEl);
+        refreshSelect();
     }
     setupAutoSave() {
         this.plugin.registerEvent(this.app.workspace.on("layout-change", () => {
@@ -4082,6 +5116,1091 @@ class WindowLayoutsView extends obsidian.ItemView {
     }
 }
 
+const INITIAL_SPLIT_RATIO = 0.34;
+/** 判斷 DOM Window 是否為 Popout。 */
+function isPopoutWindow(win) {
+    var _a;
+    if (!win || win === window)
+        return false;
+    const body = (_a = win.document) === null || _a === void 0 ? void 0 : _a.body;
+    return !!body && (body.classList.contains("is-popout-window") || body.classList.contains("mod-popout"));
+}
+/** 取得 leaf 所屬的 DOM Window。 */
+function getWindowOfLeaf(leaf) {
+    var _a, _b, _c;
+    if (!leaf)
+        return null;
+    const extLeaf = leaf;
+    const container = extLeaf.containerEl || ((_a = leaf.view) === null || _a === void 0 ? void 0 : _a.containerEl);
+    return (_c = (_b = container === null || container === void 0 ? void 0 : container.ownerDocument) === null || _b === void 0 ? void 0 : _b.defaultView) !== null && _c !== void 0 ? _c : null;
+}
+/** 測量 WorkspaceTabs 容器本身的 DOMRect（背景 tab 寬高為 0，需測 tabs 容器）。 */
+function getPaneRect(tabs) {
+    var _a, _b;
+    const container = tabs === null || tabs === void 0 ? void 0 : tabs.containerEl;
+    if (container instanceof HTMLElement) {
+        const rect = container.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0)
+            return rect;
+    }
+    const children = ((_a = tabs === null || tabs === void 0 ? void 0 : tabs.children) !== null && _a !== void 0 ? _a : []);
+    for (const leaf of children) {
+        const extLeaf = leaf;
+        const leafContainer = extLeaf.containerEl || ((_b = leaf.view) === null || _b === void 0 ? void 0 : _b.containerEl);
+        if (leafContainer instanceof HTMLElement) {
+            const rect = leafContainer.getBoundingClientRect();
+            if (rect.width > 0 && rect.height > 0)
+                return rect;
+        }
+    }
+    return null;
+}
+/** 向上追溯至 Popout 視窗層級的最頂層 Split 節點。 */
+function getTopLevelNodeInWindow(leaf) {
+    let curr = leaf;
+    while (curr && curr.parent) {
+        const parent = curr.parent;
+        if (!parent || !parent.parent || parent.type === "root" || parent.isRoot || parent.kind === "root") {
+            return curr;
+        }
+        curr = parent;
+    }
+    return curr;
+}
+/** 尋找 leaf 的 containerEl 距離最近（含自身）的祖先中的 `.mod-root` split 元素。 */
+function findRootSplitElement(element) {
+    let node = element;
+    while (node) {
+        if (node.classList.contains("workspace-split") && node.classList.contains("mod-root")) {
+            return node;
+        }
+        node = node.parentElement;
+    }
+    return null;
+}
+/** 找到 leaf 在其 parent split 下的 direct child 元素（`.workspace-tabs` 或巢狀 split）。 */
+function getPaneContainerElement(leaf) {
+    var _a;
+    const extLeaf = leaf;
+    const container = extLeaf.containerEl || ((_a = leaf.view) === null || _a === void 0 ? void 0 : _a.containerEl);
+    if (!(container instanceof HTMLElement))
+        return null;
+    let current = container;
+    while (current && current.parentElement) {
+        if (current.parentElement.classList.contains("workspace-split")) {
+            return current;
+        }
+        current = current.parentElement;
+    }
+    return null;
+}
+/** 是否為隱藏狀態（inline display:none）。 */
+function isElementHidden(el) {
+    return !!el && el.style.display === "none";
+}
+/** 透過 Obsidian 樣式 Helper 設定 display（禁止直接指派 el.style.display）。 */
+function setElementDisplay(el, display) {
+    const customEl = el;
+    if (typeof customEl.setCssProps === "function") {
+        customEl.setCssProps({ display });
+    }
+    else {
+        el.style.display = display;
+    }
+}
+function setElementCssStyles(el, styles) {
+    const customEl = el;
+    if (typeof customEl.setCssStyles === "function") {
+        customEl.setCssStyles(styles);
+    }
+    else if (typeof customEl.setCssProps === "function") {
+        customEl.setCssProps(styles);
+    }
+    else {
+        for (const [key, value] of Object.entries(styles)) {
+            el.style.setProperty(key, value);
+        }
+    }
+}
+function getViewContainer(leaf) {
+    var _a;
+    const extLeaf = leaf;
+    const container = extLeaf.containerEl || ((_a = leaf.view) === null || _a === void 0 ? void 0 : _a.containerEl);
+    return container instanceof HTMLElement ? container : null;
+}
+function getDirectSplitChild(split, element) {
+    let current = element;
+    while (current && current.parentElement !== split) {
+        current = current.parentElement;
+    }
+    return current;
+}
+function scheduleInitialSplitSizing(panelLeaf, editorLeaf, win) {
+    var _a;
+    const raf = ((_a = win.requestAnimationFrame) === null || _a === void 0 ? void 0 : _a.bind(win)) || window.requestAnimationFrame.bind(window);
+    raf(() => {
+        raf(() => {
+            applyInitialSplitSizing(panelLeaf, editorLeaf);
+        });
+    });
+}
+function applyInitialSplitSizing(panelLeaf, editorLeaf) {
+    const panelContainer = getViewContainer(panelLeaf);
+    const editorContainer = getViewContainer(editorLeaf);
+    if (!panelContainer || !editorContainer)
+        return;
+    const split = panelContainer.closest(".workspace-split.mod-vertical");
+    if (!split || !split.contains(editorContainer))
+        return;
+    const panelPane = getDirectSplitChild(split, panelContainer);
+    const editorPane = getDirectSplitChild(split, editorContainer);
+    if (!panelPane || !editorPane || panelPane === editorPane)
+        return;
+    setElementCssStyles(panelPane, { flex: `0 0 ${INITIAL_SPLIT_RATIO * 100}%` });
+    setElementCssStyles(editorPane, { flex: "1 1 0%" });
+}
+function findLeafInTabs(tabs, viewType) {
+    var _a, _b;
+    const children = ((_a = tabs === null || tabs === void 0 ? void 0 : tabs.children) !== null && _a !== void 0 ? _a : []);
+    for (const leaf of children) {
+        if (((_b = leaf.getViewState()) === null || _b === void 0 ? void 0 : _b.type) === viewType) {
+            return leaf;
+        }
+    }
+    return null;
+}
+class PopoutLayoutEngine {
+    constructor(app) {
+        this.app = app;
+    }
+    get workspace() {
+        return this.app.workspace;
+    }
+    /** 取得指定視窗中最新的 active leaf（限定該 window）。 */
+    getActiveLeafInWindow(win) {
+        const activeLeaf = typeof this.workspace.getMostRecentLeaf === "function"
+            ? this.workspace.getMostRecentLeaf()
+            : this.workspace.activeLeaf;
+        return activeLeaf && getWindowOfLeaf(activeLeaf) === win ? activeLeaf : null;
+    }
+    /** 取得指定視窗中最後一個 leaf（限定該 window）。 */
+    getLastLeafInWindow(win) {
+        let lastLeaf = null;
+        this.workspace.iterateAllLeaves((leaf) => {
+            if (getWindowOfLeaf(leaf) === win) {
+                lastLeaf = leaf;
+            }
+        });
+        return lastLeaf;
+    }
+    /** 取得指定視窗中所有 leaf。 */
+    getLeavesForWindow(win) {
+        const leaves = [];
+        this.workspace.iterateAllLeaves((leaf) => {
+            if (getWindowOfLeaf(leaf) === win) {
+                leaves.push(leaf);
+            }
+        });
+        return leaves;
+    }
+    /** 取得所有目前存活的 Popout DOM Window（去重）。 */
+    getLivePopoutWindows() {
+        const wins = [];
+        this.workspace.iterateAllLeaves((leaf) => {
+            const win = getWindowOfLeaf(leaf);
+            if (win && isPopoutWindow(win) && !wins.includes(win)) {
+                wins.push(win);
+            }
+        });
+        return wins;
+    }
+    /** 收集 Popout 視窗中的所有 Pane（測量 tabs 容器）。 */
+    collectPopoutPanes(win) {
+        const tabsSet = new Set();
+        this.workspace.iterateAllLeaves((leaf) => {
+            if (getWindowOfLeaf(leaf) !== win)
+                return;
+            const parent = leaf.parent;
+            if (parent) {
+                tabsSet.add(parent);
+            }
+        });
+        const panes = [];
+        for (const tabs of tabsSet) {
+            const rect = getPaneRect(tabs);
+            const left = rect ? rect.left : 0;
+            const width = rect ? rect.width : 400;
+            panes.push({ tabs, left, width, center: left + width / 2 });
+        }
+        panes.sort((a, b) => a.left - b.left);
+        return panes;
+    }
+    /** 在指定頂層欄位內尋找特定 view type 的 leaf（限定該欄位，不跨 tab group / 不跨側欄）。 */
+    findLeafOfTypeInColumn(win, columnEl, viewType) {
+        let found = null;
+        this.workspace.iterateAllLeaves((leaf) => {
+            var _a, _b;
+            if (found)
+                return;
+            if (getWindowOfLeaf(leaf) !== win || ((_a = leaf.getViewState()) === null || _a === void 0 ? void 0 : _a.type) !== viewType)
+                return;
+            const extLeaf = leaf;
+            const container = extLeaf.containerEl || ((_b = leaf.view) === null || _b === void 0 ? void 0 : _b.containerEl);
+            if (container instanceof HTMLElement && columnEl.contains(container)) {
+                found = leaf;
+            }
+        });
+        return found;
+    }
+    findLeafByIdInWindow(win, leafId) {
+        let found = null;
+        this.workspace.iterateAllLeaves((leaf) => {
+            if (!found && getWindowOfLeaf(leaf) === win && leaf.id === leafId) {
+                found = leaf;
+            }
+        });
+        return found;
+    }
+    pickCenterPopoutPane(panes, win) {
+        const firstPane = panes[0];
+        if (!firstPane)
+            return null;
+        if (panes.length === 1)
+            return firstPane;
+        const winCenter = win.innerWidth / 2;
+        let bestPane = firstPane;
+        let bestDistance = Infinity;
+        for (const pane of panes) {
+            const distance = Math.abs(pane.center - winCenter);
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                bestPane = pane;
+            }
+        }
+        return bestPane;
+    }
+    /**
+     * 確保指定 Popout 的某側存在「側欄欄位」（結構化：第一/最後頂層欄位即側欄），
+     * 並開啟/聚焦指定 view type。
+     * - viewType 有值：建立/聚焦該 view 的 leaf。
+     * - viewType 無值：僅確保欄位存在並回傳一個空 leaf（供攔截器由第三方設定 view）。
+     */
+    ensureSideColumn(win, side, viewType) {
+        var _a;
+        return __awaiter(this, void 0, void 0, function* () {
+            const workspace = this.workspace;
+            const columnEl = this.getColumnElement(win, side);
+            if (columnEl) {
+                const tabs = this.getSidebarTabsInColumn(win, columnEl);
+                if (tabs) {
+                    if (viewType) {
+                        const existingInSidebar = findLeafInTabs(tabs, viewType);
+                        if (existingInSidebar) {
+                            yield workspace.revealLeaf(existingInSidebar);
+                            workspace.setActiveLeaf(existingInSidebar, { focus: true });
+                            return existingInSidebar;
+                        }
+                    }
+                    const newLeaf = viewType
+                        ? yield this.openPanelInTabs(tabs, viewType)
+                        : this.createLeafInTabs(tabs);
+                    yield workspace.revealLeaf(newLeaf);
+                    workspace.setActiveLeaf(newLeaf, { focus: true });
+                    return newLeaf;
+                }
+            }
+            // 尚無側欄欄位：建立貫穿全高的垂直 Split 欄位
+            let editorLeaf = this.getActiveLeafInWindow(win) || this.getLastLeafInWindow(win);
+            if (editorLeaf && viewType && ((_a = editorLeaf.getViewState()) === null || _a === void 0 ? void 0 : _a.type) === viewType) {
+                let otherLeaf = null;
+                workspace.iterateAllLeaves((l) => {
+                    var _a;
+                    if (!otherLeaf && getWindowOfLeaf(l) === win && ((_a = l.getViewState()) === null || _a === void 0 ? void 0 : _a.type) !== viewType) {
+                        otherLeaf = l;
+                    }
+                });
+                if (otherLeaf)
+                    editorLeaf = otherLeaf;
+            }
+            if (!editorLeaf) {
+                return this.openPanelInEditor(win, viewType);
+            }
+            const targetNode = getTopLevelNodeInWindow(editorLeaf) || editorLeaf;
+            const isParentNode = targetNode !== editorLeaf && Boolean(targetNode.children);
+            const before = side === "left" ? !isParentNode : isParentNode;
+            const panelLeaf = workspace.createLeafBySplit(targetNode, "vertical", before);
+            if (viewType) {
+                yield panelLeaf.setViewState({
+                    type: viewType,
+                    active: false,
+                    state: {},
+                });
+            }
+            scheduleInitialSplitSizing(panelLeaf, editorLeaf, win);
+            yield workspace.revealLeaf(panelLeaf);
+            workspace.setActiveLeaf(panelLeaf, { focus: true });
+            return panelLeaf;
+        });
+    }
+    /**
+     * 在指定側欄欄位（頂層 column 元素）內解析目標 tabs 群組：
+     * 優先取該欄位中 active leaf 所在的 pane，否則第一個 pane 的 tabs。
+     */
+    getSidebarTabsInColumn(win, columnEl) {
+        const activeLeaf = this.getActiveLeafInWindow(win);
+        if (activeLeaf) {
+            const tabs = this.getTabsForLeafInColumn(win, columnEl, activeLeaf);
+            if (tabs)
+                return tabs;
+        }
+        let firstTabs = null;
+        this.workspace.iterateAllLeaves((leaf) => {
+            if (firstTabs)
+                return;
+            const tabs = this.getTabsForLeafInColumn(win, columnEl, leaf);
+            if (tabs)
+                firstTabs = tabs;
+        });
+        return firstTabs;
+    }
+    /** 若 leaf 位於指定 column 元素內，回傳其所屬 tabs 群組；否則 null。 */
+    getTabsForLeafInColumn(win, columnEl, leaf) {
+        var _a, _b;
+        if (getWindowOfLeaf(leaf) !== win)
+            return null;
+        const extLeaf = leaf;
+        const container = extLeaf.containerEl || ((_a = leaf.view) === null || _a === void 0 ? void 0 : _a.containerEl);
+        if (container instanceof HTMLElement && columnEl.contains(container)) {
+            return (_b = extLeaf.parent) !== null && _b !== void 0 ? _b : null;
+        }
+        return null;
+    }
+    /** 攔截器專用：在指定側欄回傳一個 leaf（欄位不存在則建立），供第三方設定 view state。 */
+    openSideLeaf(win, side) {
+        return __awaiter(this, void 0, void 0, function* () {
+            return this.ensureSideColumn(win, side);
+        });
+    }
+    /**
+     * 攔截器專用（同步版本）：`app.workspace.getLeftLeaf` 為同步 API，無法 await。
+     * 同步建立/回傳側欄 leaf，不進行 reveal / setViewState（由第三方呼叫端後續設定）。
+     */
+    openSideLeafSync(win, side) {
+        const workspace = this.workspace;
+        const columnEl = this.getColumnElement(win, side);
+        if (columnEl) {
+            const tabs = this.getSidebarTabsInColumn(win, columnEl);
+            if (tabs) {
+                return this.createLeafInTabs(tabs);
+            }
+        }
+        let editorLeaf = this.getActiveLeafInWindow(win) || this.getLastLeafInWindow(win);
+        if (!editorLeaf)
+            return null;
+        const targetNode = getTopLevelNodeInWindow(editorLeaf) || editorLeaf;
+        const isParentNode = targetNode !== editorLeaf && Boolean(targetNode.children);
+        const before = side === "left" ? !isParentNode : isParentNode;
+        const panelLeaf = workspace.createLeafBySplit(targetNode, "vertical", before);
+        scheduleInitialSplitSizing(panelLeaf, editorLeaf, win);
+        return panelLeaf;
+    }
+    createLeafInTabs(tabs) {
+        var _a;
+        const workspace = this.workspace;
+        const children = ((_a = tabs === null || tabs === void 0 ? void 0 : tabs.children) !== null && _a !== void 0 ? _a : []);
+        const leaf = workspace.createLeafInParent(tabs, children.length);
+        return leaf;
+    }
+    openPanelInTabs(tabs, viewType) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const leaf = this.createLeafInTabs(tabs);
+            yield leaf.setViewState({
+                type: viewType,
+                active: true,
+                state: {},
+            });
+            return leaf;
+        });
+    }
+    /**
+     * 統一入口：在指定 Popout 開啟/聚焦指定 view type。
+     * - location "left"/"right"：側欄欄位。
+     * - location "tab"：中央編輯區域。
+     */
+    openPanel(win, location, viewType) {
+        return __awaiter(this, void 0, void 0, function* () {
+            if (location === "left" || location === "right") {
+                return this.ensureSideColumn(win, location, viewType);
+            }
+            return this.ensureCenterPanel(win, viewType);
+        });
+    }
+    /** 在指定 Popout 的中央編輯區域開啟/聚焦指定 view type。 */
+    ensureCenterPanel(win, viewType) {
+        var _a;
+        return __awaiter(this, void 0, void 0, function* () {
+            const workspace = this.workspace;
+            const panes = this.collectPopoutPanes(win);
+            const targetPane = this.pickCenterPopoutPane(panes, win);
+            if (targetPane) {
+                const existingInTabs = findLeafInTabs(targetPane.tabs, viewType);
+                if (existingInTabs) {
+                    yield workspace.revealLeaf(existingInTabs);
+                    workspace.setActiveLeaf(existingInTabs, { focus: true });
+                    return existingInTabs;
+                }
+                return this.openPanelInTabs(targetPane.tabs, viewType);
+            }
+            const baseLeaf = (_a = this.getActiveLeafInWindow(win)) !== null && _a !== void 0 ? _a : this.getLastLeafInWindow(win);
+            if (!baseLeaf) {
+                const leaf = workspace.getLeaf("tab");
+                yield leaf.setViewState({
+                    type: viewType,
+                    active: true,
+                    state: {},
+                });
+                yield workspace.revealLeaf(leaf);
+                workspace.setActiveLeaf(leaf, { focus: true });
+                return leaf;
+            }
+            const tabs = baseLeaf.parent;
+            if (tabs) {
+                const existingInTabs = findLeafInTabs(tabs, viewType);
+                if (existingInTabs) {
+                    yield workspace.revealLeaf(existingInTabs);
+                    workspace.setActiveLeaf(existingInTabs, { focus: true });
+                    return existingInTabs;
+                }
+            }
+            const leaf = yield this.openPanelInTabs(tabs, viewType);
+            yield workspace.revealLeaf(leaf);
+            workspace.setActiveLeaf(leaf, { focus: true });
+            return leaf;
+        });
+    }
+    openPanelInEditor(win, viewType) {
+        var _a;
+        return __awaiter(this, void 0, void 0, function* () {
+            const workspace = this.workspace;
+            const panes = this.collectPopoutPanes(win);
+            const targetPane = this.pickCenterPopoutPane(panes, win);
+            if (targetPane) {
+                if (viewType) {
+                    const existingInTabs = findLeafInTabs(targetPane.tabs, viewType);
+                    if (existingInTabs)
+                        return existingInTabs;
+                }
+                return viewType
+                    ? this.openPanelInTabs(targetPane.tabs, viewType)
+                    : this.createLeafInTabs(targetPane.tabs);
+            }
+            const baseLeaf = (_a = this.getActiveLeafInWindow(win)) !== null && _a !== void 0 ? _a : this.getLastLeafInWindow(win);
+            if (!baseLeaf) {
+                const leaf = workspace.getLeaf("tab");
+                if (viewType) {
+                    yield leaf.setViewState({ type: viewType, active: true, state: {} });
+                }
+                return leaf;
+            }
+            const tabs = baseLeaf.parent;
+            if (tabs && viewType) {
+                const existingInTabs = findLeafInTabs(tabs, viewType);
+                if (existingInTabs)
+                    return existingInTabs;
+            }
+            return viewType ? this.openPanelInTabs(tabs, viewType) : this.createLeafInTabs(tabs);
+        });
+    }
+    // ===== 隱藏/還原 =====
+    /**
+     * 取得 Popout 視窗 Root split 的頂層欄位元素（依 DOM 結構，不依賴幾何測量，
+     * 因此即使欄位被 display:none 隱藏仍能正確定址）。
+     */
+    getTopLevelColumnElements(win) {
+        var _a;
+        const leaves = this.getLeavesForWindow(win);
+        if (leaves.length === 0)
+            return [];
+        const leaf = leaves[0];
+        const container = leaf.containerEl ||
+            ((_a = leaf.view) === null || _a === void 0 ? void 0 : _a.containerEl);
+        if (!(container instanceof HTMLElement))
+            return [];
+        const rootEl = findRootSplitElement(container);
+        if (!rootEl)
+            return [];
+        return Array.from(rootEl.children).filter((el) => {
+            if (!(el instanceof HTMLElement))
+                return false;
+            return (el.classList.contains("workspace-tabs") ||
+                el.classList.contains("workspace-split"));
+        });
+    }
+    /** 取得指定側的頂層欄位元素（DOM 結構優先，display-independent）。 */
+    getColumnElement(win, side) {
+        // 幾何測量（collectPopoutColumns）量不到 display:none 的欄位，側欄隱藏時會被
+        // 誤判為最右/最左的可見欄位；因此一律先以 root split 的 direct children
+        // （DOM 順序）定位左右側欄，隱藏中的側欄仍在 DOM 中，不受影響。
+        const topEls = this.getTopLevelColumnElements(win);
+        if (topEls.length >= 2) {
+            return side === "left" ? topEls[0] : topEls[topEls.length - 1];
+        }
+        return null;
+    }
+    /** 目前仍可見的頂層欄位數量（display:none 的欄位不計）。 */
+    getVisibleColumnCount(win) {
+        return this.getTopLevelColumnElements(win).filter((el) => !isElementHidden(el)).length;
+    }
+    isColumnHidden(win, side) {
+        return isElementHidden(this.getColumnElement(win, side));
+    }
+    hideColumn(win, side) {
+        const column = this.getColumnElement(win, side);
+        if (column)
+            setElementDisplay(column, "none");
+    }
+    showColumn(win, side) {
+        const column = this.getColumnElement(win, side);
+        if (column)
+            setElementDisplay(column, "");
+    }
+    hidePaneGroup(leaf) {
+        const container = getPaneContainerElement(leaf);
+        if (container)
+            setElementDisplay(container, "none");
+    }
+    // ===== 持久化 =====
+    /** 讀取指定視窗目前隱藏的欄位與 pane group。 */
+    captureHiddenState(win) {
+        const state = {};
+        const leftEl = this.getColumnElement(win, "left");
+        if (leftEl)
+            state.leftSidebar = isElementHidden(leftEl);
+        const rightEl = this.getColumnElement(win, "right");
+        if (rightEl)
+            state.rightSidebar = isElementHidden(rightEl);
+        const hiddenIds = [];
+        this.getLeavesForWindow(win).forEach((leaf) => {
+            const container = getPaneContainerElement(leaf);
+            if (container && isElementHidden(container)) {
+                const id = leaf.id;
+                if (id)
+                    hiddenIds.push(id);
+            }
+        });
+        if (hiddenIds.length > 0) {
+            state.hiddenLeafIds = hiddenIds;
+        }
+        return state;
+    }
+    /** 於 restore 完成後重新套用隱藏狀態。 */
+    applyHiddenState(win, state) {
+        if (!state || !win || win.closed)
+            return;
+        if (state.leftSidebar)
+            this.hideColumn(win, "left");
+        if (state.rightSidebar)
+            this.hideColumn(win, "right");
+        if (Array.isArray(state.hiddenLeafIds)) {
+            state.hiddenLeafIds.forEach((leafId) => {
+                const leaf = this.findLeafByIdInWindow(win, leafId);
+                if (leaf)
+                    this.hidePaneGroup(leaf);
+            });
+        }
+    }
+}
+
+/**
+ * Popout Activity Bar 控制器。
+ *
+ * 在每個 Popout 左右邊緣注入垂直工具列：
+ * - 頂端：toggle 本側欄位按鈕。
+ * - 分隔線下方：設定指定的 view 切換按鈕。
+ * 欄位隱藏由 `PopoutLayoutEngine` 的 CSS display 機制處理。
+ * 另外在左上角注入可拖曳移動視窗的 drag handle。
+ */
+class PopoutActivityBarManager {
+    constructor(plugin, engine) {
+        this.barsByWindow = new WeakMap();
+        this.injectedWindows = new Set();
+        this.app = plugin.app;
+        this.plugin = plugin;
+        this.engine = engine;
+    }
+    get settings() {
+        return this.plugin.settings;
+    }
+    isEnabled() {
+        return this.settings.showActivityBars !== false;
+    }
+    getItemsForSide(side) {
+        var _a, _b;
+        return (_b = (_a = this.settings.activityBars) === null || _a === void 0 ? void 0 : _a[side]) !== null && _b !== void 0 ? _b : [];
+    }
+    /**
+     * 套用 sidebar toggle icon（設計階段決定的靜態 Lucide icon，與主視窗一致）：
+     * - 欄位開啟（可收合）：`panel-left` / `panel-right`
+     * - 欄位隱藏（可展開）：`panel-left-open` / `panel-right-open`
+     */
+    applySidebarToggleIcon(btn, side, hidden) {
+        const openIcon = side === "left" ? "panel-left" : "panel-right";
+        const closedIcon = side === "left" ? "panel-left-open" : "panel-right-open";
+        if (!setIconWithCheck(btn, hidden ? closedIcon : openIcon)) {
+            obsidian.setIcon(btn, openIcon);
+        }
+    }
+    /** 針對單一 Popout 注入（若已注入且仍連接著 DOM 則重新渲染按鈕）。 */
+    injectForWindow(win) {
+        var _a;
+        if (!win || win.closed || !isPopoutWindow(win))
+            return;
+        if (!this.isEnabled()) {
+            this.cleanupWindow(win);
+            return;
+        }
+        // 跳過 Obsidian 自己的 UI 視窗（如設定 popout：含 modal container），
+        // 避免注入 Activity Bar / 攔截器影響其運作。
+        const body = (_a = win.document) === null || _a === void 0 ? void 0 : _a.body;
+        if (!body) {
+            this.cleanupWindow(win);
+            return;
+        }
+        if (body.querySelector(".modal-container")) {
+            this.cleanupWindow(win);
+            return;
+        }
+        const existing = this.barsByWindow.get(win);
+        if (existing && existing.left.isConnected) {
+            this.renderWindow(win);
+            return;
+        }
+        const left = body.createDiv({ cls: "window-spaces-activity-bar window-spaces-activity-left" });
+        // 只有左側 bar 有拖曳 handle（右上方是原生視窗控制鈕，不能遮蓋）
+        left.createDiv({ cls: "window-spaces-activity-drag" });
+        const right = body.createDiv({ cls: "window-spaces-activity-bar window-spaces-activity-right" });
+        this.barsByWindow.set(win, {
+            left,
+            right,
+            viewButtons: new Map(),
+            columnButtons: {
+                left: left.createEl("button", { cls: "window-spaces-activity-btn clickable-icon", attr: { type: "button", "aria-label": t("activityBar.toggleColumn"), title: t("activityBar.toggleColumn") } }),
+                right: right.createEl("button", { cls: "window-spaces-activity-btn clickable-icon", attr: { type: "button", "aria-label": t("activityBar.toggleColumn"), title: t("activityBar.toggleColumn") } }),
+            },
+        });
+        body.classList.add("window-spaces-has-left-activity");
+        body.classList.add("window-spaces-has-right-activity");
+        this.renderWindow(win);
+    }
+    /** 移除單一 Popout 的 activity bar 與 body class。 */
+    cleanupWindow(win) {
+        var _a;
+        const bars = this.barsByWindow.get(win);
+        if (bars) {
+            bars.left.remove();
+            bars.right.remove();
+        }
+        this.barsByWindow.delete(win);
+        this.injectedWindows.delete(win);
+        const body = (_a = win.document) === null || _a === void 0 ? void 0 : _a.body;
+        body === null || body === void 0 ? void 0 : body.classList.remove("window-spaces-has-left-activity");
+        body === null || body === void 0 ? void 0 : body.classList.remove("window-spaces-has-right-activity");
+    }
+    /** 清理所有已注入的 Popout。 */
+    cleanupAll() {
+        Array.from(this.injectedWindows).forEach((win) => this.cleanupWindow(win));
+    }
+    /** 重新注入並渲染所有存活 Popout，並清理已關閉視窗的殘留（layout-change 時呼叫）。 */
+    refreshAll() {
+        const live = this.engine.getLivePopoutWindows();
+        live.forEach((win) => this.injectForWindow(win));
+        Array.from(this.injectedWindows).forEach((win) => {
+            if (!live.includes(win))
+                this.cleanupWindow(win);
+        });
+    }
+    /** 重建指定視窗的按鈕內容。 */
+    renderWindow(win) {
+        const bars = this.barsByWindow.get(win);
+        if (!bars)
+            return;
+        this.renderBar(bars, win, "left");
+        this.renderBar(bars, win, "right");
+        this.updateActiveStates(win);
+    }
+    renderBar(bars, win, side) {
+        const bar = side === "left" ? bars.left : bars.right;
+        // 移除舊的 view 按鈕與分隔線（保留 bar 容器與固定按鈕）
+        bar.querySelectorAll(".window-spaces-activity-view, .window-spaces-activity-divider").forEach((el) => el.remove());
+        bars.viewButtons.clear();
+        // 固定控制按鈕：插入於 drag handle 之後、視圖按鈕之前
+        const colBtn = side === "left" ? bars.columnButtons.left : bars.columnButtons.right;
+        const isHidden = this.engine.isColumnHidden(win, side);
+        this.applySidebarToggleIcon(colBtn, side, isHidden);
+        colBtn.onclick = (evt) => {
+            evt.preventDefault();
+            evt.stopPropagation();
+            this.toggleColumn(win, side);
+        };
+        const drag = bar.querySelector(".window-spaces-activity-drag");
+        if (drag) {
+            drag.after(colBtn);
+        }
+        else {
+            bar.prepend(colBtn);
+        }
+        // 固定控制與 view 按鈕之間的分隔線
+        bar.createDiv({ cls: "window-spaces-activity-divider" });
+        const items = this.getItemsForSide(side);
+        const configuredTypes = new Set();
+        for (const item of items) {
+            const label = item.label || resolveViewLabel(this.app, item.viewType);
+            const btn = bar.createEl("button", {
+                cls: "window-spaces-activity-btn window-spaces-activity-view clickable-icon",
+                attr: { type: "button", "aria-label": label, title: label },
+            });
+            // 自訂 icon 優先，否則走 A+B 機制
+            applyItemIcon(btn, this.app, item);
+            btn.onclick = (evt) => {
+                evt.preventDefault();
+                evt.stopPropagation();
+                void this.toggleView(win, item);
+            };
+            bars.viewButtons.set(item.viewType, btn);
+            configuredTypes.add(item.viewType);
+        }
+    }
+    /** 更新所有按鈕的 active 狀態。 */
+    updateActiveStates(win) {
+        const bars = this.barsByWindow.get(win);
+        if (!bars)
+            return;
+        this.syncSidebarColumnClasses(win);
+        bars.viewButtons.forEach((btn, viewType) => {
+            // 以按鈕所屬的 bar 判定側（同側的 view 按鈕只反映自己側欄的狀態）
+            const side = bars.left.contains(btn) ? "left" : "right";
+            const columnEl = this.engine.getColumnElement(win, side);
+            let active = false;
+            if (columnEl) {
+                const leaf = this.engine.findLeafOfTypeInColumn(win, columnEl, viewType);
+                if (leaf) {
+                    active = this.isLeafVisibleInSideColumn(win, side, leaf);
+                }
+            }
+            btn.classList.toggle("is-active", active);
+        });
+        this.setColumnActive(bars, win, "left");
+        this.setColumnActive(bars, win, "right");
+    }
+    /** 判斷 Leaf 在所屬 Popout 側欄中是否處於 active (可見/選中) 狀態。 */
+    isLeafVisibleInSideColumn(win, side, leaf) {
+        var _a;
+        if (this.engine.isColumnHidden(win, side))
+            return false;
+        const extLeaf = leaf;
+        const container = extLeaf.containerEl;
+        if (!container)
+            return false;
+        if ((_a = extLeaf.tabEl) === null || _a === void 0 ? void 0 : _a.classList.contains("is-active"))
+            return true;
+        const parent = container.parentElement;
+        if (!parent)
+            return false;
+        const isHidden = container.classList.contains("mod-hidden") ||
+            container.style.display === "none" ||
+            parent.style.display === "none" ||
+            parent.classList.contains("mod-hidden");
+        return !isHidden;
+    }
+    /**
+     * 將視窗最左/最右的頂層欄位標記為 sidebar column，並套用 Obsidian 的
+     * sidebar 相關 class（mod-sidedock / mod-left-split / mod-right-split），
+     * 使其 tab 使用與主視窗 sidebar 一致的樣式。
+     *
+     * 注意：這些 sidebar class 只能套用在 `.workspace-tabs` 元素上（tab header 樣式
+     * 依賴 `.mod-left-split .workspace-tab-header` 等 descendant selector），
+     * 不能套用在 `.workspace-split` 容器上——Obsidian 的
+     * `.workspace-split.mod-left-split, .workspace-split.mod-right-split { flex: 0 0 auto }`
+     * 會把巢狀 split 容器壓扁成 width 0，導致 sidebar 消失。
+     */
+    syncSidebarColumnClasses(win) {
+        const columns = this.engine.getTopLevelColumnElements(win);
+        const last = columns.length - 1;
+        columns.forEach((el, index) => {
+            const isSidebar = columns.length >= 2 && (index === 0 || index === last);
+            el.classList.toggle("window-spaces-sidebar-column", isSidebar);
+            // split 容器本身絕不能套用 mod-left-split/mod-right-split（會被 flex 壓扁），
+            // 若有殘留（先前 sync 或 Obsidian 自己加的）也一併清除。
+            if (el.classList.contains("workspace-split")) {
+                el.classList.remove("mod-sidedock", "mod-left-split", "mod-right-split");
+            }
+            const tabGroups = this.getSidebarTabGroups(el);
+            tabGroups.forEach((tabsEl) => {
+                tabsEl.classList.toggle("mod-sidedock", isSidebar);
+                tabsEl.classList.toggle("mod-left-split", isSidebar && index === 0);
+                tabsEl.classList.toggle("mod-right-split", isSidebar && index === last);
+            });
+            if (isSidebar) {
+                this.ensureSidebarFileTabIcons(win, el);
+            }
+        });
+    }
+    /** 取得欄位內需要套用 sidebar 樣式的 tab group 元素（不含 split 容器本身）。 */
+    getSidebarTabGroups(columnEl) {
+        if (columnEl.classList.contains("workspace-tabs")) {
+            return [columnEl];
+        }
+        return Array.from(columnEl.querySelectorAll(".workspace-tabs"));
+    }
+    /** DOM fallback：側欄中頁籤若無 icon（部分情境 Obsidian 不渲染），補上 icon。 */
+    ensureSidebarFileTabIcons(win, columnEl) {
+        columnEl.querySelectorAll(".workspace-tab-header").forEach((tabEl) => {
+            var _a, _b;
+            let iconEl = tabEl.querySelector(".workspace-tab-header-inner-icon");
+            if (!iconEl) {
+                iconEl = tabEl.createDiv({ cls: "workspace-tab-header-inner-icon" });
+                tabEl.prepend(iconEl);
+            }
+            if (iconEl.querySelector("svg"))
+                return;
+            const viewType = tabEl.getAttribute("data-type") || "markdown";
+            // 該 tab 對應的 leaf 一定開在目前欄位內：直接取 view 實體的 icon，避免全域掃描
+            const leaf = this.engine.findLeafOfTypeInColumn(win, columnEl, viewType);
+            const leafIcon = leaf ? (_b = (_a = leaf.view).getIcon) === null || _b === void 0 ? void 0 : _b.call(_a) : "";
+            if (leafIcon && setIconWithCheck(iconEl, leafIcon))
+                return;
+            applyViewIcon(iconEl, this.app, viewType);
+        });
+    }
+    setColumnActive(bars, win, side) {
+        const columnEl = this.engine.getColumnElement(win, side);
+        const hidden = !!columnEl && this.engine.isColumnHidden(win, side);
+        const active = !!columnEl && !hidden;
+        bars.columnButtons[side].classList.toggle("is-active", active);
+        // 依開合狀態切換 toggle 圖示（模仿主視窗）
+        this.applySidebarToggleIcon(bars.columnButtons[side], side, hidden);
+    }
+    /** 該視窗是否已注入 Activity Bar（供攔截器判斷是否為本外掛管理的視窗）。 */
+    isInjected(win) {
+        return this.barsByWindow.has(win);
+    }
+    /** 更新所有已注入視窗的 active 狀態（layout-change 時呼叫）。 */
+    updateActiveStatesAll() {
+        Array.from(this.injectedWindows).forEach((win) => this.updateActiveStates(win));
+    }
+    // ===== 互動邏輯 =====
+    toggleView(win, item) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const side = item.side;
+            // 只在自己的側欄欄位內找該 view（不跨中央編輯區 / 不跨對側 sidebar）
+            const columnEl = this.engine.getColumnElement(win, side);
+            const leaf = columnEl ? this.engine.findLeafOfTypeInColumn(win, columnEl, item.viewType) : null;
+            if (leaf) {
+                if (this.engine.isColumnHidden(win, side)) {
+                    // 側欄隱藏中 → 顯示並切到該 view
+                    this.engine.showColumn(win, side);
+                    yield this.revealAndActivate(leaf);
+                }
+                else {
+                    // 側欄顯示中：僅當該 view 目前就是側欄中「可見/顯示中」的 view 時才關閉（toggle off）。
+                    // 判斷以容器可見性為準（背景 tab 內容為 display:none），而非 tab 的 is-active
+                    // （is-active 對應視窗 active leaf，點擊側欄外的 view 時會被移除）。
+                    if (this.isLeafVisibleInSideColumn(win, side, leaf)) {
+                        this.engine.hideColumn(win, side);
+                    }
+                    else {
+                        yield this.revealAndActivate(leaf);
+                    }
+                }
+            }
+            else {
+                // 自己側欄內沒有該 view（即使它存在於中央編輯區或對側 sidebar）→ 開在自己側欄
+                yield this.engine.ensureSideColumn(win, side, item.viewType);
+            }
+            this.updateActiveStates(win);
+        });
+    }
+    revealAndActivate(leaf) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                yield this.app.workspace.revealLeaf(leaf);
+                this.app.workspace.setActiveLeaf(leaf, { focus: true });
+            }
+            catch (_a) {
+                // Ignore focus error
+            }
+        });
+    }
+    toggleColumn(win, side) {
+        const columnEl = this.engine.getColumnElement(win, side);
+        if (!columnEl)
+            return;
+        if (this.engine.isColumnHidden(win, side)) {
+            this.engine.showColumn(win, side);
+        }
+        else {
+            // 防呆：若隱藏後沒有任何可見欄位，則拒絕
+            if (this.engine.getVisibleColumnCount(win) < 2) {
+                new obsidian.Notice(t("activityBar.cannotHideLastPane"));
+                return;
+            }
+            this.engine.hideColumn(win, side);
+        }
+        this.updateActiveStates(win);
+    }
+}
+
+/**
+ * Workspace API 攔截器（Monkey Patch）。
+ *
+ * 攔截 `app.workspace.getLeftLeaf(split)` 與 `getRightLeaf(split)`：
+ * 當呼叫發生於 Popout 視窗（active window 為 Popout）時，將結果路由至該
+ * Popout 的模擬側欄，讓第三方外掛（AI Chatbox、Calendar 等）零修改地把 view
+ * 開到 Popout 側欄，而非跳回主視窗。
+ *
+ * 安全要求（cheatsheet）：
+ * - 薄補丁：僅做「判定 → 路由 → fallback」。
+ * - `onunload()` 時精準還原原始方法；重載防呆避免重複 patch。
+ * - 提供可關閉開關（由 plugin 設定驅動）。
+ */
+class WorkspaceInterceptor {
+    constructor(app) {
+        this.installed = false;
+        this.originalGetLeftLeaf = null;
+        this.originalGetRightLeaf = null;
+        this.originalGetLeavesOfType = null;
+        /** 是否啟用（由 plugin 設定動態讀取）。 */
+        this.enabled = true;
+        /**
+         * 判斷指定視窗是否為「本外掛管理的 Popout」。
+         * 僅對受管理的視窗進行攔截，避免影響 Obsidian 自己的 UI 視窗（如設定 popout）。
+         */
+        this.isManagedWindow = null;
+        this.app = app;
+        this.engine = new PopoutLayoutEngine(app);
+    }
+    install() {
+        var _a, _b, _c;
+        const ws = this.app.workspace;
+        if (!ws || this.installed)
+            return;
+        if (ws._windowSpacesInterceptorInstalled) {
+            // 重載防呆：若上次卸載未完整還原，先還原再重新安裝
+            this.forceRestore();
+        }
+        this.originalGetLeftLeaf = (_a = ws.getLeftLeaf) !== null && _a !== void 0 ? _a : null;
+        this.originalGetRightLeaf = (_b = ws.getRightLeaf) !== null && _b !== void 0 ? _b : null;
+        this.originalGetLeavesOfType = (_c = ws.getLeavesOfType) !== null && _c !== void 0 ? _c : null;
+        ws._windowSpacesOriginalGetLeftLeaf = ws.getLeftLeaf;
+        ws._windowSpacesOriginalGetRightLeaf = ws.getRightLeaf;
+        ws._windowSpacesOriginalGetLeavesOfType = ws.getLeavesOfType;
+        const self = this;
+        ws.getLeftLeaf = function (split) {
+            const intercepted = self.tryIntercept("left");
+            if (intercepted)
+                return intercepted;
+            const original = ws._windowSpacesOriginalGetLeftLeaf;
+            return original ? original.call(ws, split) : null;
+        };
+        ws.getRightLeaf = function (split) {
+            const intercepted = self.tryIntercept("right");
+            if (intercepted)
+                return intercepted;
+            const original = ws._windowSpacesOriginalGetRightLeaf;
+            return original ? original.call(ws, split) : null;
+        };
+        ws.getLeavesOfType = function (type) {
+            const original = ws._windowSpacesOriginalGetLeavesOfType;
+            const leaves = original ? original.call(ws, type) : [];
+            if (!self.enabled || !leaves || leaves.length === 0)
+                return leaves;
+            // 取得目前活動視窗 (activeWindow / window)
+            const currentWin = typeof activeWindow !== "undefined" ? activeWindow : window;
+            // 嚴格過濾：僅傳回與當前活動視窗相同的 leaves，避免外掛跨視窗取得並 active 異地頁籤
+            return leaves.filter((leaf) => {
+                const leafWin = getWindowOfLeaf(leaf);
+                return leafWin === currentWin;
+            });
+        };
+        ws._windowSpacesInterceptorInstalled = true;
+        this.installed = true;
+    }
+    uninstall() {
+        this.forceRestore();
+        this.installed = false;
+    }
+    forceRestore() {
+        const ws = this.app.workspace;
+        if (!ws)
+            return;
+        if (ws._windowSpacesOriginalGetLeftLeaf) {
+            ws.getLeftLeaf = ws._windowSpacesOriginalGetLeftLeaf;
+        }
+        else if (this.originalGetLeftLeaf) {
+            ws.getLeftLeaf = this.originalGetLeftLeaf;
+        }
+        if (ws._windowSpacesOriginalGetRightLeaf) {
+            ws.getRightLeaf = ws._windowSpacesOriginalGetRightLeaf;
+        }
+        else if (this.originalGetRightLeaf) {
+            ws.getRightLeaf = this.originalGetRightLeaf;
+        }
+        if (ws._windowSpacesOriginalGetLeavesOfType) {
+            ws.getLeavesOfType = ws._windowSpacesOriginalGetLeavesOfType;
+        }
+        else if (this.originalGetLeavesOfType) {
+            ws.getLeavesOfType = this.originalGetLeavesOfType;
+        }
+        delete ws._windowSpacesOriginalGetLeftLeaf;
+        delete ws._windowSpacesOriginalGetRightLeaf;
+        delete ws._windowSpacesOriginalGetLeavesOfType;
+        ws._windowSpacesInterceptorInstalled = false;
+    }
+    tryIntercept(side) {
+        if (!this.enabled)
+            return null;
+        const activeWin = this.getActivePopoutWindow();
+        if (!activeWin)
+            return null;
+        // 只攔截受本外掛管理的 Popout，避免誤攔 Obsidian 自己的 UI 視窗
+        if (this.isManagedWindow && !this.isManagedWindow(activeWin)) {
+            return null;
+        }
+        try {
+            return this.engine.openSideLeafSync(activeWin, side);
+        }
+        catch (_a) {
+            return null;
+        }
+    }
+    /** 判定當前 active window 是否為 Popout（三級判定）。 */
+    getActivePopoutWindow() {
+        var _a, _b;
+        // 1. Obsidian 官方 activeWindow 全域
+        if (typeof activeWindow !== "undefined" && activeWindow !== window && isPopoutWindow(activeWindow)) {
+            return activeWindow;
+        }
+        // 2. mostRecentLeaf 的 owner window
+        const ws = this.app.workspace;
+        const leaf = typeof ws.getMostRecentLeaf === "function" ? ws.getMostRecentLeaf() : null;
+        if (leaf) {
+            const win = getWindowOfLeaf(leaf);
+            if (win && isPopoutWindow(win))
+                return win;
+        }
+        // 3. 遍歷 leaf 找 focus 的 Popout
+        let focusedPopout = null;
+        (_b = (_a = this.app.workspace).iterateAllLeaves) === null || _b === void 0 ? void 0 : _b.call(_a, (candidate) => {
+            var _a, _b;
+            const win = getWindowOfLeaf(candidate);
+            if (!focusedPopout && win && isPopoutWindow(win) && ((_b = (_a = win.document) === null || _a === void 0 ? void 0 : _a.hasFocus) === null || _b === void 0 ? void 0 : _b.call(_a))) {
+                focusedPopout = win;
+            }
+        });
+        return focusedPopout;
+    }
+}
+
 const DEFAULT_SETTINGS = {
     spaces: [],
     autoSave: false,
@@ -4095,6 +6214,12 @@ const DEFAULT_SETTINGS = {
     sectionsOrder: [],
     groupBySection: true,
     showArchived: false,
+    showActivityBars: true,
+    activityBars: {
+        left: BUILTIN_SIDEBAR_VIEWS.filter((item) => item.side === "left"),
+        right: BUILTIN_SIDEBAR_VIEWS.filter((item) => item.side === "right"),
+    },
+    workspaceInterceptorEnabled: true,
 };
 class WindowSpacesPlugin extends obsidian.Plugin {
     constructor() {
@@ -4111,6 +6236,21 @@ class WindowSpacesPlugin extends obsidian.Plugin {
             // 初始化管理器
             this.manager = new WindowLayoutManager(this);
             this.manager.registerExistingPopoutWindows();
+            // 初始化 Popout 工作空間增強（Activity Bar + API 攔截器）
+            this.popoutLayout = new PopoutLayoutEngine(this.app);
+            this.activityBars = new PopoutActivityBarManager(this, this.popoutLayout);
+            this.workspaceInterceptor = new WorkspaceInterceptor(this.app);
+            this.workspaceInterceptor.enabled = this.settings.workspaceInterceptorEnabled !== false;
+            // 僅對已注入 Activity Bar 且非 Obsidian UI 視窗（如設定 popout）攔截
+            this.workspaceInterceptor.isManagedWindow = (win) => {
+                var _a, _b;
+                if (!this.activityBars.isInjected(win))
+                    return false;
+                if ((_b = (_a = win.document) === null || _a === void 0 ? void 0 : _a.body) === null || _b === void 0 ? void 0 : _b.querySelector(".modal-container"))
+                    return false;
+                return true;
+            };
+            this.workspaceInterceptor.install();
             // 註冊可固定在側欄或主工作區分頁的 Window Layouts view
             this.registerView(WINDOW_LAYOUTS_VIEW_TYPE, (leaf) => new WindowLayoutsView(leaf, this));
             // 註冊命令
@@ -4121,6 +6261,8 @@ class WindowSpacesPlugin extends obsidian.Plugin {
             this.addSettingTab(new WindowSpacesSettingTab(this.app, this));
             // 設置事件監聽
             this.setupEventListeners();
+            // 為既有 Popout 注入 Activity Bar
+            this.activityBars.refreshAll();
             // 添加狀態欄指示器（可選）
             if (this.settings.showStatusBarIndicator === true) {
                 this.addStatusBarIndicator();
@@ -4128,10 +6270,13 @@ class WindowSpacesPlugin extends obsidian.Plugin {
         });
     }
     onunload() {
-        var _a, _b;
+        var _a, _b, _c, _d;
         (_a = this.windowLayoutsRibbonEl) === null || _a === void 0 ? void 0 : _a.remove();
         this.windowLayoutsRibbonEl = null;
         (_b = this.manager) === null || _b === void 0 ? void 0 : _b.clearLayoutLabels();
+        // 清理 Activity Bar 與 API 攔截器
+        (_c = this.workspaceInterceptor) === null || _c === void 0 ? void 0 : _c.uninstall();
+        (_d = this.activityBars) === null || _d === void 0 ? void 0 : _d.cleanupAll();
         // 清理自動保存
         if (this.autoSaveCleanup) {
             this.autoSaveCleanup();
@@ -4140,7 +6285,7 @@ class WindowSpacesPlugin extends obsidian.Plugin {
     refreshRibbonIcons() {
         if (this.settings.showWindowLayoutsRibbonIcon) {
             if (!this.windowLayoutsRibbonEl) {
-                this.windowLayoutsRibbonEl = this.addRibbonIcon("layout", t("commands.openLayouts"), () => this.openWindowLayoutsModal());
+                this.windowLayoutsRibbonEl = this.addRibbonIcon("layout", t("commands.openLayoutsRibbon"), () => this.openWindowLayoutsModal());
             }
         }
         else if (this.windowLayoutsRibbonEl) {
@@ -4215,6 +6360,43 @@ class WindowSpacesPlugin extends obsidian.Plugin {
             icon: "panel-right",
             callback: () => void this.openWindowLayoutsPanel("right"),
         });
+        // Popout 工作空間增強命令
+        this.addCommand({
+            id: "toggle-left-activity-bar",
+            name: t("commands.toggleLeftActivityBar"),
+            icon: "panel-left",
+            callback: () => this.toggleActivityBarVisibility("left"),
+        });
+        this.addCommand({
+            id: "toggle-right-activity-bar",
+            name: t("commands.toggleRightActivityBar"),
+            icon: "panel-right",
+            callback: () => this.toggleActivityBarVisibility("right"),
+        });
+    }
+    toggleActivityBarVisibility(side) {
+        const win = (this.manager ? this.manager.getActiveWindow() : undefined) ||
+            (typeof activeWindow !== "undefined" ? activeWindow : window);
+        if (!win || win === window) {
+            new obsidian.Notice(t("activityBar.onlyInPopout"));
+            return;
+        }
+        const columnEl = this.popoutLayout.getColumnElement(win, side);
+        if (!columnEl) {
+            new obsidian.Notice(t("activityBar.cannotHideLastPane"));
+            return;
+        }
+        if (this.popoutLayout.isColumnHidden(win, side)) {
+            this.popoutLayout.showColumn(win, side);
+        }
+        else {
+            if (this.popoutLayout.getVisibleColumnCount(win) < 2) {
+                new obsidian.Notice(t("activityBar.cannotHideLastPane"));
+                return;
+            }
+            this.popoutLayout.hideColumn(win, side);
+        }
+        this.activityBars.updateActiveStates(win);
     }
     openSaveLayoutModal(layout) {
         const modal = new SaveLayoutModal(this.app, this, layout, (savedLayout) => {
@@ -4294,7 +6476,7 @@ class WindowSpacesPlugin extends obsidian.Plugin {
             const workspace = this.app.workspace;
             // 處理在 Popout 視窗開啟
             if (isPopout) {
-                return this.openPanelInPopoutWindow(location, win);
+                return this.popoutLayout.openPanel(win, location, WINDOW_LAYOUTS_VIEW_TYPE);
             }
             // 處理在 Main Window 開啟
             let root;
@@ -4346,228 +6528,28 @@ class WindowSpacesPlugin extends obsidian.Plugin {
             return leaf;
         });
     }
-    openPanelInPopoutWindow(location, win) {
-        var _a, _b;
-        return __awaiter(this, void 0, void 0, function* () {
-            const workspace = this.app.workspace;
-            const columns = this.collectPopoutColumns(win);
-            if (location === "left" || location === "right") {
-                const sidebar = location === "left"
-                    ? findTrueLeftSidebar(win, columns)
-                    : findTrueRightSidebar(win, columns);
-                if (sidebar) {
-                    // 已有滿高度的標準側欄 (紅框)
-                    const existingInSidebar = findLeafInTabs(sidebar.tabs, WINDOW_LAYOUTS_VIEW_TYPE);
-                    if (existingInSidebar) {
-                        yield workspace.revealLeaf(existingInSidebar);
-                        workspace.setActiveLeaf(existingInSidebar, { focus: true });
-                        return existingInSidebar;
-                    }
-                    const newLeaf = yield this.openPanelInTabs(sidebar.tabs);
-                    yield workspace.revealLeaf(newLeaf);
-                    workspace.setActiveLeaf(newLeaf, { focus: true });
-                    return newLeaf;
-                }
-                // 尚無標準滿高度側欄 (綠框或單一/上下分割)：創立標準滿高度側欄 Vertical Split
-                let editorLeaf = this.getActiveLeafInWindow(win) || this.getLastLeafInWindow(win);
-                if (editorLeaf && ((_a = editorLeaf.getViewState()) === null || _a === void 0 ? void 0 : _a.type) === WINDOW_LAYOUTS_VIEW_TYPE) {
-                    let otherLeaf = null;
-                    workspace.iterateAllLeaves((l) => {
-                        var _a;
-                        if (!otherLeaf && getWindowOfLeaf(l) === win && ((_a = l.getViewState()) === null || _a === void 0 ? void 0 : _a.type) !== WINDOW_LAYOUTS_VIEW_TYPE) {
-                            otherLeaf = l;
-                        }
-                    });
-                    if (otherLeaf)
-                        editorLeaf = otherLeaf;
-                }
-                if (!editorLeaf) {
-                    return this.openPanelInPopoutEditor(win);
-                }
-                const targetNode = getTopLevelNodeInWindow(editorLeaf) || editorLeaf;
-                const isParentNode = targetNode !== editorLeaf && Boolean(targetNode.children);
-                const before = location === "left" ? !isParentNode : isParentNode;
-                const panelLeaf = workspace.createLeafBySplit(targetNode, "vertical", before);
-                yield panelLeaf.setViewState({
-                    type: WINDOW_LAYOUTS_VIEW_TYPE,
-                    active: false,
-                    state: {}
-                });
-                scheduleInitialSplitSizing(panelLeaf, editorLeaf, win);
-                yield workspace.revealLeaf(panelLeaf);
-                workspace.setActiveLeaf(panelLeaf, { focus: true });
-                return panelLeaf;
-            }
-            // location === "tab" (在 Popout 編輯器中央區域開啟/切換)
-            const allPanes = columns.reduce((acc, col) => acc.concat(col.panes), []);
-            const targetPane = pickCenterPopoutPane(allPanes, win);
-            const targetTabs = targetPane ? targetPane.tabs : ((_b = this.getActiveLeafInWindow(win)) === null || _b === void 0 ? void 0 : _b.parent);
-            if (targetTabs) {
-                const existingInTarget = findLeafInTabs(targetTabs, WINDOW_LAYOUTS_VIEW_TYPE);
-                if (existingInTarget) {
-                    yield workspace.revealLeaf(existingInTarget);
-                    workspace.setActiveLeaf(existingInTarget, { focus: true });
-                    return existingInTarget;
-                }
-                const newLeaf = yield this.openPanelInTabs(targetTabs);
-                yield workspace.revealLeaf(newLeaf);
-                workspace.setActiveLeaf(newLeaf, { focus: true });
-                return newLeaf;
-            }
-            const leaf = workspace.getLeaf("tab");
-            yield leaf.setViewState({
-                type: WINDOW_LAYOUTS_VIEW_TYPE,
-                active: true,
-                state: {}
-            });
-            yield workspace.revealLeaf(leaf);
-            workspace.setActiveLeaf(leaf, { focus: true });
-            return leaf;
-        });
-    }
-    openPanelInPopoutEditor(win) {
-        var _a;
-        return __awaiter(this, void 0, void 0, function* () {
-            const workspace = this.app.workspace;
-            const columns = this.collectPopoutColumns(win);
-            const allPanes = columns.reduce((acc, col) => acc.concat(col.panes), []);
-            const targetPane = pickCenterPopoutPane(allPanes, win);
-            if (targetPane) {
-                const existingInTabs = findLeafInTabs(targetPane.tabs, WINDOW_LAYOUTS_VIEW_TYPE);
-                if (existingInTabs) {
-                    yield workspace.revealLeaf(existingInTabs);
-                    workspace.setActiveLeaf(existingInTabs, { focus: true });
-                    return existingInTabs;
-                }
-                return this.openPanelInTabs(targetPane.tabs);
-            }
-            const baseLeaf = (_a = this.getActiveLeafInWindow(win)) !== null && _a !== void 0 ? _a : this.getLastLeafInWindow(win);
-            if (!baseLeaf) {
-                const leaf = workspace.getLeaf("tab");
-                yield leaf.setViewState({
-                    type: WINDOW_LAYOUTS_VIEW_TYPE,
-                    active: true,
-                    state: {}
-                });
-                yield workspace.revealLeaf(leaf);
-                workspace.setActiveLeaf(leaf, { focus: true });
-                return leaf;
-            }
-            const tabs = baseLeaf.parent;
-            if (tabs) {
-                const existingInTabs = findLeafInTabs(tabs, WINDOW_LAYOUTS_VIEW_TYPE);
-                if (existingInTabs) {
-                    yield workspace.revealLeaf(existingInTabs);
-                    workspace.setActiveLeaf(existingInTabs, { focus: true });
-                    return existingInTabs;
-                }
-            }
-            return this.openPanelInTabs(tabs);
-        });
-    }
-    openPanelInTabs(tabs) {
-        var _a;
-        return __awaiter(this, void 0, void 0, function* () {
-            const workspace = this.app.workspace;
-            const children = ((_a = tabs === null || tabs === void 0 ? void 0 : tabs.children) !== null && _a !== void 0 ? _a : []);
-            for (const leaf of children) {
-                if (leaf.getViewState().type === WINDOW_LAYOUTS_VIEW_TYPE) {
-                    yield workspace.revealLeaf(leaf);
-                    workspace.setActiveLeaf(leaf, { focus: true });
-                    return leaf;
-                }
-            }
-            const leaf = workspace.createLeafInParent(tabs, children.length);
-            yield leaf.setViewState({
-                type: WINDOW_LAYOUTS_VIEW_TYPE,
-                active: true,
-                state: {}
-            });
-            yield workspace.revealLeaf(leaf);
-            workspace.setActiveLeaf(leaf, { focus: true });
-            return leaf;
-        });
-    }
-    collectPopoutColumns(win) {
-        var _a;
-        const panes = this.collectPopoutPanes(win);
-        if (panes.length === 0)
-            return [];
-        const columns = [];
-        for (const pane of panes) {
-            const paneWidth = (_a = pane.width) !== null && _a !== void 0 ? _a : 400;
-            let matchedColumn = columns.find((col) => {
-                const overlap = Math.max(0, Math.min(pane.left + paneWidth, col.left + col.width) - Math.max(pane.left, col.left));
-                const minWidth = Math.min(paneWidth, col.width);
-                const overlapRatio = minWidth > 0 ? overlap / minWidth : 0;
-                return overlapRatio > 0.5 || Math.abs(pane.left - col.left) < 30;
-            });
-            if (matchedColumn) {
-                matchedColumn.panes.push(pane);
-            }
-            else {
-                columns.push({
-                    left: pane.left,
-                    width: paneWidth,
-                    panes: [pane],
-                });
-            }
-        }
-        columns.sort((a, b) => a.left - b.left);
-        return columns;
-    }
-    collectPopoutPanes(win) {
-        const tabsSet = new Set();
-        this.app.workspace.iterateAllLeaves((leaf) => {
-            if (getWindowOfLeaf(leaf) !== win) {
-                return;
-            }
-            const parent = leaf.parent;
-            if (parent) {
-                tabsSet.add(parent);
-            }
-        });
-        const panes = [];
-        for (const tabs of tabsSet) {
-            const rect = getPaneRect(tabs);
-            const left = rect ? rect.left : 0;
-            const width = rect ? rect.width : 400;
-            panes.push({ tabs, left, width, center: left + width / 2 });
-        }
-        panes.sort((a, b) => a.left - b.left);
-        return panes;
-    }
-    getActiveLeafInWindow(win) {
-        const activeLeaf = typeof this.app.workspace.getMostRecentLeaf === "function"
-            ? this.app.workspace.getMostRecentLeaf()
-            : this.app.workspace.activeLeaf;
-        return activeLeaf && getWindowOfLeaf(activeLeaf) === win ? activeLeaf : null;
-    }
-    getLastLeafInWindow(win) {
-        let lastLeaf = null;
-        this.app.workspace.iterateAllLeaves((leaf) => {
-            if (getWindowOfLeaf(leaf) === win) {
-                lastLeaf = leaf;
-            }
-        });
-        return lastLeaf;
-    }
     setupEventListeners() {
         // 監聽視窗開關
         this.registerEvent(this.app.workspace.on("window-open", (_workspaceWindow, popoutWindow) => {
             this.manager.registerPopoutWindow(popoutWindow);
+            this.activityBars.injectForWindow(popoutWindow);
             WindowLayoutsModal.renderAllInstances();
         }));
         this.registerEvent(this.app.workspace.on("window-close", (_workspaceWindow, popoutWindow) => {
             this.manager.unregisterPopoutWindow(popoutWindow);
+            this.activityBars.cleanupWindow(popoutWindow);
             WindowLayoutsModal.renderAllInstances();
         }));
         // 監聽 Workspace 分頁與佈局變化（用於特定 Layout 的 5 秒 Debounced 自動儲存）
         this.registerEvent(this.app.workspace.on("layout-change", () => {
             this.manager.checkAndDebouncedAutoSaveAll();
+            this.activityBars.refreshAll();
         }));
-        this.registerEvent(this.app.workspace.on("active-leaf-change", () => {
+        this.registerEvent(this.app.workspace.on("active-leaf-change", (leaf) => {
             this.manager.checkAndDebouncedAutoSaveAll();
+            this.activityBars.updateActiveStatesAll();
+            // 當 view 的 tab 被點選/成為 active 時，若其內容未渲染則強制重新渲染
+            this.manager.ensureViewRendered(leaf);
         }));
     }
     addStatusBarIndicator() {
@@ -4591,157 +6573,6 @@ class WindowSpacesPlugin extends obsidian.Plugin {
         // 添加工具提示
         statusBarItem.setAttribute("aria-label", "Window Spaces - Click to restore space, Shift+Click to save space");
     }
-}
-const INITIAL_SPLIT_RATIO = 0.34;
-function getWindowOfLeaf(leaf) {
-    var _a, _b, _c;
-    const extLeaf = leaf;
-    const container = extLeaf.containerEl || ((_a = leaf.view) === null || _a === void 0 ? void 0 : _a.containerEl);
-    return (_c = (_b = container === null || container === void 0 ? void 0 : container.ownerDocument) === null || _b === void 0 ? void 0 : _b.defaultView) !== null && _c !== void 0 ? _c : null;
-}
-function getTopLevelNodeInWindow(leaf) {
-    let curr = leaf;
-    while (curr && curr.parent) {
-        const parent = curr.parent;
-        if (!parent || !parent.parent || parent.type === "root" || parent.isRoot || parent.kind === "root") {
-            return curr;
-        }
-        curr = parent;
-    }
-    return curr;
-}
-function getPaneRect(tabs) {
-    var _a, _b;
-    const container = tabs === null || tabs === void 0 ? void 0 : tabs.containerEl;
-    if (container instanceof HTMLElement) {
-        const rect = container.getBoundingClientRect();
-        if (rect.width > 0 && rect.height > 0)
-            return rect;
-    }
-    const children = ((_a = tabs === null || tabs === void 0 ? void 0 : tabs.children) !== null && _a !== void 0 ? _a : []);
-    for (const leaf of children) {
-        const extLeaf = leaf;
-        const leafContainer = extLeaf.containerEl || ((_b = leaf.view) === null || _b === void 0 ? void 0 : _b.containerEl);
-        if (leafContainer instanceof HTMLElement) {
-            const rect = leafContainer.getBoundingClientRect();
-            if (rect.width > 0 && rect.height > 0)
-                return rect;
-        }
-    }
-    return null;
-}
-function findTrueLeftSidebar(win, columns) {
-    if (columns.length < 2)
-        return null;
-    const leftCol = columns[0];
-    // 標準側欄 (紅框) 必須是該直欄唯一的全高分欄
-    if (leftCol.panes.length !== 1)
-        return null;
-    const pane = leftCol.panes[0];
-    const rect = getPaneRect(pane.tabs);
-    const winHeight = (win === null || win === void 0 ? void 0 : win.innerHeight) || 600;
-    if (rect) {
-        const isFullHeight = rect.top < winHeight * 0.15 && (rect.top + rect.height) > winHeight * 0.85;
-        if (!isFullHeight)
-            return null;
-    }
-    return { pane, tabs: pane.tabs };
-}
-function findTrueRightSidebar(win, columns) {
-    if (columns.length < 2)
-        return null;
-    const rightCol = columns[columns.length - 1];
-    // 標準側欄 (紅框) 必須是該直欄唯一的全高分欄
-    if (rightCol.panes.length !== 1)
-        return null;
-    const pane = rightCol.panes[0];
-    const rect = getPaneRect(pane.tabs);
-    const winHeight = (win === null || win === void 0 ? void 0 : win.innerHeight) || 600;
-    if (rect) {
-        const isFullHeight = rect.top < winHeight * 0.15 && (rect.top + rect.height) > winHeight * 0.85;
-        if (!isFullHeight)
-            return null;
-    }
-    return { pane, tabs: pane.tabs };
-}
-function pickCenterPopoutPane(panes, win) {
-    const firstPane = panes[0];
-    if (!firstPane)
-        return null;
-    if (panes.length === 1)
-        return firstPane;
-    const winCenter = win.innerWidth / 2;
-    let bestPane = firstPane;
-    let bestDistance = Infinity;
-    for (const pane of panes) {
-        const distance = Math.abs(pane.center - winCenter);
-        if (distance < bestDistance) {
-            bestDistance = distance;
-            bestPane = pane;
-        }
-    }
-    return bestPane;
-}
-function scheduleInitialSplitSizing(panelLeaf, editorLeaf, win) {
-    var _a;
-    const raf = ((_a = win.requestAnimationFrame) === null || _a === void 0 ? void 0 : _a.bind(win)) || window.requestAnimationFrame.bind(window);
-    raf(() => {
-        raf(() => {
-            applyInitialSplitSizing(panelLeaf, editorLeaf);
-        });
-    });
-}
-function applyInitialSplitSizing(panelLeaf, editorLeaf) {
-    const panelContainer = getViewContainer(panelLeaf);
-    const editorContainer = getViewContainer(editorLeaf);
-    if (!panelContainer || !editorContainer)
-        return;
-    const split = panelContainer.closest(".workspace-split.mod-vertical");
-    if (!split || !split.contains(editorContainer))
-        return;
-    const panelPane = getDirectSplitChild(split, panelContainer);
-    const editorPane = getDirectSplitChild(split, editorContainer);
-    if (!panelPane || !editorPane || panelPane === editorPane)
-        return;
-    setElementCssStyles(panelPane, { flex: `0 0 ${INITIAL_SPLIT_RATIO * 100}%` });
-    setElementCssStyles(editorPane, { flex: "1 1 0%" });
-}
-function setElementCssStyles(el, styles) {
-    const customEl = el;
-    if (typeof customEl.setCssStyles === "function") {
-        customEl.setCssStyles(styles);
-    }
-    else if (typeof customEl.setCssProps === "function") {
-        customEl.setCssProps(styles);
-    }
-    else {
-        for (const [key, value] of Object.entries(styles)) {
-            el.style.setProperty(key, value);
-        }
-    }
-}
-function getViewContainer(leaf) {
-    var _a;
-    const extLeaf = leaf;
-    const container = extLeaf.containerEl || ((_a = leaf.view) === null || _a === void 0 ? void 0 : _a.containerEl);
-    return container instanceof HTMLElement ? container : null;
-}
-function getDirectSplitChild(split, element) {
-    let current = element;
-    while (current && current.parentElement !== split) {
-        current = current.parentElement;
-    }
-    return current;
-}
-function findLeafInTabs(tabs, viewType) {
-    var _a, _b;
-    const children = ((_a = tabs === null || tabs === void 0 ? void 0 : tabs.children) !== null && _a !== void 0 ? _a : []);
-    for (const leaf of children) {
-        if (((_b = leaf.getViewState()) === null || _b === void 0 ? void 0 : _b.type) === viewType) {
-            return leaf;
-        }
-    }
-    return null;
 }
 function findLeafInRoot(workspace, root, viewType) {
     if (!root)

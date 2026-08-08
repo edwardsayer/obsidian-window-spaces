@@ -1006,3 +1006,229 @@
   font-size: 12px;
   cursor: pointer;
 }
+
+/* ===== Popout Activity Bars ===== */
+/* CRITICAL: 與左右側欄 padding 連動，修改時需同時檢視 body class 規則 */
+.window-spaces-activity-bar {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  width: 44px;
+  z-index: var(--layer-side-dock, 10);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 2px 8px 2px;
+  box-sizing: border-box;
+  /* 對齊主視窗 ribbon 底色 */
+  background-color: var(--ribbon-background, var(--background-primary));
+  user-select: none;
+}
+.window-spaces-activity-left {
+  left: 0;
+  top: 0;
+  border-right: 1px solid var(--background-modifier-border);
+}
+.window-spaces-activity-right {
+  right: 0;
+  top: var(--titlebar-height, 40px);
+  border-left: 1px solid var(--background-modifier-border);
+}
+
+/* 讓 popout 內容避開左右固定列 */
+body.is-popout-window.window-spaces-has-left-activity .workspace-split.mod-root {
+  margin-left: 44px;
+}
+body.is-popout-window.window-spaces-has-right-activity .workspace-split.mod-root {
+  margin-right: 44px;
+}
+
+/* 每個 Activity Bar 頂端（標題列高度）的拖曳區：拖曳移動整個視窗 */
+.window-spaces-activity-drag {
+  flex: 0 0 auto;
+  width: 100%;
+  height: var(--titlebar-height, 40px);
+  -webkit-app-region: drag;
+  cursor: default;
+}
+
+.window-spaces-activity-btn {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  padding: 6px;
+  border: none;
+  border-radius: var(--radius-s, 4px);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.window-spaces-activity-btn:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.window-spaces-activity-btn.is-active {
+  color: var(--text-normal);
+  background-color: var(--background-modifier-hover);
+  border: none !important;
+  box-shadow: none !important;
+}
+.window-spaces-activity-btn svg {
+  width: var(--icon-s, 16px);
+  height: var(--icon-s, 16px);
+}
+
+/* 固定控制與 view 按鈕之間的分隔線 */
+.window-spaces-activity-divider {
+  flex: 0 0 auto;
+  width: calc(100% - 16px);
+  height: 1px;
+  background-color: var(--background-modifier-border);
+  margin: 4px 0;
+}
+
+/* 側欄欄位（被判定為 sidebar 的頂層欄）：底色與邊距對齊主視窗 sidebar */
+.window-spaces-sidebar-column,
+.window-spaces-sidebar-column .workspace-tabs,
+.window-spaces-sidebar-column .workspace-leaf-content {
+  background-color: var(--background-secondary);
+}
+
+/* Popout 的整個 root 是 `.workspace-split.mod-root`，Obsidian 的
+   `.workspace-split.mod-root .view-content { background: var(--background-primary) }`
+   會把側欄內 view 的 content area 也套成編輯區底色。主視窗側欄是獨立的
+   `.mod-left-split` 不受此規則影響，因此這裡要將側欄 view-content 改為透明，
+   讓其上層的 `--background-secondary` 透出，與主視窗側欄一致。 */
+.window-spaces-sidebar-column .workspace-leaf-content .view-content {
+  background-color: transparent;
+}
+
+/* 頂層欄位是巢狀 split（如側欄被分割成上下兩個 tab group）時，Obsidian 的
+   `.workspace-split.mod-left-split/mod-right-split { flex: 0 0 auto }` 會把容器壓扁成
+   width 0（sidebar 消失）。這裡用非 important 的 `flex: 1 1 0` 蓋過該規則
+   （相同 specificity、plugin 的 stylesheet 較晚載入 → 勝出），
+   同時保留 Obsidian 在 popout 中設定的 inline `flex-grow`（拖曳 resize 的機制），
+   因此不能使用 `!important`——否則會蓋掉 inline flex-grow，導致側欄無法拖寬。 */
+.window-spaces-sidebar-column.workspace-split {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* 側欄頂部頁籤列容器：重置邊距，消除頂部巨大空隙 */
+.window-spaces-sidebar-column .workspace-tab-header-container {
+  padding-top: 0 !important;
+  margin-top: 0 !important;
+}
+
+/* 側欄欄位（被判定為 sidebar 的頂層欄）的 tab 只顯示 icon、隱藏文字標籤 */
+.window-spaces-sidebar-column .workspace-tab-header-inner-title {
+  display: none !important;
+}
+
+/* 側欄 tab 尺寸與對齊（對齊主視窗 sidebar tab：icon 18px + 內距 8px → 寬 34px，
+   height 由 flex stretch 依 container-inner 的 padding 自然得出 ~25px），去除 tab 間的直線與邊框 */
+.window-spaces-sidebar-column .workspace-tab-header {
+  width: var(--sidebar-tab-width, 34px) !important;
+  height: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  flex: 0 0 var(--sidebar-tab-width, 34px) !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  box-shadow: none !important;
+  box-sizing: border-box !important;
+}
+.window-spaces-sidebar-column .workspace-tab-header::before,
+.window-spaces-sidebar-column .workspace-tab-header::after {
+  display: none !important;
+  border: none !important;
+  background: none !important;
+}
+/* Obsidian core 的 tab 分隔線是畫在 inner 的 ::after（非 header 本身），需另外隱藏 */
+.window-spaces-sidebar-column .workspace-tab-header-inner::after {
+  display: none !important;
+}
+.window-spaces-sidebar-column .workspace-tab-header-inner {
+  width: 100% !important;
+  height: 100% !important;
+  padding: 0 8px !important;
+  margin: 0 !important;
+  border: none !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  box-sizing: border-box !important;
+}
+
+/* 強制確保側欄 tab 的 icon 容器及其 svg 顯示 (修正檔案 tab 無 icon 問題) */
+.window-spaces-sidebar-column .workspace-tab-header-inner-icon {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  flex: 0 0 auto !important;
+}
+.window-spaces-sidebar-column .workspace-tab-header-inner-icon svg {
+  display: block !important;
+  width: var(--icon-size, 18px) !important;
+  height: var(--icon-size, 18px) !important;
+}
+
+/* 側欄 tab 不顯示關閉 (X) 按鈕，不顯示新增 tab (+)，也不顯示下拉選單箭頭 (tab-list) */
+.window-spaces-sidebar-column .workspace-tab-header-inner-close-button,
+.window-spaces-sidebar-column .workspace-tab-header-close-button {
+  display: none !important;
+}
+.window-spaces-sidebar-column .workspace-tab-header-new-tab,
+.window-spaces-sidebar-column .workspace-tab-header-tab-list {
+  display: none !important;
+}
+
+/* 設定頁：view type 輸入 */
+.window-spaces-view-type-input {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+/* Icon 選擇器：多欄 + 垂直捲軸 */
+.window-spaces-icon-picker {
+  width: min(520px, 88vw);
+  max-width: 100%;
+}
+.window-spaces-icon-picker h3 {
+  margin: 0 0 8px 0;
+}
+.window-spaces-icon-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(36px, 1fr));
+  gap: 4px;
+  max-height: 60vh;
+  max-width: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m, 8px);
+  box-sizing: border-box;
+}
+.window-spaces-icon-grid .clickable-icon {
+  width: 36px;
+  height: 36px;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-s, 4px);
+}
+.window-spaces-icon-grid .clickable-icon:hover {
+  background-color: var(--background-modifier-hover);
+}
+

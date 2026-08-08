@@ -6,6 +6,16 @@ export class Notice {
   hide() {}
 }
 
+// Obsidian 在 runtime 對 HTMLElement prototype 加入的 helper，jsdom 沒有；
+// setIconWithCheck 依賴 el.empty()，在此補上以貼近真實環境。
+if (typeof HTMLElement.prototype.empty !== "function") {
+  HTMLElement.prototype.empty = function empty() {
+    while (this.firstChild) {
+      this.removeChild(this.firstChild);
+    }
+  };
+}
+
 export class TFile {
   path: string = "";
   name: string = "";

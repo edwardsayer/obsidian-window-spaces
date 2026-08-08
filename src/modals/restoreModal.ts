@@ -616,7 +616,9 @@ export class WindowLayoutsModal extends Modal {
         }
       }
 
-      new Notice(`${t("saveModal.saveSuccess")}: ${cleanName}`);
+      if (this.plugin.settings.showNotifications !== false) {
+        new Notice(`${t("saveModal.saveSuccess")}: ${cleanName}`);
+      }
 
       if (this.searchInput) {
         this.searchInput.value = "";
@@ -953,8 +955,9 @@ export class WindowLayoutsModal extends Modal {
       text: `${t("manageModal.updatedDate")}: ${i18n.formatDate(new Date(layout.updatedAt || layout.timestamp || layout.createdAt || Date.now()))}`,
       cls: "layout-date",
     });
+    const totalTabs = layout.metadata?.tabCount || layout.workspace?.leaves?.length || 0;
     pathEl.createSpan({
-      text: `${t("manageModal.fileCount")}: ${layout.metadata?.fileCount || 0}`,
+      text: `${t("manageModal.tabCount")}: ${totalTabs}`,
       cls: "layout-files",
     });
 
@@ -1094,7 +1097,9 @@ export class WindowLayoutsModal extends Modal {
         await this.plugin.saveSettings();
         modal.close();
         WindowLayoutsModal.renderAllInstances();
-        new Notice(t("notifications.layoutRenamed"));
+        if (this.plugin.settings.showNotifications !== false) {
+          new Notice(t("notifications.layoutRenamed"));
+        }
       };
 
       saveButton.onclick = () => void submit();
@@ -1267,11 +1272,13 @@ export class WindowLayoutsModal extends Modal {
         .onClick(async () => {
           layout.autoSave = !layout.autoSave;
           await this.plugin.saveSettings();
-          new Notice(
-            layout.autoSave
-              ? `${layout.name}: ${t("manageModal.autoSaveEnabled")}`
-              : `${layout.name}: ${t("manageModal.autoSaveDisabled")}`
-          );
+          if (this.plugin.settings.showNotifications !== false) {
+            new Notice(
+              layout.autoSave
+                ? `${layout.name}: ${t("manageModal.autoSaveEnabled")}`
+                : `${layout.name}: ${t("manageModal.autoSaveDisabled")}`
+            );
+          }
           WindowLayoutsModal.renderAllInstances();
         });
     });

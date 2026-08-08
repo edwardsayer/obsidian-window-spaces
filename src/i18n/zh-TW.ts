@@ -27,10 +27,14 @@ export const zhTW: TranslationStrings = {
 
   commands: {
     saveLayout: "儲存目前空間",
-    openLayouts: "開啟為彈出視窗",
+    openLayouts: "開啟切換器",
+    openLayoutsRibbon: "開啟 Window Spaces 切換器",
     openLayoutsPanel: "開啟為標籤面板",
     openLayoutsPanelLeft: "開啟在左側邊欄",
     openLayoutsPanelRight: "開啟在右側邊欄",
+    toggleLeftActivityBar: "切換左側 Activity Bar",
+    toggleRightActivityBar: "切換右側 Activity Bar",
+    toggleCurrentPaneGroup: "切換目前分頁群組",
   },
 
   saveModal: {
@@ -81,6 +85,7 @@ export const zhTW: TranslationStrings = {
     createdDate: "建立時間",
     updatedDate: "更新時間",
     fileCount: "檔案數",
+    tabCount: "分頁數",
     actions: "操作",
     renameButton: "重命名",
     deleteButton: "刪除",
@@ -138,6 +143,21 @@ export const zhTW: TranslationStrings = {
     resetConfirmTitle: "確認重設",
     resetConfirmMessage: "您確定要重設所有設定嗎？這不會刪除您已儲存的空間。",
     resetSuccess: "設定重設成功",
+    popoutSidebarSection: "Popout 視窗側欄設定",
+    enableInterceptor: "將側欄視圖路由至 Popout 視窗",
+    enableInterceptorDesc:
+      "當在 Popout 視窗觸發開啟側欄視圖（透過指令、熱鍵、Activity Bar 或第三方外掛）時，將視圖開啟於該 Popout 的側欄，而非跳回主視窗。",
+    activityBarSection: "Activity Bars",
+    enableActivityBars: "在 Popout 視窗顯示 Activity Bars",
+    enableActivityBarsDesc: "在每個 Popout 視窗左右邊緣顯示垂直的快速存取工具列",
+    leftBar: "左側 Activity Bar",
+    rightBar: "右側 Activity Bar",
+    addView: "新增 View",
+    removeView: "移除",
+    viewTypePlaceholder: "View type（例如 file-explorer）",
+    pickIcon: "選擇圖示",
+    restoreDefaultButtons: "還原預設按鈕",
+    restoreDefaultIcon: "還原預設圖示",
   },
 
   notifications: {
@@ -171,5 +191,13 @@ export const zhTW: TranslationStrings = {
     use: "套用",
     useNewWindow: "在新視窗開啟",
     dismiss: "關閉",
+  },
+
+  activityBar: {
+    toggleColumn: "切換側欄",
+    toggleGroup: "切換目前分頁群組",
+    cannotHideLastPane: "無法隱藏最後一個可見的分頁",
+    onlyInPopout: "此命令僅可在 Popout 視窗內使用",
+    openSettings: "開啟 Window Spaces 設定",
   },
 };

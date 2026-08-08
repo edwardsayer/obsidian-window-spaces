@@ -27,10 +27,14 @@ export const zhCN: TranslationStrings = {
 
   commands: {
     saveLayout: "保存当前空间",
-    openLayouts: "作为弹出窗口打开",
+    openLayouts: "打开切换器",
+    openLayoutsRibbon: "打开 Window Spaces 切换器",
     openLayoutsPanel: "作为标签页面板打开",
     openLayoutsPanelLeft: "在左侧边栏打开",
     openLayoutsPanelRight: "在右侧边栏打开",
+    toggleLeftActivityBar: "切换左侧 Activity Bar",
+    toggleRightActivityBar: "切换右侧 Activity Bar",
+    toggleCurrentPaneGroup: "切换当前标签组",
   },
 
   saveModal: {
@@ -81,6 +85,7 @@ export const zhCN: TranslationStrings = {
     createdDate: "创建时间",
     updatedDate: "更新时间",
     fileCount: "文件数",
+    tabCount: "标签页数",
     actions: "操作",
     renameButton: "重命名",
     deleteButton: "删除",
@@ -138,6 +143,21 @@ export const zhCN: TranslationStrings = {
     resetConfirmTitle: "确认重置",
     resetConfirmMessage: "您确定要重置所有设置吗？这不会删除您已保存的空间。",
     resetSuccess: "设置重置成功",
+    popoutSidebarSection: "Popout 窗口侧栏设置",
+    enableInterceptor: "将侧栏视图路由至 Popout 窗口",
+    enableInterceptorDesc:
+      "当在 Popout 窗口触发打开侧栏视图（通过命令、快捷键、Activity Bar 或第三方插件）时，将视图打开于该 Popout 的侧栏，而非跳回主窗口。",
+    activityBarSection: "Activity Bars",
+    enableActivityBars: "在 Popout 窗口显示 Activity Bars",
+    enableActivityBarsDesc: "在每个 Popout 窗口左右边缘显示垂直的快速访问工具栏",
+    leftBar: "左侧 Activity Bar",
+    rightBar: "右侧 Activity Bar",
+    addView: "添加 View",
+    removeView: "移除",
+    viewTypePlaceholder: "View type（例如 file-explorer）",
+    pickIcon: "选择图标",
+    restoreDefaultButtons: "还原默认按钮",
+    restoreDefaultIcon: "还原默认图标",
   },
 
   notifications: {
@@ -171,5 +191,13 @@ export const zhCN: TranslationStrings = {
     use: "应用",
     useNewWindow: "在新窗口打开",
     dismiss: "关闭",
+  },
+
+  activityBar: {
+    toggleColumn: "切换侧栏",
+    toggleGroup: "切换当前标签组",
+    cannotHideLastPane: "无法隐藏最后一个可见的标签",
+    onlyInPopout: "此命令只能在 Popout 窗口内使用",
+    openSettings: "打开 Window Spaces 设置",
   },
 };

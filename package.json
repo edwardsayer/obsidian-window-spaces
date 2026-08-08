@@ -13,7 +13,8 @@
 		"test": "vitest run",
 		"test:watch": "vitest",
 		"test:build": "node src/tools/test-build.js",
-		"install:vault": "node src/tools/install.js"
+		"install:vault": "node src/tools/install.js",
+		"obsidian:debug": "node src/tools/obsidian-debug.js"
 	},
 	"keywords": [
 		"obsidian",

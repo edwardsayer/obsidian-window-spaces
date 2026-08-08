@@ -109,4 +109,25 @@ describe("Smart Layout Name Generation (generateSmartLayoutName)", () => {
     const smartName = manager.generateSmartLayoutName(layout);
     expect(smartName).toBe("Doc1, Doc2 and others");
   });
+
+  test("should prioritize Folder Space Explorer folder name over pinned/active files", () => {
+    const layout: WindowLayout = {
+      id: "layout-fs",
+      name: "",
+      timestamp: Date.now(),
+      windowState: { size: { width: 800, height: 600 } },
+      workspace: {
+        layout: {},
+        activeFile: "projects/ActiveDoc.md",
+        leaves: [
+          { id: "l1", type: "markdown", state: { file: "notes/PinnedDoc.md" }, pinned: true },
+          { id: "l2", type: "folder-space-explorer", state: { folder: "Projects/Frontend/ReactApp" } },
+        ],
+      },
+      metadata: { fileCount: 1, tabCount: 2, splitCount: 0 },
+    };
+
+    const smartName = manager.generateSmartLayoutName(layout);
+    expect(smartName).toBe("ReactApp");
+  });
 });

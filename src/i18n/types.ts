@@ -28,9 +28,13 @@ export interface TranslationStrings {
   commands: {
     saveLayout: string;
     openLayouts: string;
+    openLayoutsRibbon: string;
     openLayoutsPanel: string;
     openLayoutsPanelLeft: string;
     openLayoutsPanelRight: string;
+    toggleLeftActivityBar: string;
+    toggleRightActivityBar: string;
+    toggleCurrentPaneGroup: string;
   };
 
   // 保存對話框
@@ -84,6 +88,7 @@ export interface TranslationStrings {
     createdDate: string;
     updatedDate: string;
     fileCount: string;
+    tabCount: string;
     actions: string;
     renameButton: string;
     deleteButton: string;
@@ -142,6 +147,20 @@ export interface TranslationStrings {
     resetConfirmTitle: string;
     resetConfirmMessage: string;
     resetSuccess: string;
+    popoutSidebarSection: string;
+    activityBarSection: string;
+    enableActivityBars: string;
+    enableActivityBarsDesc: string;
+    leftBar: string;
+    rightBar: string;
+    addView: string;
+    removeView: string;
+    viewTypePlaceholder: string;
+    pickIcon: string;
+    restoreDefaultButtons: string;
+    restoreDefaultIcon: string;
+    enableInterceptor: string;
+    enableInterceptorDesc: string;
   };
 
   // 通知
@@ -178,5 +197,14 @@ export interface TranslationStrings {
     use: string;
     useNewWindow: string;
     dismiss: string;
+  };
+
+  // Activity Bar
+  activityBar: {
+    toggleColumn: string;
+    toggleGroup: string;
+    cannotHideLastPane: string;
+    onlyInPopout: string;
+    openSettings: string;
   };
 }

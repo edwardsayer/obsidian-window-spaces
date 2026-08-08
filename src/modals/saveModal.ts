@@ -60,8 +60,9 @@ export class SaveLayoutModal extends Modal {
     });
 
     const infoList = infoEl.createEl("ul");
+    const totalTabs = this.layout.metadata?.tabCount || this.layout.workspace?.leaves?.length || 0;
     infoList.createEl("li", {
-      text: `${t("manageModal.fileCount")}: ${this.layout.metadata.fileCount}`,
+      text: `${t("manageModal.tabCount")}: ${totalTabs}`,
     });
     infoList.createEl("li", {
       text: `${t("manageModal.createdDate")}: ${i18n.formatDate(new Date(this.layout.timestamp))}`,

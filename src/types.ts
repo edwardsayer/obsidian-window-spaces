@@ -1,4 +1,4 @@
-import { EventRef, WorkspaceLeaf } from "obsidian";
+import { EventRef, Setting, WorkspaceLeaf } from "obsidian";
 
 export interface WorkspaceParent {
   parent?: WorkspaceParent;
@@ -27,6 +27,8 @@ export interface WindowLayout {
     windowId?: string;
     firstLeafId?: string;
   };
+  // 隱藏的側欄/分頁群組狀態（Activity Bar 與 Pane 隱藏功能持久化）
+  hidden?: PopoutHiddenState;
 }
 
 export interface WindowState {
@@ -74,6 +76,8 @@ export interface WorkspaceWindow {
   win: Window;
   children?: WorkspaceItem[];
   getLayout(): Record<string, unknown>;
+  setTitle?: (title: string) => void;
+  _originalSetTitle?: (title: string) => void;
 }
 
 export interface ExtendedWorkspace {
@@ -84,6 +88,7 @@ export interface ExtendedWorkspace {
     children?: WorkspaceWindow[];
   };
   activeLeaf: WorkspaceLeaf | null;
+  getMostRecentLeaf?(root?: WorkspaceParent): WorkspaceLeaf | null;
   iterateAllLeaves(callback: (leaf: WorkspaceLeaf) => void | boolean): void;
   getLeftLeaf(split: boolean): WorkspaceLeaf;
   getRightLeaf(split: boolean): WorkspaceLeaf;
@@ -122,6 +127,79 @@ export interface WindowSettings {
   sectionsOrder?: string[];
   groupBySection?: boolean;
   showArchived?: boolean;
+  // Activity Bar 設定
+  activityBars?: {
+    left: ActivityBarItem[];
+    right: ActivityBarItem[];
+  };
+  showActivityBars?: boolean;
+  // Workspace API 攔截器（Monkey Patch）開關，預設開啟
+  workspaceInterceptorEnabled?: boolean;
+}
+
+/**
+ * Activity Bar 上的單一 view 按鈕設定。
+ */
+export interface ActivityBarItem {
+  viewType: string;
+  label?: string;
+  icon?: string;
+  side: "left" | "right";
+}
+
+/**
+ * Popout 視窗的隱藏狀態（側欄欄位與分頁群組）。
+ */
+export interface PopoutHiddenState {
+  leftSidebar?: boolean;
+  rightSidebar?: boolean;
+  hiddenLeafIds?: string[];
+}
+
+/**
+ * Obsidian 內部 ViewRegistry 的擴充介面（非公開 API，防禦式存取）。
+ */
+export interface ViewRegistryEntry {
+  type?: string;
+  getIcon?: () => string;
+  getDisplayText?: () => string;
+  creator?: unknown;
+}
+
+/**
+ * Obsidian `SettingGroup` 的型別宣告（Obsidian 1.12.7+ 新增，
+ * 未包含於 obsidian.d.ts 1.10.3）。用於將同一 section 的設定
+ * 組合成單一 panel（內部以水平分隔線連接）。
+ */
+export interface SettingGroupLike {
+  settingEl: HTMLElement;
+  nameEl?: HTMLElement;
+  descEl?: HTMLElement;
+  setName(name: string): this;
+  setDesc(desc: string): this;
+  setHeading(): this;
+  addSetting(callback: (setting: Setting) => unknown): this;
+  then(callback: (group: this) => unknown): this;
+}
+
+export interface ExtendedViewRegistry {
+  viewByType?: Record<string, ViewRegistryEntry>;
+  getViewCreator?(viewType: string): unknown;
+  getIcon?(viewType: string): string;
+  getDisplayText?(viewType: string): string;
+}
+
+/**
+ * Obsidian 內部 workspace 擴充介面（含攔截器所需的方法）。
+ */
+export interface ExtendedWorkspaceWithInterceptor extends ExtendedWorkspace {
+  getLeftLeaf: (split: boolean) => WorkspaceLeaf | null;
+  getRightLeaf: (split: boolean) => WorkspaceLeaf | null;
+  getLeavesOfType: (type: string) => WorkspaceLeaf[];
+  _windowSpacesOriginalGetLeftLeaf?: (split: boolean) => WorkspaceLeaf | null;
+  _windowSpacesOriginalGetRightLeaf?: (split: boolean) => WorkspaceLeaf | null;
+  _windowSpacesOriginalGetLeavesOfType?: (type: string) => WorkspaceLeaf[];
+  _windowSpacesInterceptorInstalled?: boolean;
 }
 
 export interface SaveLayoutOptions {
