@@ -52,6 +52,16 @@ typeof SuppressedError === "function" ? SuppressedError : function (error, suppr
     return e.name = "SuppressedError", e.error = error, e.suppressed = suppressed, e;
 };
 
+const DEFAULT_COLOR_PRESETS = [
+    "#3b82f6",
+    "#8b5cf6",
+    "#10b981",
+    "#f59e0b",
+    "#f43f5e",
+    "#06b6d4",
+    "#6366f1",
+];
+
 /**
  * 英文翻譯
  */
@@ -107,6 +117,11 @@ const en = {
         cancelButton: "Cancel",
         emptyNameError: "Space name cannot be empty",
         duplicateNameError: "A space with this name already exists",
+        iconLabel: "Icon / Emoji",
+        iconPlaceholder: "e.g. 🚀 or star",
+        colorLabel: "Window Frame Color",
+        colorPresetLabel: "Color Swatches",
+        clearColor: "Clear Color",
         saveSuccess: "Space saved successfully",
         autoSaveToggle: "Enable auto-save for this space",
     },
@@ -204,6 +219,9 @@ const en = {
         pickIcon: "Choose icon",
         restoreDefaultButtons: "Restore default buttons",
         restoreDefaultIcon: "Restore default icon",
+        accentSection: "Window Accent & Icons",
+        defaultIcon: "Default Popout Icon",
+        defaultIconDesc: "Icon to use when a Space does not specify a custom icon",
     },
     notifications: {
         layoutSaved: "Space saved successfully",
@@ -299,6 +317,11 @@ const zhTW = {
         cancelButton: "取消",
         emptyNameError: "空間名稱不能為空",
         duplicateNameError: "此名稱的空間已經存在",
+        iconLabel: "圖示 / Emoji",
+        iconPlaceholder: "例如：🚀 或 star",
+        colorLabel: "視窗邊框顏色",
+        colorPresetLabel: "快捷調色盤",
+        clearColor: "清除顏色",
         saveSuccess: "空間儲存成功",
         autoSaveToggle: "啟用此空間的自動保存",
     },
@@ -396,6 +419,9 @@ const zhTW = {
         pickIcon: "選擇圖示",
         restoreDefaultButtons: "還原預設按鈕",
         restoreDefaultIcon: "還原預設圖示",
+        accentSection: "視窗外觀與圖示",
+        defaultIcon: "預設 Popout 圖示",
+        defaultIconDesc: "當 Space 未指定自訂 Icon 時使用的預設圖示",
     },
     notifications: {
         layoutSaved: "空間儲存成功",
@@ -491,6 +517,11 @@ const zhCN = {
         cancelButton: "取消",
         emptyNameError: "空间名称不能为空",
         duplicateNameError: "此名称的空间已存在",
+        iconLabel: "图标 / Emoji",
+        iconPlaceholder: "例如：🚀 或 star",
+        colorLabel: "窗口边框颜色",
+        colorPresetLabel: "快捷调色盘",
+        clearColor: "清除颜色",
         saveSuccess: "空间保存成功",
         autoSaveToggle: "启用此空间的自动保存",
     },
@@ -588,6 +619,9 @@ const zhCN = {
         pickIcon: "选择图标",
         restoreDefaultButtons: "还原默认按钮",
         restoreDefaultIcon: "还原默认图标",
+        accentSection: "窗口外观与图标",
+        defaultIcon: "默认 Popout 图标",
+        defaultIconDesc: "当 Space 未指定自定义 Icon 时使用的默认图标",
     },
     notifications: {
         layoutSaved: "空间保存成功",
@@ -817,6 +851,382 @@ function t(key) {
  */
 function tWithParams(key, params) {
     return getI18n().tWithParams(key, params);
+}
+
+/**
+ * View type 列舉與解析工具。
+ *
+ * 三層組合（設計書 §4.3）：
+ * 1. 內建精選清單（固定、可離線）。
+ * 2. 防禦式讀取 `app.viewRegistry.viewByType`（非公開 API，try/catch）。
+ * 3. 自訂 type 輸入（由設定頁處理）。
+ */
+/** 內建側欄可用的精選 View（icon 為 Lucide icon 名稱）。 */
+const BUILTIN_SIDEBAR_VIEWS = [
+    { viewType: "file-explorer", label: "File explorer", icon: "folder", side: "left" },
+    { viewType: "search", label: "Search", icon: "search", side: "left" },
+    { viewType: "outline", label: "Outline", icon: "list-tree", side: "left" },
+    { viewType: "window-spaces-layouts", label: "Window Spaces", icon: "layout", side: "left" },
+    { viewType: "bookmarks", label: "Bookmarks", icon: "bookmark", side: "right" },
+    { viewType: "backlink", label: "Backlinks", icon: "link", side: "right" },
+    { viewType: "tag", label: "Tags", icon: "tag", side: "right" },
+    { viewType: "all-properties", label: "Properties", icon: "list", side: "right" },
+    { viewType: "canvas", label: "Canvas", icon: "frame", side: "right" },
+];
+/** 已知非側欄可嵌入的 View type（列舉時排除）。 */
+const EXCLUDED_VIEW_TYPES = new Set([
+    "empty",
+    "markdown",
+    "pdf",
+    "image",
+    "audio",
+    "video",
+    "release-notes",
+    "sync",
+]);
+function getViewRegistry(app) {
+    var _a;
+    return (_a = app === null || app === void 0 ? void 0 : app.viewRegistry) !== null && _a !== void 0 ? _a : {};
+}
+/** 從 viewRegistry 動態取得 view type 清單（防禦式）。 */
+function getRegistryViewTypes(app) {
+    try {
+        const registry = getViewRegistry(app);
+        const viewByType = registry.viewByType;
+        if (!viewByType || typeof viewByType !== "object")
+            return [];
+        return Object.keys(viewByType).filter((type) => !EXCLUDED_VIEW_TYPES.has(type));
+    }
+    catch (_a) {
+        return [];
+    }
+}
+/** 設定 icon 並驗證是否成功渲染（無效名稱會產生空 svg）。 */
+function setIconWithCheck(el, name) {
+    try {
+        el.empty();
+        obsidian.setIcon(el, name);
+        const svg = el.querySelector("svg");
+        return !!svg && svg.children.length > 0;
+    }
+    catch (_a) {
+        return false;
+    }
+}
+/** 檔案類型 view 的固定 icon（Obsidian 無公開的文件類型 icon API）。 */
+const FILE_VIEW_ICONS = {
+    markdown: "file-text",
+    pdf: "file-text",
+    image: "image",
+    audio: "audio",
+    video: "video",
+    canvas: "frame",
+};
+/** 取得某 view type 的 icon（檔案固定 icon → 快取 → 內建清單 → fallback）。 */
+function resolveViewIcon(_app, viewType) {
+    var _a, _b;
+    const fixedFileIcon = FILE_VIEW_ICONS[viewType];
+    if (fixedFileIcon)
+        return fixedFileIcon;
+    const cached = iconCache.get(viewType);
+    if (cached === null || cached === void 0 ? void 0 : cached.icon)
+        return cached.icon;
+    const builtin = BUILTIN_SIDEBAR_VIEWS.find((item) => item.viewType === viewType);
+    const icon = (_a = builtin === null || builtin === void 0 ? void 0 : builtin.icon) !== null && _a !== void 0 ? _a : null;
+    iconCache.set(viewType, { icon, dynamicAttempted: (_b = cached === null || cached === void 0 ? void 0 : cached.dynamicAttempted) !== null && _b !== void 0 ? _b : false });
+    return icon !== null && icon !== void 0 ? icon : "layout";
+}
+/**
+ * 把 view 的 icon 套用到按鈕上：
+ * - 0：檔案類型 view 使用固定 icon。
+ * - 快取/內建硬編碼 icon。
+ * - 兜底："layout"。
+ * 若 `opts.allowDynamicIcon`（activity bar 中的 view 且無自訂 icon），在一般路徑都找不到
+ * icon 時，會以非同步觸發動態偵測（掃描全部視窗已開啟的 leaf → 動態建立不可見實體），
+ * 找到後直接更新按鈕。
+ */
+function applyViewIcon(btn, app, viewType, opts) {
+    var _a, _b, _c;
+    // 0：檔案類型 view 使用固定 icon
+    const fixedFileIcon = FILE_VIEW_ICONS[viewType];
+    if (fixedFileIcon && setIconWithCheck(btn, fixedFileIcon))
+        return;
+    const cached = iconCache.get(viewType);
+    const icon = (_c = (_a = cached === null || cached === void 0 ? void 0 : cached.icon) !== null && _a !== void 0 ? _a : (_b = BUILTIN_SIDEBAR_VIEWS.find((item) => item.viewType === viewType)) === null || _b === void 0 ? void 0 : _b.icon) !== null && _c !== void 0 ? _c : null;
+    if (icon) {
+        setIconWithCheck(btn, icon);
+    }
+    else {
+        obsidian.setIcon(btn, "layout");
+    }
+    // 動態偵測（gated）：僅在「無固定/內建 icon」且「此 view 位於 activity bar」且「尚未嘗試過」時進行，
+    // 避免為無關 view 浪費掃描 / 建立實體的開銷。
+    if (!icon && (opts === null || opts === void 0 ? void 0 : opts.allowDynamicIcon) && !(cached === null || cached === void 0 ? void 0 : cached.dynamicAttempted)) {
+        iconCache.set(viewType, { icon: null, dynamicAttempted: true });
+        void detectViewIcon(app, viewType).then((dynamicIcon) => {
+            if (!dynamicIcon)
+                return;
+            iconCache.set(viewType, { icon: dynamicIcon, dynamicAttempted: true });
+            if (btn.isConnected)
+                setIconWithCheck(btn, dynamicIcon);
+        });
+    }
+}
+/**
+ * 套用 ActivityBarItem 的 icon：若有自訂 icon 先用自訂，否則走 applyViewIcon
+ * （並允許動態偵測，因為這是 activity bar 中已設定的 view）。
+ */
+function applyItemIcon(btn, app, item) {
+    if (item.icon && setIconWithCheck(btn, item.icon))
+        return;
+    applyViewIcon(btn, app, item.viewType, { allowDynamicIcon: true });
+}
+const iconCache = new Map();
+/** 掃描全部視窗已開啟的 leaf，找該 view 的實體並取其 `view.getIcon()`。 */
+function findIconFromOpenLeaves(app, viewType) {
+    let found = null;
+    const ws = app.workspace;
+    if (typeof ws.iterateAllLeaves !== "function")
+        return null;
+    ws.iterateAllLeaves((leaf) => {
+        if (found)
+            return;
+        const view = leaf === null || leaf === void 0 ? void 0 : leaf.view;
+        if (!view)
+            return;
+        try {
+            const vt = typeof view.getViewType === "function" ? view.getViewType() : "";
+            if (vt !== viewType)
+                return;
+            const icon = typeof view.getIcon === "function" ? view.getIcon() : "";
+            if (icon && typeof icon === "string")
+                found = icon;
+        }
+        catch (_a) {
+            // skip this leaf
+        }
+    });
+    return found;
+}
+/** 以多種內部存取方式取得 view creator（registry 方法 → entry 欄位）。 */
+function getViewCreatorForType(app, viewType) {
+    var _a;
+    const registry = getViewRegistry(app);
+    let creator = null;
+    if (typeof registry.getViewCreator === "function") {
+        const c = registry.getViewCreator(viewType);
+        if (typeof c === "function")
+            creator = c;
+    }
+    if (!creator) {
+        const entry = ((_a = registry.viewByType) !== null && _a !== void 0 ? _a : {})[viewType];
+        // 情況 A：viewByType[type] 本身就是 view creator function
+        if (typeof entry === "function") {
+            creator = entry;
+        }
+        else if (entry && typeof entry === "object") {
+            // 情況 B：entry 物件內含 creator 欄位
+            for (const key of ["creator", "view", "viewCreator"]) {
+                const candidate = entry[key];
+                if (typeof candidate === "function") {
+                    creator = candidate;
+                    break;
+                }
+            }
+        }
+    }
+    return creator;
+}
+/** 嘗試直接呼叫 registry entry 上的 getIcon（若 Obsidian 內部有提供）。 */
+function getIconFromRegistryEntry(app, viewType) {
+    var _a;
+    const entry = (_a = getViewRegistry(app).viewByType) === null || _a === void 0 ? void 0 : _a[viewType];
+    if (entry && typeof entry.getIcon === "function") {
+        try {
+            const icon = entry.getIcon();
+            if (icon && typeof icon === "string")
+                return icon;
+        }
+        catch (_b) {
+            // fallthrough
+        }
+    }
+    return null;
+}
+/** 動態建立該 view 的一個不可見實體（detached container）並取其 `getIcon()`。 */
+function getIconFromEphemeralView(app, viewType) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const creator = getViewCreatorForType(app, viewType);
+        if (!creator)
+            return null;
+        const host = document.createElement("div");
+        host.style.display = "none";
+        try {
+            document.body.appendChild(host);
+            // 提供完整點的 fake leaf（Obsidian View 建構子會讀 leaf.app / viewState / history 等）
+            const leaf = {
+                app,
+                containerEl: host,
+                view: null,
+                viewState: { type: viewType, state: {}, eState: {} },
+                // View 基底建構子建立導覽按鈕時會讀 leaf.history.backHistory / forwardHistory
+                history: { backHistory: [], forwardHistory: [] },
+                parent: null,
+                getViewState: () => ({ type: viewType, state: {}, eState: {} }),
+                setViewState: () => Promise.resolve(),
+                getRoot: () => null,
+                detach: () => undefined,
+            };
+            const view = creator(leaf);
+            leaf.view = view;
+            const icon = typeof view.getIcon === "function" ? view.getIcon() : "";
+            return icon && typeof icon === "string" ? icon : null;
+        }
+        catch (error) {
+            console.debug(`[Window Spaces] Ephemeral view creation failed for "${viewType}"`, error);
+            return null;
+        }
+        finally {
+            host.remove();
+        }
+    });
+}
+/** 以真實 leaf（getLeaf + setViewState）建立實體取 icon，讀取後立即 detach。 */
+function getIconFromRealLeaf(app, viewType) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const workspace = app.workspace;
+        if (typeof workspace.getLeaf !== "function")
+            return null;
+        let leaf = null;
+        try {
+            leaf = workspace.getLeaf("tab");
+            // 先隱藏 leaf 容器再開 view，避免 tab 開啟觸發版面計算（forced reflow）
+            const container = leaf.containerEl;
+            if (container instanceof HTMLElement) {
+                container.style.display = "none";
+            }
+            yield leaf.setViewState({ type: viewType, active: false, state: {} });
+            const view = leaf.view;
+            const icon = view && typeof view.getIcon === "function" ? view.getIcon() : "";
+            return icon && typeof icon === "string" ? icon : null;
+        }
+        catch (_a) {
+            return null;
+        }
+        finally {
+            if (leaf && typeof leaf.detach === "function") {
+                try {
+                    leaf.detach();
+                }
+                catch (_b) {
+                    // ignore
+                }
+            }
+        }
+    });
+}
+/** 動態偵測 view icon：掃全部視窗 → registry entry → 不可見實體 → 真實 leaf 兜底。 */
+function detectViewIcon(app, viewType) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const openIcon = findIconFromOpenLeaves(app, viewType);
+        if (openIcon)
+            return openIcon;
+        const entryIcon = getIconFromRegistryEntry(app, viewType);
+        if (entryIcon)
+            return entryIcon;
+        const ephemeralIcon = yield getIconFromEphemeralView(app, viewType);
+        if (ephemeralIcon)
+            return ephemeralIcon;
+        return getIconFromRealLeaf(app, viewType);
+    });
+}
+/**
+ * 重新進行動態 icon 偵測（掃描全部視窗 + 動態建立不可見實體）。
+ * 用於使用者從 View type list 選定新的 view、且該 view 尚未解析到 icon 時。
+ * 已有 icon 時直接回傳快取結果。
+ */
+function ensureViewIcon(app, viewType) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const cached = iconCache.get(viewType);
+        if (cached === null || cached === void 0 ? void 0 : cached.icon)
+            return cached.icon;
+        const icon = yield detectViewIcon(app, viewType);
+        iconCache.set(viewType, { icon, dynamicAttempted: true });
+        return icon;
+    });
+}
+/** 設定頁 icon 選擇器提供的候選 icon 清單。 */
+const ICON_CHOICES = [
+    "folder", "search", "list-tree", "bookmark", "link", "tag", "list",
+    "layout", "frame", "canvas", "history", "star", "hash", "file-text",
+    "image", "audio", "video", "calendar", "mail", "message-square",
+    "command", "terminal", "code", "pen", "pencil", "note", "copy",
+    "settings", "sliders-horizontal", "filter", "globe", "eye",
+    "eye-off", "check", "x", "plus", "minus", "arrow-right", "arrow-left",
+    "arrow-up", "arrow-down", "chevron-up", "chevron-down", "chevron-left",
+    "chevron-right", "panel-left", "panel-right", "panel-top", "panel-bottom",
+    "columns", "rows", "layout-grid", "layout-list", "grid", "inbox",
+    "archive", "trash", "refresh-cw", "more-horizontal", "more-vertical",
+];
+/**
+ * 將 viewType ID 美化為標題大小寫（如 "folder-spaces-explorer" -> "Folder Spaces Explorer"）。
+ */
+function formatViewTypeId(viewType) {
+    if (!viewType)
+        return "";
+    return viewType
+        .split(/[-_]+/)
+        .filter(Boolean)
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" ");
+}
+/** 取得某 view type 的顯示名稱（registry → 內建清單 → 美化 viewType）。 */
+function resolveViewLabel(app, viewType) {
+    // 1. 優先取 view 自己在 viewRegistry 註冊的 display text
+    try {
+        const registry = getViewRegistry(app);
+        const label = typeof registry.getDisplayText === "function" ? registry.getDisplayText(viewType) : "";
+        if (label)
+            return label;
+    }
+    catch (_a) {
+        // fallthrough
+    }
+    // 2. 取內建清單
+    const builtin = BUILTIN_SIDEBAR_VIEWS.find((item) => item.viewType === viewType);
+    if (builtin === null || builtin === void 0 ? void 0 : builtin.label)
+        return builtin.label;
+    // 3. Fallback：純粹將 ID 的 '-' 替換為空格，單詞首字母大寫
+    return formatViewTypeId(viewType);
+}
+/**
+ * 將內建精選 + 動態 registry view 合併為「可用 view type」清單（去重）。
+ * 回傳 items 已依照 `side` 分派至 left / right。
+ */
+function enumerateAvailableViews(app) {
+    const seen = new Set();
+    const left = [];
+    const right = [];
+    const push = (item) => {
+        if (seen.has(item.viewType))
+            return;
+        seen.add(item.viewType);
+        if (item.side === "right")
+            right.push(item);
+        else
+            left.push(item);
+    };
+    BUILTIN_SIDEBAR_VIEWS.forEach(push);
+    const registryTypes = getRegistryViewTypes(app);
+    for (const type of registryTypes) {
+        if (!seen.has(type)) {
+            push({
+                viewType: type,
+                side: "left",
+            });
+        }
+    }
+    return { left, right };
 }
 
 /**
@@ -1635,6 +2045,24 @@ class WindowLayoutsModal extends obsidian.Modal {
         const titleEl = itemContentEl.createDiv({
             cls: "suggestion-title qsp-title",
         });
+        if (layout.color) {
+            const colorBadge = titleEl.createSpan({ cls: "window-space-color-badge" });
+            colorBadge.style.backgroundColor = layout.color;
+        }
+        if (layout.icon) {
+            const iconSpan = titleEl.createSpan({ cls: "window-space-item-icon" });
+            const val = layout.icon;
+            const isEmoji = /\p{Extended_Pictographic}/u.test(val) || !/^[a-zA-Z0-9-]+$/.test(val);
+            if (isEmoji) {
+                iconSpan.setText(val);
+            }
+            else {
+                const iconDiv = iconSpan.createDiv();
+                if (!setIconWithCheck(iconDiv, val)) {
+                    obsidian.setIcon(iconDiv, "layout");
+                }
+            }
+        }
         titleEl.createSpan({ text: layout.name });
         if (layout.archived === true) {
             const archivedBadge = titleEl.createSpan({
@@ -4107,11 +4535,80 @@ class SaveLayoutModal extends obsidian.Modal {
             text.inputEl.addEventListener("keydown", (e) => {
                 if (e.key === "Enter") {
                     e.preventDefault();
-                    void this.submitForm(nameInput, includeGeometry, autoSave, selectedSections, archived);
+                    void this.submitForm(nameInput, includeGeometry, autoSave, selectedSections, archived, currentIcon, currentColor);
                 }
             });
         });
         nameSetting.settingEl.addClass("window-spaces-setting-full-width");
+        // Icon / Emoji 輸入框與預覽
+        let currentIcon = this.layout.icon || "";
+        let currentColor = this.layout.color || "";
+        const iconSetting = new obsidian.Setting(contentEl)
+            .setName(t("saveModal.iconLabel"))
+            .addText((text) => {
+            text.setPlaceholder(t("saveModal.iconPlaceholder"));
+            text.setValue(currentIcon);
+            text.onChange((val) => {
+                currentIcon = val.trim();
+                updateIconPreview();
+            });
+        });
+        const iconPreviewEl = iconSetting.controlEl.createDiv({ cls: "window-space-icon-preview" });
+        const updateIconPreview = () => {
+            iconPreviewEl.empty();
+            const val = currentIcon || this.plugin.settings.defaultIcon || "layout";
+            const isEmoji = /\p{Extended_Pictographic}/u.test(val) || !/^[a-zA-Z0-9-]+$/.test(val);
+            if (isEmoji) {
+                iconPreviewEl.createSpan({ text: val });
+            }
+            else {
+                const iconDiv = iconPreviewEl.createDiv();
+                if (!setIconWithCheck(iconDiv, val)) {
+                    obsidian.setIcon(iconDiv, "layout");
+                }
+            }
+        };
+        updateIconPreview();
+        // 邊框顏色選擇器與 Swatches
+        const presets = this.plugin.settings.colorPresets || DEFAULT_COLOR_PRESETS;
+        const colorSetting = new obsidian.Setting(contentEl)
+            .setName(t("saveModal.colorLabel"));
+        const colorPickerContainer = colorSetting.controlEl.createDiv({ cls: "window-space-color-picker-container" });
+        const colorInput = colorPickerContainer.createEl("input", {
+            attr: { type: "color" },
+            value: currentColor || "#3b82f6",
+        });
+        const swatchesContainer = colorPickerContainer.createDiv({ cls: "window-space-color-swatches" });
+        const renderSwatches = () => {
+            swatchesContainer.empty();
+            presets.forEach((hex) => {
+                const swatch = swatchesContainer.createDiv({
+                    cls: `window-space-color-swatch${currentColor === hex ? " is-selected" : ""}`,
+                });
+                swatch.style.backgroundColor = hex;
+                swatch.onclick = () => {
+                    currentColor = hex;
+                    colorInput.value = hex;
+                    renderSwatches();
+                };
+            });
+            if (currentColor) {
+                const clearBtn = swatchesContainer.createEl("button", {
+                    text: "✖",
+                    cls: "clickable-icon",
+                    attr: { title: t("saveModal.clearColor") },
+                });
+                clearBtn.onclick = () => {
+                    currentColor = "";
+                    renderSwatches();
+                };
+            }
+        };
+        colorInput.onchange = () => {
+            currentColor = colorInput.value;
+            renderSwatches();
+        };
+        renderSwatches();
         const noticeContainer = contentEl.createDiv("save-overwrite-notice");
         let autoSave = (_a = this.layout.autoSave) !== null && _a !== void 0 ? _a : false;
         let autoSaveToggleComponent = null;
@@ -4258,11 +4755,11 @@ class SaveLayoutModal extends obsidian.Modal {
             cls: "mod-cta",
         });
         saveButton.onclick = () => {
-            void this.submitForm(nameInput, includeGeometry, autoSave, selectedSections, archived);
+            void this.submitForm(nameInput, includeGeometry, autoSave, selectedSections, archived, currentIcon, currentColor);
         };
         window.setTimeout(() => nameInput === null || nameInput === void 0 ? void 0 : nameInput.focus(), 50);
     }
-    submitForm(nameInput, includeGeometry, autoSave, selectedSections, archived) {
+    submitForm(nameInput, includeGeometry, autoSave, selectedSections, archived, icon, color) {
         return __awaiter(this, void 0, void 0, function* () {
             const name = nameInput.value.trim();
             if (!name) {
@@ -4276,6 +4773,8 @@ class SaveLayoutModal extends obsidian.Modal {
             this.layout.includeGeometry = includeGeometry;
             this.layout.sections = selectedSections;
             this.layout.archived = archived;
+            this.layout.icon = icon ? icon.trim() : undefined;
+            this.layout.color = color ? color.trim() : undefined;
             if (!includeGeometry) {
                 this.layout.windowState.position = undefined;
             }
@@ -4297,382 +4796,6 @@ class SaveLayoutModal extends obsidian.Modal {
         const dateStr = i18n.formatDate(now);
         return `${t("saveModal.title")} ${dateStr}`;
     }
-}
-
-/**
- * View type 列舉與解析工具。
- *
- * 三層組合（設計書 §4.3）：
- * 1. 內建精選清單（固定、可離線）。
- * 2. 防禦式讀取 `app.viewRegistry.viewByType`（非公開 API，try/catch）。
- * 3. 自訂 type 輸入（由設定頁處理）。
- */
-/** 內建側欄可用的精選 View（icon 為 Lucide icon 名稱）。 */
-const BUILTIN_SIDEBAR_VIEWS = [
-    { viewType: "file-explorer", label: "File explorer", icon: "folder", side: "left" },
-    { viewType: "search", label: "Search", icon: "search", side: "left" },
-    { viewType: "outline", label: "Outline", icon: "list-tree", side: "left" },
-    { viewType: "window-spaces-layouts", label: "Window Spaces", icon: "layout", side: "left" },
-    { viewType: "bookmarks", label: "Bookmarks", icon: "bookmark", side: "right" },
-    { viewType: "backlink", label: "Backlinks", icon: "link", side: "right" },
-    { viewType: "tag", label: "Tags", icon: "tag", side: "right" },
-    { viewType: "all-properties", label: "Properties", icon: "list", side: "right" },
-    { viewType: "canvas", label: "Canvas", icon: "frame", side: "right" },
-];
-/** 已知非側欄可嵌入的 View type（列舉時排除）。 */
-const EXCLUDED_VIEW_TYPES = new Set([
-    "empty",
-    "markdown",
-    "pdf",
-    "image",
-    "audio",
-    "video",
-    "release-notes",
-    "sync",
-]);
-function getViewRegistry(app) {
-    var _a;
-    return (_a = app === null || app === void 0 ? void 0 : app.viewRegistry) !== null && _a !== void 0 ? _a : {};
-}
-/** 從 viewRegistry 動態取得 view type 清單（防禦式）。 */
-function getRegistryViewTypes(app) {
-    try {
-        const registry = getViewRegistry(app);
-        const viewByType = registry.viewByType;
-        if (!viewByType || typeof viewByType !== "object")
-            return [];
-        return Object.keys(viewByType).filter((type) => !EXCLUDED_VIEW_TYPES.has(type));
-    }
-    catch (_a) {
-        return [];
-    }
-}
-/** 設定 icon 並驗證是否成功渲染（無效名稱會產生空 svg）。 */
-function setIconWithCheck(el, name) {
-    try {
-        el.empty();
-        obsidian.setIcon(el, name);
-        const svg = el.querySelector("svg");
-        return !!svg && svg.children.length > 0;
-    }
-    catch (_a) {
-        return false;
-    }
-}
-/** 檔案類型 view 的固定 icon（Obsidian 無公開的文件類型 icon API）。 */
-const FILE_VIEW_ICONS = {
-    markdown: "file-text",
-    pdf: "file-text",
-    image: "image",
-    audio: "audio",
-    video: "video",
-    canvas: "frame",
-};
-/** 取得某 view type 的 icon（檔案固定 icon → 快取 → 內建清單 → fallback）。 */
-function resolveViewIcon(_app, viewType) {
-    var _a, _b;
-    const fixedFileIcon = FILE_VIEW_ICONS[viewType];
-    if (fixedFileIcon)
-        return fixedFileIcon;
-    const cached = iconCache.get(viewType);
-    if (cached === null || cached === void 0 ? void 0 : cached.icon)
-        return cached.icon;
-    const builtin = BUILTIN_SIDEBAR_VIEWS.find((item) => item.viewType === viewType);
-    const icon = (_a = builtin === null || builtin === void 0 ? void 0 : builtin.icon) !== null && _a !== void 0 ? _a : null;
-    iconCache.set(viewType, { icon, dynamicAttempted: (_b = cached === null || cached === void 0 ? void 0 : cached.dynamicAttempted) !== null && _b !== void 0 ? _b : false });
-    return icon !== null && icon !== void 0 ? icon : "layout";
-}
-/**
- * 把 view 的 icon 套用到按鈕上：
- * - 0：檔案類型 view 使用固定 icon。
- * - 快取/內建硬編碼 icon。
- * - 兜底："layout"。
- * 若 `opts.allowDynamicIcon`（activity bar 中的 view 且無自訂 icon），在一般路徑都找不到
- * icon 時，會以非同步觸發動態偵測（掃描全部視窗已開啟的 leaf → 動態建立不可見實體），
- * 找到後直接更新按鈕。
- */
-function applyViewIcon(btn, app, viewType, opts) {
-    var _a, _b, _c;
-    // 0：檔案類型 view 使用固定 icon
-    const fixedFileIcon = FILE_VIEW_ICONS[viewType];
-    if (fixedFileIcon && setIconWithCheck(btn, fixedFileIcon))
-        return;
-    const cached = iconCache.get(viewType);
-    const icon = (_c = (_a = cached === null || cached === void 0 ? void 0 : cached.icon) !== null && _a !== void 0 ? _a : (_b = BUILTIN_SIDEBAR_VIEWS.find((item) => item.viewType === viewType)) === null || _b === void 0 ? void 0 : _b.icon) !== null && _c !== void 0 ? _c : null;
-    if (icon) {
-        setIconWithCheck(btn, icon);
-    }
-    else {
-        obsidian.setIcon(btn, "layout");
-    }
-    // 動態偵測（gated）：僅在「無固定/內建 icon」且「此 view 位於 activity bar」且「尚未嘗試過」時進行，
-    // 避免為無關 view 浪費掃描 / 建立實體的開銷。
-    if (!icon && (opts === null || opts === void 0 ? void 0 : opts.allowDynamicIcon) && !(cached === null || cached === void 0 ? void 0 : cached.dynamicAttempted)) {
-        iconCache.set(viewType, { icon: null, dynamicAttempted: true });
-        void detectViewIcon(app, viewType).then((dynamicIcon) => {
-            if (!dynamicIcon)
-                return;
-            iconCache.set(viewType, { icon: dynamicIcon, dynamicAttempted: true });
-            if (btn.isConnected)
-                setIconWithCheck(btn, dynamicIcon);
-        });
-    }
-}
-/**
- * 套用 ActivityBarItem 的 icon：若有自訂 icon 先用自訂，否則走 applyViewIcon
- * （並允許動態偵測，因為這是 activity bar 中已設定的 view）。
- */
-function applyItemIcon(btn, app, item) {
-    if (item.icon && setIconWithCheck(btn, item.icon))
-        return;
-    applyViewIcon(btn, app, item.viewType, { allowDynamicIcon: true });
-}
-const iconCache = new Map();
-/** 掃描全部視窗已開啟的 leaf，找該 view 的實體並取其 `view.getIcon()`。 */
-function findIconFromOpenLeaves(app, viewType) {
-    let found = null;
-    const ws = app.workspace;
-    if (typeof ws.iterateAllLeaves !== "function")
-        return null;
-    ws.iterateAllLeaves((leaf) => {
-        if (found)
-            return;
-        const view = leaf === null || leaf === void 0 ? void 0 : leaf.view;
-        if (!view)
-            return;
-        try {
-            const vt = typeof view.getViewType === "function" ? view.getViewType() : "";
-            if (vt !== viewType)
-                return;
-            const icon = typeof view.getIcon === "function" ? view.getIcon() : "";
-            if (icon && typeof icon === "string")
-                found = icon;
-        }
-        catch (_a) {
-            // skip this leaf
-        }
-    });
-    return found;
-}
-/** 以多種內部存取方式取得 view creator（registry 方法 → entry 欄位）。 */
-function getViewCreatorForType(app, viewType) {
-    var _a;
-    const registry = getViewRegistry(app);
-    let creator = null;
-    if (typeof registry.getViewCreator === "function") {
-        const c = registry.getViewCreator(viewType);
-        if (typeof c === "function")
-            creator = c;
-    }
-    if (!creator) {
-        const entry = ((_a = registry.viewByType) !== null && _a !== void 0 ? _a : {})[viewType];
-        // 情況 A：viewByType[type] 本身就是 view creator function
-        if (typeof entry === "function") {
-            creator = entry;
-        }
-        else if (entry && typeof entry === "object") {
-            // 情況 B：entry 物件內含 creator 欄位
-            for (const key of ["creator", "view", "viewCreator"]) {
-                const candidate = entry[key];
-                if (typeof candidate === "function") {
-                    creator = candidate;
-                    break;
-                }
-            }
-        }
-    }
-    return creator;
-}
-/** 嘗試直接呼叫 registry entry 上的 getIcon（若 Obsidian 內部有提供）。 */
-function getIconFromRegistryEntry(app, viewType) {
-    var _a;
-    const entry = (_a = getViewRegistry(app).viewByType) === null || _a === void 0 ? void 0 : _a[viewType];
-    if (entry && typeof entry.getIcon === "function") {
-        try {
-            const icon = entry.getIcon();
-            if (icon && typeof icon === "string")
-                return icon;
-        }
-        catch (_b) {
-            // fallthrough
-        }
-    }
-    return null;
-}
-/** 動態建立該 view 的一個不可見實體（detached container）並取其 `getIcon()`。 */
-function getIconFromEphemeralView(app, viewType) {
-    return __awaiter(this, void 0, void 0, function* () {
-        const creator = getViewCreatorForType(app, viewType);
-        if (!creator)
-            return null;
-        const host = document.createElement("div");
-        host.style.display = "none";
-        try {
-            document.body.appendChild(host);
-            // 提供完整點的 fake leaf（Obsidian View 建構子會讀 leaf.app / viewState / history 等）
-            const leaf = {
-                app,
-                containerEl: host,
-                view: null,
-                viewState: { type: viewType, state: {}, eState: {} },
-                // View 基底建構子建立導覽按鈕時會讀 leaf.history.backHistory / forwardHistory
-                history: { backHistory: [], forwardHistory: [] },
-                parent: null,
-                getViewState: () => ({ type: viewType, state: {}, eState: {} }),
-                setViewState: () => Promise.resolve(),
-                getRoot: () => null,
-                detach: () => undefined,
-            };
-            const view = creator(leaf);
-            leaf.view = view;
-            const icon = typeof view.getIcon === "function" ? view.getIcon() : "";
-            return icon && typeof icon === "string" ? icon : null;
-        }
-        catch (error) {
-            console.debug(`[Window Spaces] Ephemeral view creation failed for "${viewType}"`, error);
-            return null;
-        }
-        finally {
-            host.remove();
-        }
-    });
-}
-/** 以真實 leaf（getLeaf + setViewState）建立實體取 icon，讀取後立即 detach。 */
-function getIconFromRealLeaf(app, viewType) {
-    return __awaiter(this, void 0, void 0, function* () {
-        const workspace = app.workspace;
-        if (typeof workspace.getLeaf !== "function")
-            return null;
-        let leaf = null;
-        try {
-            leaf = workspace.getLeaf("tab");
-            // 先隱藏 leaf 容器再開 view，避免 tab 開啟觸發版面計算（forced reflow）
-            const container = leaf.containerEl;
-            if (container instanceof HTMLElement) {
-                container.style.display = "none";
-            }
-            yield leaf.setViewState({ type: viewType, active: false, state: {} });
-            const view = leaf.view;
-            const icon = view && typeof view.getIcon === "function" ? view.getIcon() : "";
-            return icon && typeof icon === "string" ? icon : null;
-        }
-        catch (_a) {
-            return null;
-        }
-        finally {
-            if (leaf && typeof leaf.detach === "function") {
-                try {
-                    leaf.detach();
-                }
-                catch (_b) {
-                    // ignore
-                }
-            }
-        }
-    });
-}
-/** 動態偵測 view icon：掃全部視窗 → registry entry → 不可見實體 → 真實 leaf 兜底。 */
-function detectViewIcon(app, viewType) {
-    return __awaiter(this, void 0, void 0, function* () {
-        const openIcon = findIconFromOpenLeaves(app, viewType);
-        if (openIcon)
-            return openIcon;
-        const entryIcon = getIconFromRegistryEntry(app, viewType);
-        if (entryIcon)
-            return entryIcon;
-        const ephemeralIcon = yield getIconFromEphemeralView(app, viewType);
-        if (ephemeralIcon)
-            return ephemeralIcon;
-        return getIconFromRealLeaf(app, viewType);
-    });
-}
-/**
- * 重新進行動態 icon 偵測（掃描全部視窗 + 動態建立不可見實體）。
- * 用於使用者從 View type list 選定新的 view、且該 view 尚未解析到 icon 時。
- * 已有 icon 時直接回傳快取結果。
- */
-function ensureViewIcon(app, viewType) {
-    return __awaiter(this, void 0, void 0, function* () {
-        const cached = iconCache.get(viewType);
-        if (cached === null || cached === void 0 ? void 0 : cached.icon)
-            return cached.icon;
-        const icon = yield detectViewIcon(app, viewType);
-        iconCache.set(viewType, { icon, dynamicAttempted: true });
-        return icon;
-    });
-}
-/** 設定頁 icon 選擇器提供的候選 icon 清單。 */
-const ICON_CHOICES = [
-    "folder", "search", "list-tree", "bookmark", "link", "tag", "list",
-    "layout", "frame", "canvas", "history", "star", "hash", "file-text",
-    "image", "audio", "video", "calendar", "mail", "message-square",
-    "command", "terminal", "code", "pen", "pencil", "note", "copy",
-    "settings", "sliders-horizontal", "filter", "globe", "eye",
-    "eye-off", "check", "x", "plus", "minus", "arrow-right", "arrow-left",
-    "arrow-up", "arrow-down", "chevron-up", "chevron-down", "chevron-left",
-    "chevron-right", "panel-left", "panel-right", "panel-top", "panel-bottom",
-    "columns", "rows", "layout-grid", "layout-list", "grid", "inbox",
-    "archive", "trash", "refresh-cw", "more-horizontal", "more-vertical",
-];
-/**
- * 將 viewType ID 美化為標題大小寫（如 "folder-spaces-explorer" -> "Folder Spaces Explorer"）。
- */
-function formatViewTypeId(viewType) {
-    if (!viewType)
-        return "";
-    return viewType
-        .split(/[-_]+/)
-        .filter(Boolean)
-        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(" ");
-}
-/** 取得某 view type 的顯示名稱（registry → 內建清單 → 美化 viewType）。 */
-function resolveViewLabel(app, viewType) {
-    // 1. 優先取 view 自己在 viewRegistry 註冊的 display text
-    try {
-        const registry = getViewRegistry(app);
-        const label = typeof registry.getDisplayText === "function" ? registry.getDisplayText(viewType) : "";
-        if (label)
-            return label;
-    }
-    catch (_a) {
-        // fallthrough
-    }
-    // 2. 取內建清單
-    const builtin = BUILTIN_SIDEBAR_VIEWS.find((item) => item.viewType === viewType);
-    if (builtin === null || builtin === void 0 ? void 0 : builtin.label)
-        return builtin.label;
-    // 3. Fallback：純粹將 ID 的 '-' 替換為空格，單詞首字母大寫
-    return formatViewTypeId(viewType);
-}
-/**
- * 將內建精選 + 動態 registry view 合併為「可用 view type」清單（去重）。
- * 回傳 items 已依照 `side` 分派至 left / right。
- */
-function enumerateAvailableViews(app) {
-    const seen = new Set();
-    const left = [];
-    const right = [];
-    const push = (item) => {
-        if (seen.has(item.viewType))
-            return;
-        seen.add(item.viewType);
-        if (item.side === "right")
-            right.push(item);
-        else
-            left.push(item);
-    };
-    BUILTIN_SIDEBAR_VIEWS.forEach(push);
-    const registryTypes = getRegistryViewTypes(app);
-    for (const type of registryTypes) {
-        if (!seen.has(type)) {
-            push({
-                viewType: type,
-                side: "left",
-            });
-        }
-    }
-    return { left, right };
 }
 
 /** Obsidian `SettingGroup` 建構式（1.12.7+；舊版為 undefined）。 */
@@ -4741,7 +4864,7 @@ class WindowSpacesSettingTab extends obsidian.PluginSettingTab {
         return setting;
     }
     display() {
-        var _a, _b, _c;
+        var _a, _b, _c, _d;
         const { containerEl } = this;
         containerEl.empty();
         new obsidian.Setting(containerEl).setName(t("settings.title")).setHeading();
@@ -4814,8 +4937,30 @@ class WindowSpacesSettingTab extends obsidian.PluginSettingTab {
         });
         // ===== Popout 側欄（Activity Bars） =====
         this.renderActivityBarSection(containerEl);
+        // ===== 視窗外觀與圖示 (Accent & Icons) =====
+        const accentGroup = (_c = this.createGroup(containerEl)) !== null && _c !== void 0 ? _c : containerEl;
+        this.createSettingIn(accentGroup, (s) => s.setName(t("settings.accentSection")).setHeading());
+        this.createSettingIn(accentGroup, (s) => {
+            s.setName(t("settings.defaultIcon")).setDesc(t("settings.defaultIconDesc"));
+            const currentIcon = this.plugin.settings.defaultIcon || "layout";
+            const iconBtn = s.controlEl.createEl("button", {
+                cls: "clickable-icon",
+                attr: { type: "button", title: currentIcon },
+            });
+            if (!setIconWithCheck(iconBtn, currentIcon)) {
+                obsidian.setIcon(iconBtn, "layout");
+            }
+            iconBtn.onclick = () => {
+                new IconPickerModal(this.app, (selected) => __awaiter(this, void 0, void 0, function* () {
+                    this.plugin.settings.defaultIcon = selected;
+                    yield this.plugin.saveSettings();
+                    this.display();
+                    this.plugin.activityBars.refreshAll();
+                })).open();
+            };
+        });
         // ===== 危險操作（單一 panel） =====
-        const dangerGroup = (_c = this.createGroup(containerEl)) !== null && _c !== void 0 ? _c : containerEl;
+        const dangerGroup = (_d = this.createGroup(containerEl)) !== null && _d !== void 0 ? _d : containerEl;
         this.createSettingIn(dangerGroup, (s) => s.setName(t("settings.resetSettings")).setHeading());
         this.createSettingIn(dangerGroup, (s) => {
             s.setName(t("settings.resetSettings")).setDesc(t("settings.resetSettingsDescription"));
@@ -5819,11 +5964,64 @@ class PopoutActivityBarManager {
                 this.cleanupWindow(win);
         });
     }
+    getLayoutForWindow(win) {
+        var _a, _b;
+        if (!win || win.closed)
+            return null;
+        const explicitId = win._windowSpacesLayoutId;
+        if (explicitId) {
+            const found = this.settings.spaces.find((s) => s.id === explicitId);
+            if (found)
+                return found;
+        }
+        const leafEls = Array.from(win.document.querySelectorAll(".workspace-leaf"));
+        if (leafEls.length === 0)
+            return null;
+        for (const space of this.settings.spaces) {
+            const leaves = ((_a = space.workspace) === null || _a === void 0 ? void 0 : _a.leaves) || [];
+            const spaceLeafIds = new Set(leaves.map((l) => l.id));
+            if ((_b = space.windowInfo) === null || _b === void 0 ? void 0 : _b.firstLeafId)
+                spaceLeafIds.add(space.windowInfo.firstLeafId);
+            for (const el of leafEls) {
+                const leafId = el.getAttribute("data-id") || el.id;
+                if (leafId && spaceLeafIds.has(leafId)) {
+                    return space;
+                }
+            }
+        }
+        return null;
+    }
+    updateDragHandleIcon(bars, win) {
+        const drag = bars.left.querySelector(".window-spaces-activity-drag");
+        if (!drag)
+            return;
+        drag.empty();
+        const layout = this.getLayoutForWindow(win);
+        const icon = (layout === null || layout === void 0 ? void 0 : layout.icon) || this.settings.defaultIcon || "layout";
+        const color = layout === null || layout === void 0 ? void 0 : layout.color;
+        if (color) {
+            win.document.body.style.setProperty("--window-space-color", color);
+        }
+        else {
+            win.document.body.style.removeProperty("--window-space-color");
+        }
+        const isEmoji = /\p{Extended_Pictographic}/u.test(icon) || !/^[a-zA-Z0-9-]+$/.test(icon);
+        if (isEmoji) {
+            drag.createSpan({ cls: "window-spaces-drag-emoji", text: icon });
+        }
+        else {
+            const iconEl = drag.createDiv({ cls: "window-spaces-drag-icon" });
+            if (!setIconWithCheck(iconEl, icon)) {
+                obsidian.setIcon(iconEl, "layout");
+            }
+        }
+    }
     /** 重建指定視窗的按鈕內容。 */
     renderWindow(win) {
         const bars = this.barsByWindow.get(win);
         if (!bars)
             return;
+        this.updateDragHandleIcon(bars, win);
         this.renderBar(bars, win, "left");
         this.renderBar(bars, win, "right");
         this.updateActiveStates(win);
@@ -5915,13 +6113,13 @@ class PopoutActivityBarManager {
     /**
      * 將視窗最左/最右的頂層欄位標記為 sidebar column，並套用 Obsidian 的
      * sidebar 相關 class（mod-sidedock / mod-left-split / mod-right-split），
-     * 使其 tab 使用與主視窗 sidebar 一致的樣式。
+     * 使其 tab 使用與主視窗 sidebar 一致的樣式，且讓側欄的 resize handle 可拖曳。
      *
-     * 注意：這些 sidebar class 只能套用在 `.workspace-tabs` 元素上（tab header 樣式
-     * 依賴 `.mod-left-split .workspace-tab-header` 等 descendant selector），
-     * 不能套用在 `.workspace-split` 容器上——Obsidian 的
+     * 注意：`.workspace-split` 容器也會套用這些 class——Obsidian 的
      * `.workspace-split.mod-left-split, .workspace-split.mod-right-split { flex: 0 0 auto }`
-     * 會把巢狀 split 容器壓扁成 width 0，導致 sidebar 消失。
+     * 確實會把巢狀 split 容器壓扁成 width 0，因此 styles.css 以相同 specificity、
+     * 較晚載入的非 important `flex: 1 1 0` 覆蓋它，同時保留 Obsidian 的 inline
+     * `flex-grow`（popout 的 resize 機制），sidebar 才不會消失、也才能拖寬。
      */
     syncSidebarColumnClasses(win) {
         const columns = this.engine.getTopLevelColumnElements(win);
@@ -5929,11 +6127,9 @@ class PopoutActivityBarManager {
         columns.forEach((el, index) => {
             const isSidebar = columns.length >= 2 && (index === 0 || index === last);
             el.classList.toggle("window-spaces-sidebar-column", isSidebar);
-            // split 容器本身絕不能套用 mod-left-split/mod-right-split（會被 flex 壓扁），
-            // 若有殘留（先前 sync 或 Obsidian 自己加的）也一併清除。
-            if (el.classList.contains("workspace-split")) {
-                el.classList.remove("mod-sidedock", "mod-left-split", "mod-right-split");
-            }
+            el.classList.toggle("mod-sidedock", isSidebar);
+            el.classList.toggle("mod-left-split", isSidebar && index === 0);
+            el.classList.toggle("mod-right-split", isSidebar && index === last);
             const tabGroups = this.getSidebarTabGroups(el);
             tabGroups.forEach((tabsEl) => {
                 tabsEl.classList.toggle("mod-sidedock", isSidebar);
@@ -6214,6 +6410,8 @@ const DEFAULT_SETTINGS = {
     sectionsOrder: [],
     groupBySection: true,
     showArchived: false,
+    defaultIcon: "layout",
+    colorPresets: DEFAULT_COLOR_PRESETS,
     showActivityBars: true,
     activityBars: {
         left: BUILTIN_SIDEBAR_VIEWS.filter((item) => item.side === "left"),

@@ -2,6 +2,7 @@ import { App, Modal, Notice, Setting, setIcon, setTooltip, Menu } from "obsidian
 import { WindowLayout, ViewState, WindowSettings } from "../types";
 import { t, getI18n } from "../i18n";
 import WindowSpacesPlugin from "../main";
+import { setIconWithCheck } from "../popout/viewRegistry";
 
 /**
  * 統一的 Window Layouts 視窗：搜尋、恢復與管理都在同一個入口完成。
@@ -929,6 +930,26 @@ export class WindowLayoutsModal extends Modal {
     const titleEl = itemContentEl.createDiv({
       cls: "suggestion-title qsp-title",
     });
+
+    if (layout.color) {
+      const colorBadge = titleEl.createSpan({ cls: "window-space-color-badge" });
+      colorBadge.style.backgroundColor = layout.color;
+    }
+
+    if (layout.icon) {
+      const iconSpan = titleEl.createSpan({ cls: "window-space-item-icon" });
+      const val = layout.icon;
+      const isEmoji = /\p{Extended_Pictographic}/u.test(val) || !/^[a-zA-Z0-9-]+$/.test(val);
+      if (isEmoji) {
+        iconSpan.setText(val);
+      } else {
+        const iconDiv = iconSpan.createDiv();
+        if (!setIconWithCheck(iconDiv, val)) {
+          setIcon(iconDiv, "layout");
+        }
+      }
+    }
+
     titleEl.createSpan({ text: layout.name });
 
     if (layout.archived === true) {

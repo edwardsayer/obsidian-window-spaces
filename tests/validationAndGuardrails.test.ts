@@ -36,6 +36,22 @@ describe("Validation & Auto-Save Guardrails (validationAndGuardrails.test.ts)", 
     expect((manager as any).validateLayout(valid)).toBe(true);
   });
 
+  test("WindowLayout preserves custom icon and color fields when validated and saved", () => {
+    const validWithIconAndColor: WindowLayout = {
+      id: "v-icon-color",
+      name: "Styled Layout",
+      timestamp: Date.now(),
+      icon: "🚀",
+      color: "#ef4444",
+      windowState: { size: { width: 800, height: 600 } },
+      workspace: { layout: {}, leaves: [] },
+      metadata: { fileCount: 1, tabCount: 1, splitCount: 0 },
+    };
+    expect((manager as any).validateLayout(validWithIconAndColor)).toBe(true);
+    expect(validWithIconAndColor.icon).toBe("🚀");
+    expect(validWithIconAndColor.color).toBe("#ef4444");
+  });
+
   test("ensureViewRendered rebuilds only when content is empty and view is not a file view", () => {
     const contentEl = document.createElement("div");
     contentEl.classList.add("view-content");

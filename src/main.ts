@@ -5,6 +5,7 @@ import {
   ExtendedWorkspace,
   ExtendedWorkspaceLeaf,
   WorkspaceSplit,
+  DEFAULT_COLOR_PRESETS,
 } from "./types";
 import { WindowLayoutManager } from "./manager";
 import { SaveLayoutModal } from "./modals/saveModal";
@@ -34,6 +35,8 @@ const DEFAULT_SETTINGS: WindowSettings = {
   sectionsOrder: [],
   groupBySection: true,
   showArchived: false,
+  defaultIcon: "layout",
+  colorPresets: DEFAULT_COLOR_PRESETS,
   showActivityBars: true,
   activityBars: {
     left: BUILTIN_SIDEBAR_VIEWS.filter((item) => item.side === "left"),

@@ -1,7 +1,8 @@
-import { App, Modal, Setting, Notice, ToggleComponent } from "obsidian";
-import { WindowLayout } from "../types";
+import { App, Modal, Setting, Notice, ToggleComponent, setIcon } from "obsidian";
+import { WindowLayout, DEFAULT_COLOR_PRESETS } from "../types";
 import { t, getI18n } from "../i18n";
 import WindowSpacesPlugin from "../main";
+import { setIconWithCheck } from "../popout/viewRegistry";
 
 export class SaveLayoutModal extends Modal {
   private plugin: WindowSpacesPlugin;
@@ -40,11 +41,85 @@ export class SaveLayoutModal extends Modal {
         text.inputEl.addEventListener("keydown", (e) => {
           if (e.key === "Enter") {
             e.preventDefault();
-            void this.submitForm(nameInput, includeGeometry, autoSave, selectedSections, archived);
+            void this.submitForm(nameInput, includeGeometry, autoSave, selectedSections, archived, currentIcon, currentColor);
           }
         });
       });
     nameSetting.settingEl.addClass("window-spaces-setting-full-width");
+
+    // Icon / Emoji 輸入框與預覽
+    let currentIcon = this.layout.icon || "";
+    let currentColor = this.layout.color || "";
+
+    const iconSetting = new Setting(contentEl)
+      .setName(t("saveModal.iconLabel"))
+      .addText((text) => {
+        text.setPlaceholder(t("saveModal.iconPlaceholder"));
+        text.setValue(currentIcon);
+        text.onChange((val) => {
+          currentIcon = val.trim();
+          updateIconPreview();
+        });
+      });
+
+    const iconPreviewEl = iconSetting.controlEl.createDiv({ cls: "window-space-icon-preview" });
+    const updateIconPreview = () => {
+      iconPreviewEl.empty();
+      const val = currentIcon || this.plugin.settings.defaultIcon || "layout";
+      const isEmoji = /\p{Extended_Pictographic}/u.test(val) || !/^[a-zA-Z0-9-]+$/.test(val);
+      if (isEmoji) {
+        iconPreviewEl.createSpan({ text: val });
+      } else {
+        const iconDiv = iconPreviewEl.createDiv();
+        if (!setIconWithCheck(iconDiv, val)) {
+          setIcon(iconDiv, "layout");
+        }
+      }
+    };
+    updateIconPreview();
+
+    // 邊框顏色選擇器與 Swatches
+    const presets = this.plugin.settings.colorPresets || DEFAULT_COLOR_PRESETS;
+    const colorSetting = new Setting(contentEl)
+      .setName(t("saveModal.colorLabel"));
+
+    const colorPickerContainer = colorSetting.controlEl.createDiv({ cls: "window-space-color-picker-container" });
+    const colorInput = colorPickerContainer.createEl("input", {
+      attr: { type: "color" },
+      value: currentColor || "#3b82f6",
+    });
+
+    const swatchesContainer = colorPickerContainer.createDiv({ cls: "window-space-color-swatches" });
+    const renderSwatches = () => {
+      swatchesContainer.empty();
+      presets.forEach((hex) => {
+        const swatch = swatchesContainer.createDiv({
+          cls: `window-space-color-swatch${currentColor === hex ? " is-selected" : ""}`,
+        });
+        swatch.style.backgroundColor = hex;
+        swatch.onclick = () => {
+          currentColor = hex;
+          colorInput.value = hex;
+          renderSwatches();
+        };
+      });
+      if (currentColor) {
+        const clearBtn = swatchesContainer.createEl("button", {
+          text: "✖",
+          cls: "clickable-icon",
+          attr: { title: t("saveModal.clearColor") },
+        });
+        clearBtn.onclick = () => {
+          currentColor = "";
+          renderSwatches();
+        };
+      }
+    };
+    colorInput.onchange = () => {
+      currentColor = colorInput.value;
+      renderSwatches();
+    };
+    renderSwatches();
 
     const noticeContainer = contentEl.createDiv("save-overwrite-notice");
 
@@ -213,7 +288,7 @@ export class SaveLayoutModal extends Modal {
       cls: "mod-cta",
     });
     saveButton.onclick = () => {
-      void this.submitForm(nameInput, includeGeometry, autoSave, selectedSections, archived);
+      void this.submitForm(nameInput, includeGeometry, autoSave, selectedSections, archived, currentIcon, currentColor);
     };
 
     window.setTimeout(() => nameInput?.focus(), 50);
@@ -224,7 +299,9 @@ export class SaveLayoutModal extends Modal {
     includeGeometry: boolean,
     autoSave: boolean,
     selectedSections: string[],
-    archived: boolean
+    archived: boolean,
+    icon?: string,
+    color?: string
   ): Promise<void> {
     const name = nameInput.value.trim();
     if (!name) {
@@ -239,6 +316,8 @@ export class SaveLayoutModal extends Modal {
     this.layout.includeGeometry = includeGeometry;
     this.layout.sections = selectedSections;
     this.layout.archived = archived;
+    this.layout.icon = icon ? icon.trim() : undefined;
+    this.layout.color = color ? color.trim() : undefined;
     if (!includeGeometry) {
       this.layout.windowState.position = undefined;
     }

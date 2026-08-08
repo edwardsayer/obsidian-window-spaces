@@ -1,5 +1,5 @@
 import { App, Notice, WorkspaceLeaf, setIcon } from "obsidian";
-import { ActivityBarItem, WindowSettings } from "../types";
+import { ActivityBarItem, WindowLayout, WindowSettings } from "../types";
 import { t } from "../i18n";
 import {
   isPopoutWindow,
@@ -138,11 +138,64 @@ export class PopoutActivityBarManager {
     });
   }
 
+  getLayoutForWindow(win: Window): WindowLayout | null {
+    if (!win || win.closed) return null;
+    const explicitId = (win as unknown as { _windowSpacesLayoutId?: string })._windowSpacesLayoutId;
+    if (explicitId) {
+      const found = this.settings.spaces.find((s) => s.id === explicitId);
+      if (found) return found;
+    }
+    const leafEls = Array.from(win.document.querySelectorAll(".workspace-leaf"));
+    if (leafEls.length === 0) return null;
+
+    for (const space of this.settings.spaces) {
+      const leaves = space.workspace?.leaves || [];
+      const spaceLeafIds = new Set(leaves.map((l) => l.id));
+      if (space.windowInfo?.firstLeafId) spaceLeafIds.add(space.windowInfo.firstLeafId);
+
+      for (const el of leafEls) {
+        const leafId = el.getAttribute("data-id") || (el as unknown as { id?: string }).id;
+        if (leafId && spaceLeafIds.has(leafId)) {
+          return space;
+        }
+      }
+    }
+    return null;
+  }
+
+  private updateDragHandleIcon(bars: WindowBars, win: Window): void {
+    const drag = bars.left.querySelector<HTMLElement>(".window-spaces-activity-drag");
+    if (!drag) return;
+
+    drag.empty();
+
+    const layout = this.getLayoutForWindow(win);
+    const icon = layout?.icon || this.settings.defaultIcon || "layout";
+    const color = layout?.color;
+
+    if (color) {
+      win.document.body.style.setProperty("--window-space-color", color);
+    } else {
+      win.document.body.style.removeProperty("--window-space-color");
+    }
+
+    const isEmoji = /\p{Extended_Pictographic}/u.test(icon) || !/^[a-zA-Z0-9-]+$/.test(icon);
+    if (isEmoji) {
+      drag.createSpan({ cls: "window-spaces-drag-emoji", text: icon });
+    } else {
+      const iconEl = drag.createDiv({ cls: "window-spaces-drag-icon" });
+      if (!setIconWithCheck(iconEl, icon)) {
+        setIcon(iconEl, "layout");
+      }
+    }
+  }
+
   /** 重建指定視窗的按鈕內容。 */
   renderWindow(win: Window): void {
     const bars = this.barsByWindow.get(win);
     if (!bars) return;
 
+    this.updateDragHandleIcon(bars, win);
     this.renderBar(bars, win, "left");
     this.renderBar(bars, win, "right");
     this.updateActiveStates(win);

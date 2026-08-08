@@ -57,6 +57,11 @@ export const zhCN: TranslationStrings = {
     cancelButton: "取消",
     emptyNameError: "空间名称不能为空",
     duplicateNameError: "此名称的空间已存在",
+    iconLabel: "图标 / Emoji",
+    iconPlaceholder: "例如：🚀 或 star",
+    colorLabel: "窗口边框颜色",
+    colorPresetLabel: "快捷调色盘",
+    clearColor: "清除颜色",
     saveSuccess: "空间保存成功",
     autoSaveToggle: "启用此空间的自动保存",
   },
@@ -158,6 +163,9 @@ export const zhCN: TranslationStrings = {
     pickIcon: "选择图标",
     restoreDefaultButtons: "还原默认按钮",
     restoreDefaultIcon: "还原默认图标",
+    accentSection: "窗口外观与图标",
+    defaultIcon: "默认 Popout 图标",
+    defaultIconDesc: "当 Space 未指定自定义 Icon 时使用的默认图标",
   },
 
   notifications: {

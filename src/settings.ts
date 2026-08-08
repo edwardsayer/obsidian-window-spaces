@@ -8,6 +8,7 @@ import {
   ensureViewIcon,
   resolveViewIcon,
   resolveViewLabel,
+  setIconWithCheck,
 } from "./popout/viewRegistry";
 import WindowSpacesPlugin from "./main";
 
@@ -176,6 +177,30 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
 
     // ===== Popout 側欄（Activity Bars） =====
     this.renderActivityBarSection(containerEl);
+
+    // ===== 視窗外觀與圖示 (Accent & Icons) =====
+    const accentGroup = this.createGroup(containerEl) ?? containerEl;
+    this.createSettingIn(accentGroup, (s) => s.setName(t("settings.accentSection")).setHeading());
+
+    this.createSettingIn(accentGroup, (s) => {
+      s.setName(t("settings.defaultIcon")).setDesc(t("settings.defaultIconDesc"));
+      const currentIcon = this.plugin.settings.defaultIcon || "layout";
+      const iconBtn = s.controlEl.createEl("button", {
+        cls: "clickable-icon",
+        attr: { type: "button", title: currentIcon },
+      });
+      if (!setIconWithCheck(iconBtn, currentIcon)) {
+        setIcon(iconBtn, "layout");
+      }
+      iconBtn.onclick = () => {
+        new IconPickerModal(this.app, async (selected) => {
+          this.plugin.settings.defaultIcon = selected;
+          await this.plugin.saveSettings();
+          this.display();
+          this.plugin.activityBars.refreshAll();
+        }).open();
+      };
+    });
 
     // ===== 危險操作（單一 panel） =====
     const dangerGroup = this.createGroup(containerEl) ?? containerEl;

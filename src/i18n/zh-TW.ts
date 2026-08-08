@@ -57,6 +57,11 @@ export const zhTW: TranslationStrings = {
     cancelButton: "取消",
     emptyNameError: "空間名稱不能為空",
     duplicateNameError: "此名稱的空間已經存在",
+    iconLabel: "圖示 / Emoji",
+    iconPlaceholder: "例如：🚀 或 star",
+    colorLabel: "視窗邊框顏色",
+    colorPresetLabel: "快捷調色盤",
+    clearColor: "清除顏色",
     saveSuccess: "空間儲存成功",
     autoSaveToggle: "啟用此空間的自動保存",
   },
@@ -158,6 +163,9 @@ export const zhTW: TranslationStrings = {
     pickIcon: "選擇圖示",
     restoreDefaultButtons: "還原預設按鈕",
     restoreDefaultIcon: "還原預設圖示",
+    accentSection: "視窗外觀與圖示",
+    defaultIcon: "預設 Popout 圖示",
+    defaultIconDesc: "當 Space 未指定自訂 Icon 時使用的預設圖示",
   },
 
   notifications: {

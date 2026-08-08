@@ -57,6 +57,11 @@ export const en: TranslationStrings = {
     cancelButton: "Cancel",
     emptyNameError: "Space name cannot be empty",
     duplicateNameError: "A space with this name already exists",
+    iconLabel: "Icon / Emoji",
+    iconPlaceholder: "e.g. 🚀 or star",
+    colorLabel: "Window Frame Color",
+    colorPresetLabel: "Color Swatches",
+    clearColor: "Clear Color",
     saveSuccess: "Space saved successfully",
     autoSaveToggle: "Enable auto-save for this space",
   },
@@ -162,6 +167,9 @@ export const en: TranslationStrings = {
     pickIcon: "Choose icon",
     restoreDefaultButtons: "Restore default buttons",
     restoreDefaultIcon: "Restore default icon",
+    accentSection: "Window Accent & Icons",
+    defaultIcon: "Default Popout Icon",
+    defaultIconDesc: "Icon to use when a Space does not specify a custom icon",
   },
 
   notifications: {

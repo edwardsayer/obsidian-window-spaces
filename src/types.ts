@@ -22,6 +22,8 @@ export interface WindowLayout {
   includeGeometry?: boolean;
   sections?: string[];
   archived?: boolean;
+  icon?: string;
+  color?: string;
   // 用於識別視窗的資訊
   windowInfo?: {
     windowId?: string;
@@ -113,6 +115,16 @@ export interface LayoutMetadata {
   pluginVersion: string;
 }
 
+export const DEFAULT_COLOR_PRESETS: string[] = [
+  "#3b82f6",
+  "#8b5cf6",
+  "#10b981",
+  "#f59e0b",
+  "#f43f5e",
+  "#06b6d4",
+  "#6366f1",
+];
+
 export interface WindowSettings {
   spaces: WindowLayout[];
   autoSave: boolean;
@@ -127,6 +139,8 @@ export interface WindowSettings {
   sectionsOrder?: string[];
   groupBySection?: boolean;
   showArchived?: boolean;
+  defaultIcon?: string;
+  colorPresets?: string[];
   // Activity Bar 設定
   activityBars?: {
     left: ActivityBarItem[];

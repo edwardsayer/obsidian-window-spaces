@@ -58,6 +58,11 @@ export interface TranslationStrings {
     cancelButton: string;
     emptyNameError: string;
     duplicateNameError: string;
+    iconLabel: string;
+    iconPlaceholder: string;
+    colorLabel: string;
+    colorPresetLabel: string;
+    clearColor: string;
     saveSuccess: string;
     autoSaveToggle: string;
   };
@@ -161,6 +166,9 @@ export interface TranslationStrings {
     restoreDefaultIcon: string;
     enableInterceptor: string;
     enableInterceptorDesc: string;
+    accentSection: string;
+    defaultIcon: string;
+    defaultIconDesc: string;
   };
 
   // 通知

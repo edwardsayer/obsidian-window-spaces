@@ -1021,8 +1021,8 @@
   gap: 2px;
   padding: 6px 2px 8px 2px;
   box-sizing: border-box;
-  /* 對齊主視窗 ribbon 底色 */
-  background-color: var(--ribbon-background, var(--background-primary));
+  /* 對齊 sidebar 區與 editor tab area tabbar 的 non-active 底色 */
+  background-color: var(--background-secondary);
   user-select: none;
 }
 .window-spaces-activity-left {
@@ -1051,6 +1051,28 @@ body.is-popout-window.window-spaces-has-right-activity .workspace-split.mod-root
   height: var(--titlebar-height, 40px);
   -webkit-app-region: drag;
   cursor: default;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  user-select: none;
+}
+.window-spaces-activity-drag svg {
+  width: 16px;
+  height: 16px;
+  color: var(--window-space-color, var(--text-muted));
+}
+.window-spaces-activity-drag .window-spaces-drag-emoji {
+  line-height: 1;
+  font-size: 16px;
+}
+
+/* Popout 視窗自訂主題顏色邊框 (inset box-shadow 確保 0px layout 偏移) */
+body.is-popout-window[style*="--window-space-color"] {
+  box-shadow: inset 0 0 0 3px var(--window-space-color) !important;
+}
+body.is-popout-window[style*="--window-space-color"] .window-spaces-activity-left {
+  border-left: 2px solid var(--window-space-color);
 }
 
 .window-spaces-activity-btn {
@@ -1230,5 +1252,71 @@ body.is-popout-window.window-spaces-has-right-activity .workspace-split.mod-root
 }
 .window-spaces-icon-grid .clickable-icon:hover {
   background-color: var(--background-modifier-hover);
+}
+
+/* Color Swatches & Picker in Save/Edit Modal */
+.window-space-color-picker-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.window-space-color-swatches {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.window-space-color-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+  box-sizing: border-box;
+}
+.window-space-color-swatch:hover {
+  transform: scale(1.2);
+}
+.window-space-color-swatch.is-selected {
+  border-color: var(--text-normal);
+  box-shadow: 0 0 0 2px var(--background-primary);
+  transform: scale(1.15);
+}
+.window-space-icon-preview {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  font-size: 16px;
+  margin-right: 8px;
+}
+.window-space-icon-preview svg {
+  width: 18px;
+  height: 18px;
+}
+.window-space-color-badge {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+  flex-shrink: 0;
+}
+.window-space-item-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 6px;
+  width: 16px;
+  height: 16px;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+.window-space-item-icon svg {
+  width: 14px;
+  height: 14px;
 }
 
