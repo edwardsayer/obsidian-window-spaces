@@ -3,6 +3,7 @@ import { WindowLayout, DEFAULT_COLOR_PRESETS } from "../types";
 import { t, getI18n } from "../i18n";
 import WindowSpacesPlugin from "../main";
 import { setIconWithCheck } from "../popout/viewRegistry";
+import { IconPickerModal } from "../settings";
 
 export class SaveLayoutModal extends Modal {
   private plugin: WindowSpacesPlugin;
@@ -51,9 +52,11 @@ export class SaveLayoutModal extends Modal {
     let currentIcon = this.layout.icon || "";
     let currentColor = this.layout.color || "";
 
+    let iconInputEl!: HTMLInputElement;
     const iconSetting = new Setting(contentEl)
       .setName(t("saveModal.iconLabel"))
       .addText((text) => {
+        iconInputEl = text.inputEl;
         text.setPlaceholder(t("saveModal.iconPlaceholder"));
         text.setValue(currentIcon);
         text.onChange((val) => {
@@ -61,6 +64,21 @@ export class SaveLayoutModal extends Modal {
           updateIconPreview();
         });
       });
+
+    iconSetting.controlEl.addClass("window-space-icon-setting-control");
+
+    const pickIconBtn = iconSetting.controlEl.createEl("button", {
+      cls: "clickable-icon",
+      attr: { type: "button", title: t("settings.pickIcon") },
+    });
+    setIcon(pickIconBtn, "image");
+    pickIconBtn.onclick = () => {
+      new IconPickerModal(this.app, (selected) => {
+        currentIcon = selected;
+        iconInputEl.value = selected;
+        updateIconPreview();
+      }).open();
+    };
 
     const iconPreviewEl = iconSetting.controlEl.createDiv({ cls: "window-space-icon-preview" });
     const updateIconPreview = () => {

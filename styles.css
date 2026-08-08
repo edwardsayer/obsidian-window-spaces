@@ -1067,12 +1067,30 @@ body.is-popout-window.window-spaces-has-right-activity .workspace-split.mod-root
   font-size: 16px;
 }
 
-/* Popout 視窗自訂主題顏色邊框 (inset box-shadow 確保 0px layout 偏移) */
-body.is-popout-window.has-window-space-color {
-  box-shadow: inset 0 0 0 3px var(--window-space-color) !important;
+/* Popout 視窗 4 邊全方向自訂主題顏色邊框 (使用 fixed ::after 頂層覆蓋，確保 0px layout 偏移與全 4 邊實體呈現) */
+body.is-popout-window.has-window-space-color::after {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border: 3px solid var(--window-space-color) !important;
+  pointer-events: none !important;
+  z-index: 999999 !important;
+  box-sizing: border-box !important;
 }
+
 body.is-popout-window.has-window-space-color .window-spaces-activity-left {
   border-left: 2px solid var(--window-space-color);
+}
+
+/* 統一 Activity Bar、左上角拖曳區、以及未選中 Tab Header Container 區域之背景色 */
+body.is-popout-window .window-spaces-activity-bar,
+body.is-popout-window .window-spaces-activity-drag,
+body.is-popout-window .workspace-tab-header-container,
+body.is-popout-window .workspace-tab-header-container-inner {
+  background-color: var(--background-secondary) !important;
 }
 
 .window-spaces-activity-btn {
@@ -1318,5 +1336,11 @@ body.is-popout-window.has-window-space-color .window-spaces-activity-left {
 .window-space-item-icon svg {
   width: 14px;
   height: 14px;
+}
+
+.window-space-icon-setting-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 

@@ -20,7 +20,7 @@ const SettingGroupCtor = (obsidian as unknown as {
 }).SettingGroup;
 
 /** 多欄 + 捲軸的 icon 選擇器 Modal。 */
-class IconPickerModal extends Modal {
+export class IconPickerModal extends Modal {
   private onSelect: (icon: string) => void;
 
   constructor(app: App, onSelect: (icon: string) => void) {
@@ -184,22 +184,55 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
 
     this.createSettingIn(accentGroup, (s) => {
       s.setName(t("settings.defaultIcon")).setDesc(t("settings.defaultIconDesc"));
-      const currentIcon = this.plugin.settings.defaultIcon || "layout";
-      const iconBtn = s.controlEl.createEl("button", {
-        cls: "clickable-icon",
-        attr: { type: "button", title: currentIcon },
+      s.controlEl.addClass("window-space-icon-setting-control");
+
+      let currentIcon = this.plugin.settings.defaultIcon || "layout";
+      let iconInputEl!: HTMLInputElement;
+
+      s.addText((text) => {
+        iconInputEl = text.inputEl;
+        text.setPlaceholder(t("saveModal.iconPlaceholder"));
+        text.setValue(currentIcon);
+        text.onChange(async (val) => {
+          currentIcon = val.trim() || "layout";
+          this.plugin.settings.defaultIcon = currentIcon;
+          await this.plugin.saveSettings();
+          updatePreview();
+          this.plugin.activityBars.refreshAll();
+        });
       });
-      if (!setIconWithCheck(iconBtn, currentIcon)) {
-        setIcon(iconBtn, "layout");
-      }
-      iconBtn.onclick = () => {
+
+      const pickIconBtn = s.controlEl.createEl("button", {
+        cls: "clickable-icon",
+        attr: { type: "button", title: t("settings.pickIcon") },
+      });
+      setIcon(pickIconBtn, "image");
+      pickIconBtn.onclick = () => {
         new IconPickerModal(this.app, async (selected) => {
+          currentIcon = selected;
+          iconInputEl.value = selected;
           this.plugin.settings.defaultIcon = selected;
           await this.plugin.saveSettings();
-          this.display();
+          updatePreview();
           this.plugin.activityBars.refreshAll();
         }).open();
       };
+
+      const previewEl = s.controlEl.createDiv({ cls: "window-space-icon-preview" });
+      const updatePreview = () => {
+        previewEl.empty();
+        const val = currentIcon || "layout";
+        const isEmoji = /\p{Extended_Pictographic}/u.test(val) || !/^[a-zA-Z0-9-]+$/.test(val);
+        if (isEmoji) {
+          previewEl.createSpan({ text: val });
+        } else {
+          const iconDiv = previewEl.createDiv();
+          if (!setIconWithCheck(iconDiv, val)) {
+            setIcon(iconDiv, "layout");
+          }
+        }
+      };
+      updatePreview();
     });
 
     // ===== 危險操作（單一 panel） =====
