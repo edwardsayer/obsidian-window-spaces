@@ -34,6 +34,7 @@ export class WindowLayoutManager {
   private layoutNames = new Map<Window, string>();
   private layoutLabels = new Map<Window, LayoutLabelElements>();
   private activeRestorePromise: Promise<void> | null = null;
+  private isMatchingUnlabeled = false;
 
   constructor(plugin: WindowSpacesPlugin) {
     this.plugin = plugin;
@@ -45,23 +46,28 @@ export class WindowLayoutManager {
     if (!targetWin) return;
 
     this.popoutWindows.add(targetWin);
+    this.matchUnlabeledPopoutWindows();
     this.refreshLayoutStatusBar(targetWin);
     this.hookPopoutWindowTitle(targetWin);
 
     // window-open 觸發時 Popout DOM 可能仍在建立中，再補多次確保狀態列與視窗標題 100% 正確反映。
     targetWin.setTimeout(() => {
+      this.matchUnlabeledPopoutWindows();
       this.refreshLayoutStatusBar(targetWin);
       this.hookPopoutWindowTitle(targetWin);
     }, 0);
     targetWin.setTimeout(() => {
+      this.matchUnlabeledPopoutWindows();
       this.refreshLayoutStatusBar(targetWin);
       this.hookPopoutWindowTitle(targetWin);
     }, 100);
     targetWin.setTimeout(() => {
+      this.matchUnlabeledPopoutWindows();
       this.refreshLayoutStatusBar(targetWin);
       this.hookPopoutWindowTitle(targetWin);
     }, 300);
     targetWin.setTimeout(() => {
+      this.matchUnlabeledPopoutWindows();
       this.refreshLayoutStatusBar(targetWin);
       this.hookPopoutWindowTitle(targetWin);
     }, 800);
@@ -76,6 +82,7 @@ export class WindowLayoutManager {
         this.registerPopoutWindow(targetWin);
       }
     });
+    this.matchUnlabeledPopoutWindows();
   }
 
   /** Popout 關閉時移除對應的 layout label 與追蹤狀態。 */
@@ -127,7 +134,11 @@ export class WindowLayoutManager {
           configurable: true,
           enumerable: true,
           get() {
-            return originalGet ? originalGet.call(targetDoc) : "";
+            try {
+              return originalGet ? originalGet.call(targetDoc) : "";
+            } catch {
+              return "";
+            }
           },
           set(newTitle: string) {
             const spaceName = self.getLayoutNameForWindow(targetWin);
@@ -181,10 +192,14 @@ export class WindowLayoutManager {
     }
 
     // 3. 若已有名稱，主動觸發標題寫入以更新 DOM
-    const spaceName = this.getLayoutNameForWindow(targetWin);
-    if (spaceName && targetDoc.title) {
-      const currentTitle = targetDoc.title;
-      targetDoc.title = currentTitle;
+    try {
+      const spaceName = this.getLayoutNameForWindow(targetWin);
+      if (spaceName && targetDoc.title) {
+        const currentTitle = targetDoc.title;
+        targetDoc.title = currentTitle;
+      }
+    } catch {
+      // safe fallback for non-standard DOM environments
     }
   }
 
@@ -264,7 +279,149 @@ export class WindowLayoutManager {
       this.layoutNames.set(targetWin, nameFromDOM);
       return nameFromDOM;
     }
+
+    if (!this.isMatchingUnlabeled && this.isPopoutDocument(targetWin.document)) {
+      this.matchUnlabeledPopoutWindows();
+      return this.layoutNames.get(targetWin) || null;
+    }
+
     return null;
+  }
+
+  /**
+   * 當 Obsidian 啟動或多個 Popout 視窗重開時，若 Popout 視窗尚未標籤 space name，
+   * 自動比對該視窗現有的 Leaves / 檔案與已儲存的 Layout (spaces)，
+   * 為無標籤 Popout 視窗一對一辨識還原其 space name 及狀態列 / 側欄樣式。
+   */
+  matchUnlabeledPopoutWindows(): void {
+    if (this.isMatchingUnlabeled) return;
+    this.isMatchingUnlabeled = true;
+    try {
+      const workspace = this.app.workspace as unknown as ExtendedWorkspace;
+      if (!workspace || typeof workspace.iterateAllLeaves !== "function") return;
+
+      const allPopouts = new Set<Window>();
+      const claimedLayoutNames = new Set<string>();
+
+      workspace.iterateAllLeaves((leaf: WorkspaceLeaf) => {
+        const win = this.getWindowForLeaf(leaf);
+        if (win && !win.closed && this.isPopoutDocument(win.document)) {
+          allPopouts.add(win);
+          const name =
+            this.layoutNames.get(win) ||
+            (typeof win.document?.body?.getAttribute === "function"
+              ? win.document.body.getAttribute("data-layout-name")
+              : null);
+          if (name) {
+            claimedLayoutNames.add(name);
+          }
+        }
+      });
+
+      const unlabeledWindows = Array.from(allPopouts).filter((win) => {
+        const name =
+          this.layoutNames.get(win) ||
+          (typeof win.document?.body?.getAttribute === "function"
+            ? win.document.body.getAttribute("data-layout-name")
+            : null);
+        return !name;
+      });
+
+      if (unlabeledWindows.length === 0) return;
+
+      const availableSpaces = (this.plugin.settings.spaces || []).filter(
+        (space: WindowLayout) => space && space.name && !claimedLayoutNames.has(space.name)
+      );
+
+      if (availableSpaces.length === 0) return;
+
+      for (const win of unlabeledWindows) {
+        const existingName =
+          this.layoutNames.get(win) ||
+          (typeof win.document?.body?.getAttribute === "function"
+            ? win.document.body.getAttribute("data-layout-name")
+            : null);
+        if (existingName) continue;
+
+        const winLeaves = this.getLeavesForWindow(win);
+        if (winLeaves.length === 0) continue;
+
+        const winLeafIds = new Set(
+          winLeaves.map((leaf) => (leaf as unknown as ExtendedWorkspaceLeaf).id).filter(Boolean)
+        );
+        const winFiles = new Set(
+          winLeaves
+            .map((leaf) => {
+              const state =
+                typeof (leaf as unknown as ExtendedWorkspaceLeaf).getViewState === "function"
+                  ? (leaf as unknown as ExtendedWorkspaceLeaf).getViewState()?.state
+                  : null;
+              return this.getFilePathFromLeafState({ state: state || {} });
+            })
+            .filter((f): f is string => !!f)
+        );
+
+        let bestSpace: WindowLayout | null = null;
+        let bestScore = 0;
+
+        for (const space of availableSpaces) {
+          if (claimedLayoutNames.has(space.name)) continue;
+
+          const savedLeaves = this.getSavedViewStates(space);
+          if (savedLeaves.length === 0) continue;
+
+          const savedLeafIds = new Set(savedLeaves.map((l) => l.id).filter(Boolean));
+          const savedFiles = new Set(
+            savedLeaves
+              .map((l) => this.getFilePathFromLeafState(l))
+              .filter((f): f is string => !!f)
+          );
+
+          let score = 0;
+
+          // (a) Leaf ID 匹配 (+100/leaf)
+          for (const id of winLeafIds) {
+            if (savedLeafIds.has(id)) score += 100;
+          }
+
+          // (b) 檔案路徑匹配 (+10/file)
+          let matchingFilesCount = 0;
+          for (const file of winFiles) {
+            if (savedFiles.has(file)) matchingFilesCount++;
+          }
+          score += matchingFilesCount * 10;
+
+          // (c) 檔案完全吻合（Popout 中所有檔案與 space 中所有檔案一致）時大幅加分 (+50)
+          if (winFiles.size > 0 && winFiles.size === savedFiles.size && matchingFilesCount === winFiles.size) {
+            score += 50;
+          }
+
+          // (d) 視窗幾何尺寸與位置相似度 (+5)
+          const savedWindow = space.windowState;
+          if (savedWindow && savedWindow.size) {
+            const widthDiff = Math.abs(win.outerWidth - savedWindow.size.width);
+            const heightDiff = Math.abs(win.outerHeight - savedWindow.size.height);
+            if (widthDiff < 50 && heightDiff < 50) {
+              score += 5;
+            }
+          }
+
+          if (score > bestScore) {
+            bestScore = score;
+            bestSpace = space;
+          }
+        }
+
+        // 嚴格門檻：必須至少有一項 match (score > 0)
+        if (bestSpace && bestScore > 0) {
+          claimedLayoutNames.add(bestSpace.name);
+          this.setLayoutLabelForWindow(win, bestSpace.name);
+          this.layoutWindows.set(bestSpace, win);
+        }
+      }
+    } finally {
+      this.isMatchingUnlabeled = false;
+    }
   }
 
   refreshLayoutLabels(): void {
