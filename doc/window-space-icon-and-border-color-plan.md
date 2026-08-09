@@ -1,4 +1,6 @@
-# Window Space Popout 視窗自訂 Icon/Emoji 與邊框顏色實作計畫 (Implementation Plan)
+# Window Space Popout 視窗自訂 Icon/Emoji 與邊框顏色實作計畫 (Future Proposal)
+
+> 狀態：**未實作／後續規劃**。目前 `WindowLayout`、Save Modal、Activity Bar 與 README 不支援本文件提出的 icon/color 欄位；不得將本文件的 schema 或 UI 描述當作現行功能。
 
 ## 1. 需求與設計目標 (Overview & Goals)
 

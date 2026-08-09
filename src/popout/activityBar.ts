@@ -5,7 +5,7 @@ import {
   isPopoutWindow,
   PopoutLayoutEngine,
   PopoutSide,
-} from "./popoutLayout";
+} from "../shared/popoutLayout";
 import { applyItemIcon, applyViewIcon, resolveViewLabel, setIconWithCheck } from "./viewRegistry";
 
 interface WindowBars {

@@ -8,6 +8,10 @@ import {
   setElementDisplay,
 } from "../src/popout/popoutLayout";
 import { WorkspaceInterceptor } from "../src/popout/workspaceInterceptor";
+import {
+  acquireWorkspaceInterceptor,
+  releaseWorkspaceInterceptor,
+} from "../src/shared/workspaceInterceptor";
 import { PopoutActivityBarManager } from "../src/popout/activityBar";
 import {
   applyViewIcon,
@@ -390,37 +394,305 @@ describe("WorkspaceInterceptor", () => {
     expect(app.workspace.getLeftLeaf).toBe(originalLeft);
   });
 
-  test("install without getLeftLeaf/getRightLeaf is safe", () => {
+  test("install without getLeftLeaf/getRightLeaf is safe and restores absent methods", () => {
     const app = { workspace: {} } as any;
     const interceptor = new WorkspaceInterceptor(app);
     interceptor.install();
     interceptor.uninstall();
-    expect(true).toBe(true);
+    expect("getLeftLeaf" in app.workspace).toBe(false);
+    expect("getRightLeaf" in app.workspace).toBe(false);
+    expect("getLeavesOfType" in app.workspace).toBe(false);
+    expect("ensureSideLeaf" in app.workspace).toBe(false);
   });
 
-  test("getLeavesOfType strictly filters leaves to current active window", () => {
+  test("routes ensureSideLeaf through the shared Popout engine", async () => {
     const popoutWin = {
-      document: { body: { classList: { contains: (cls: string) => cls === "is-popout-window" } } },
+      document: {
+        body: { classList: { contains: (cls: string) => cls === "is-popout-window" } },
+        hasFocus: () => true,
+      },
     } as unknown as Window;
+    const routedLeaf = {
+      getViewState: () => ({ type: "empty" }),
+      setViewState: vi.fn().mockResolvedValue(undefined),
+      loadIfDeferred: vi.fn().mockResolvedValue(undefined),
+    } as any;
+    const originalEnsureSideLeaf = vi.fn().mockResolvedValue("main-side-leaf");
+    const app = {
+      workspace: {
+        getLeftLeaf: vi.fn().mockReturnValue(null),
+        getRightLeaf: vi.fn().mockReturnValue(null),
+        ensureSideLeaf: originalEnsureSideLeaf,
+        revealLeaf: vi.fn().mockResolvedValue(undefined),
+        setActiveLeaf: vi.fn(),
+        requestSaveLayout: vi.fn().mockResolvedValue(undefined),
+      },
+    } as any;
+    const engine = {
+      getColumnElement: vi.fn().mockReturnValue(null),
+      findLeafOfTypeInColumn: vi.fn().mockReturnValue(null),
+      openSideLeafSync: vi.fn().mockReturnValue(routedLeaf),
+    } as any;
+    const interceptor = new WorkspaceInterceptor(app, engine);
+    interceptor.isManagedWindow = () => true;
+    interceptor.install();
+    (globalThis as any).activeWindow = popoutWin;
 
+    try {
+      const result = await app.workspace.ensureSideLeaf("search", "left", {
+        active: true,
+        reveal: true,
+        state: { query: "path:\"Notes/\"" },
+      });
+      expect(result).toBe(routedLeaf);
+      expect(engine.openSideLeafSync).toHaveBeenCalledWith(popoutWin, "left");
+      expect(routedLeaf.setViewState).toHaveBeenCalledWith({
+        type: "search",
+        active: true,
+        state: { query: "path:\"Notes/\"" },
+      });
+      expect(originalEnsureSideLeaf).not.toHaveBeenCalled();
+    } finally {
+      interceptor.uninstall();
+      delete (globalThis as any).activeWindow;
+    }
+  });
+
+  test("routes through the participant whose policy manages the active window", () => {
+    const popoutWin = {
+      document: {
+        body: { classList: { contains: (cls: string) => cls === "is-popout-window" } },
+        hasFocus: () => true,
+      },
+    } as unknown as Window;
+    const workspace = {
+      getLeftLeaf: vi.fn().mockReturnValue("main-left-leaf"),
+      getRightLeaf: vi.fn().mockReturnValue(null),
+    } as any;
+    const engineA = { openSideLeafSync: vi.fn().mockReturnValue("wrong-engine") } as any;
+    const engineB = { openSideLeafSync: vi.fn().mockReturnValue("managed-engine") } as any;
+    const app = { workspace } as any;
+    (globalThis as any).activeWindow = popoutWin;
+
+    acquireWorkspaceInterceptor(app, {
+      id: "policy-test-a",
+      engine: engineA,
+      isManagedWindow: () => false,
+    });
+    acquireWorkspaceInterceptor(app, {
+      id: "policy-test-b",
+      engine: engineB,
+      isManagedWindow: () => true,
+    });
+
+    try {
+      expect(workspace.getLeftLeaf(false)).toBe("managed-engine");
+      expect(engineA.openSideLeafSync).not.toHaveBeenCalled();
+      expect(engineB.openSideLeafSync).toHaveBeenCalledWith(popoutWin, "left");
+    } finally {
+      releaseWorkspaceInterceptor("policy-test-a");
+      releaseWorkspaceInterceptor("policy-test-b");
+      delete (globalThis as any).activeWindow;
+    }
+  });
+
+  test("keeps one coordinator patch while participants load and unload", () => {
+    const popoutWin = {
+      document: {
+        body: { classList: { contains: (cls: string) => cls === "is-popout-window" } },
+        hasFocus: () => true,
+      },
+    } as unknown as Window;
+    const originalLeft = vi.fn().mockReturnValue("main-left-leaf");
+    const workspace = {
+      getLeftLeaf: originalLeft,
+      getRightLeaf: vi.fn().mockReturnValue(null),
+    } as any;
+    const engineA = { openSideLeafSync: vi.fn().mockReturnValue("participant-a") } as any;
+    const engineB = { openSideLeafSync: vi.fn().mockReturnValue("participant-b") } as any;
+    const app = { workspace } as any;
+    (globalThis as any).activeWindow = popoutWin;
+
+    acquireWorkspaceInterceptor(app, {
+      id: "coordinator-test-a",
+      engine: engineA,
+      isManagedWindow: () => true,
+    });
+    acquireWorkspaceInterceptor(app, {
+      id: "coordinator-test-b",
+      engine: engineB,
+      isManagedWindow: () => true,
+    });
+
+    try {
+      expect(workspace.getLeftLeaf(false)).toBe("participant-a");
+      expect(workspace.getRightLeaf(false)).toBe("participant-a");
+      releaseWorkspaceInterceptor("coordinator-test-a");
+      expect(workspace.getLeftLeaf(false)).toBe("participant-b");
+      expect(workspace.getRightLeaf(false)).toBe("participant-b");
+    } finally {
+      releaseWorkspaceInterceptor("coordinator-test-b");
+      delete (globalThis as any).activeWindow;
+    }
+
+    expect(workspace.getLeftLeaf).toBe(originalLeft);
+  });
+
+  test("shared interceptor preserves document.hasFocus receivers with Window Spaces loaded first", async () => {
+    const globalObject = globalThis as unknown as { activeWindow?: Window };
+    const previousActiveWindow = globalObject.activeWindow;
+    const mainHasFocus = vi.spyOn(document, "hasFocus").mockImplementation(function (this: Document) {
+      if (this !== document) throw new Error("document.hasFocus receiver was lost");
+      return false;
+    });
+    const popoutDocument: {
+      body: { classList: { contains: (name: string) => boolean } };
+      defaultView?: Window;
+      hasFocus: (this: unknown) => boolean;
+    } = {
+      body: { classList: { contains: (name) => name === "is-popout-window" } },
+      hasFocus() {
+        if (this !== popoutDocument) throw new Error("popout document.hasFocus receiver was lost");
+        return true;
+      },
+    };
+    const popoutWindow = { document: popoutDocument } as unknown as Window;
+    popoutDocument.defaultView = popoutWindow;
+    const leaf = {
+      containerEl: { ownerDocument: popoutDocument },
+      setViewState: vi.fn().mockResolvedValue(undefined),
+      loadIfDeferred: vi.fn().mockResolvedValue(undefined),
+    } as any;
+    const originalGetLeavesOfType = vi.fn().mockReturnValue([leaf]);
+    const originalLeft = vi.fn().mockReturnValue("main-left-leaf");
+    const workspace = {
+      getLeftLeaf: originalLeft,
+      getLeavesOfType: originalGetLeavesOfType,
+      iterateAllLeaves: (callback: (candidate: unknown) => void) => callback(leaf),
+      revealLeaf: vi.fn().mockResolvedValue(undefined),
+      setActiveLeaf: vi.fn(),
+      requestSaveLayout: vi.fn().mockResolvedValue(undefined),
+    } as any;
+    const windowEngine = {
+      getColumnElement: vi.fn().mockReturnValue(null),
+      findLeafOfTypeInColumn: vi.fn().mockReturnValue(null),
+      openSideLeafSync: vi.fn().mockReturnValue(leaf),
+    } as any;
+    const folderEngine = {
+      openSideLeafSync: vi.fn().mockReturnValue("folder-engine"),
+    } as any;
+    const app = { workspace } as any;
+    globalObject.activeWindow = popoutWindow;
+
+    acquireWorkspaceInterceptor(app, {
+      id: "window-spaces-load-order-regression",
+      engine: windowEngine,
+      isManagedWindow: (win) => win === popoutWindow,
+    });
+    acquireWorkspaceInterceptor(app, {
+      id: "folder-spaces-load-order-regression",
+      engine: folderEngine,
+      isManagedWindow: () => false,
+    });
+
+    try {
+      expect(workspace.getLeftLeaf(false)).toBe(leaf);
+      expect(windowEngine.openSideLeafSync).toHaveBeenCalledWith(popoutWindow, "left");
+      expect(workspace.getLeavesOfType("tag")).toEqual([leaf]);
+      await workspace.ensureSideLeaf("tag", "left", { active: true });
+
+      delete globalObject.activeWindow;
+      expect(workspace.getLeavesOfType("tag")).toEqual([leaf]);
+    } finally {
+      releaseWorkspaceInterceptor("folder-spaces-load-order-regression");
+      releaseWorkspaceInterceptor("window-spaces-load-order-regression");
+      mainHasFocus.mockRestore();
+      if (previousActiveWindow === undefined) delete globalObject.activeWindow;
+      else globalObject.activeWindow = previousActiveWindow;
+    }
+  });
+
+  test("getLeavesOfType filters leaves to the active window", () => {
+    const popoutWin = {
+      document: {
+        body: { classList: { contains: (cls: string) => cls === "is-popout-window" } },
+        hasFocus: () => true,
+      },
+    } as unknown as Window;
     const otherWin = {
       document: { body: { classList: { contains: (cls: string) => cls === "is-popout-window" } } },
     } as unknown as Window;
-
-    const leaf1InOtherWin = {
+    const leafInOtherWindow = {
       containerEl: { ownerDocument: { defaultView: otherWin } },
     } as any;
-
-    const leaf2InPopoutWin = {
+    const leafInPopout = {
       containerEl: { ownerDocument: { defaultView: popoutWin } },
     } as any;
+    const originalGetLeavesOfType = vi.fn().mockReturnValue([leafInOtherWindow, leafInPopout]);
+    const app = {
+      workspace: {
+        getLeftLeaf: vi.fn().mockReturnValue(null),
+        getRightLeaf: vi.fn().mockReturnValue(null),
+        getLeavesOfType: originalGetLeavesOfType,
+      },
+    } as any;
+    const interceptor = new WorkspaceInterceptor(app);
+    interceptor.install();
+    (globalThis as any).activeWindow = popoutWin;
 
-    const originalGetLeavesOfType = vi.fn().mockReturnValue([leaf1InOtherWin, leaf2InPopoutWin]);
+    try {
+      const leaves = app.workspace.getLeavesOfType("grid-view");
+      expect(leaves).toEqual([leafInPopout]);
+      expect(originalGetLeavesOfType).toHaveBeenCalledWith("grid-view");
+    } finally {
+      interceptor.uninstall();
+      delete (globalThis as any).activeWindow;
+    }
+  });
+
+  test("does not route a main-window API call while a popout remains active", () => {
+    const popoutWin = {
+      document: {
+        body: { classList: { contains: (cls: string) => cls === "is-popout-window" } },
+        hasFocus: () => true,
+      },
+    } as unknown as Window;
+    const originalGetLeftLeaf = vi.fn().mockReturnValue("main-left-leaf");
+    const app = {
+      workspace: {
+        getLeftLeaf: originalGetLeftLeaf,
+        getRightLeaf: vi.fn().mockReturnValue(null),
+      },
+    } as any;
+    const interceptor = new WorkspaceInterceptor(app);
+    interceptor.isManagedWindow = () => true;
+    interceptor.install();
+    const openSideLeafSync = vi.spyOn((interceptor as any).engine, "openSideLeafSync");
+    const hasFocus = vi.spyOn(document, "hasFocus").mockReturnValue(true);
+    (globalThis as any).activeWindow = popoutWin;
+
+    try {
+      expect(app.workspace.getLeftLeaf(false)).toBe("main-left-leaf");
+      expect(originalGetLeftLeaf).toHaveBeenCalledWith(false);
+      expect(openSideLeafSync).not.toHaveBeenCalled();
+    } finally {
+      hasFocus.mockRestore();
+      delete (globalThis as any).activeWindow;
+      interceptor.uninstall();
+    }
+  });
+
+  test("WorkspaceInterceptor ignores main window and only intercepts popout window sidebar leaves", () => {
+    const popoutWin = {
+      document: { body: { classList: { contains: (cls: string) => cls === "is-popout-window" } }, hasFocus: () => true },
+    } as unknown as Window;
+
+    const originalGetLeftLeaf = vi.fn().mockReturnValue(null);
 
     const app = {
       workspace: {
-        getLeavesOfType: originalGetLeavesOfType,
-        getMostRecentLeaf: () => leaf2InPopoutWin,
+        getLeftLeaf: originalGetLeftLeaf,
+        getRightLeaf: vi.fn().mockReturnValue(null),
       },
     } as any;
 
@@ -428,17 +700,25 @@ describe("WorkspaceInterceptor", () => {
     interceptor.isManagedWindow = () => true;
     interceptor.install();
 
-    // Mock activeWindow global to simulate focus in popoutWin
-    (globalThis as any).activeWindow = popoutWin;
+    // 1. 當 activeWindow 為主視窗 (window) 時，禁止攔截
+    (globalThis as any).activeWindow = window;
+    app.workspace.getLeftLeaf(false);
+    expect(originalGetLeftLeaf).toHaveBeenCalled();
 
-    const leaves = app.workspace.getLeavesOfType("grid-view");
-    expect(leaves.length).toBe(1);
-    expect(leaves[0]).toBe(leaf2InPopoutWin);
+    // 2. 當 activeWindow 為 Popout 時，進行攔截
+    (globalThis as any).activeWindow = popoutWin;
+    const openSideLeafSync = vi
+      .spyOn((interceptor as any).engine, "openSideLeafSync")
+      .mockReturnValue({ id: "popout-side-leaf" });
+    const leaf = app.workspace.getLeftLeaf(false);
+    expect(openSideLeafSync).toHaveBeenCalledWith(popoutWin, "left");
+    expect(leaf).toEqual({ id: "popout-side-leaf" });
 
     interceptor.uninstall();
     delete (globalThis as any).activeWindow;
   });
 });
+
 
 describe("PopoutActivityBarManager toggle behavior", () => {
   function buildManager() {

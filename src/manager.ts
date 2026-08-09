@@ -35,6 +35,8 @@ export class WindowLayoutManager {
   private layoutLabels = new Map<Window, LayoutLabelElements>();
   private activeRestorePromise: Promise<void> | null = null;
   private isMatchingUnlabeled = false;
+  private renderAttemptedLeaves = new WeakSet<WorkspaceLeaf>();
+  private deferredViewLoads = new WeakMap<WorkspaceLeaf, Promise<void>>();
 
   constructor(plugin: WindowSpacesPlugin) {
     this.plugin = plugin;
@@ -49,6 +51,7 @@ export class WindowLayoutManager {
     this.matchUnlabeledPopoutWindows();
     this.refreshLayoutStatusBar(targetWin);
     this.hookPopoutWindowTitle(targetWin);
+    this.schedulePopoutViewRendering(targetWin);
 
     // window-open 觸發時 Popout DOM 可能仍在建立中，再補多次確保狀態列與視窗標題 100% 正確反映。
     targetWin.setTimeout(() => {
@@ -71,6 +74,26 @@ export class WindowLayoutManager {
       this.refreshLayoutStatusBar(targetWin);
       this.hookPopoutWindowTitle(targetWin);
     }, 800);
+  }
+
+  /**
+   * 在 Popout 建立/重新註冊後，以延遲生命週期工作重建尚未渲染的非檔案 view。
+   * 不可掛在 active-leaf-change：File Explorer 的 mousedown/mouseup 期間重建
+   * view 會阻止 Chromium 產生 click，造成使用者必須點兩次。
+   */
+  private schedulePopoutViewRendering(targetWin: Window): void {
+    const render = (): void => {
+      if (targetWin.closed) return;
+      this.getLeavesForWindow(targetWin).forEach((leaf) => {
+        // ensureViewRendered 會先檢查 .view-content 是否已有子元素，只有
+        // 空的非檔案 view 才會進行 rebuild。
+        this.ensureViewRendered(leaf);
+      });
+    };
+
+    targetWin.setTimeout(render, 150);
+    targetWin.setTimeout(render, 400);
+    targetWin.setTimeout(render, 900);
   }
 
   /** 插件重新載入時，補註冊已經存在的 Popout。 */
@@ -842,17 +865,38 @@ export class WindowLayoutManager {
       this.findWindowForSavedLeaves(this.getSavedViewStates(layout));
   }
 
+  /** 確認 Popout 仍持有原生焦點，避免延遲重試搶回主視窗焦點。 */
+  private isWindowFocused(targetWin: Window): boolean {
+    try {
+      const hasFocus = targetWin.document?.hasFocus;
+      return typeof hasFocus === "function" ? hasFocus.call(targetWin.document) : true;
+    } catch {
+      return true;
+    }
+  }
+
+  /** 確認主視窗 (plugin realm) 是否持有原生焦點。 */
+  private isMainWindowFocused(): boolean {
+    try {
+      const hasFocus = window.document?.hasFocus;
+      return typeof hasFocus === "function" ? hasFocus.call(window.document) : true;
+    } catch {
+      return true;
+    }
+  }
+
   /**
    * 聚焦 (Focus) 指定 Popout 視窗並啟用合適的 Leaf (顯式呼叫 revealLeaf 確保分頁真實切換為可見)
    */
   focusTargetWindow(targetWin: Window, preferredLeaf?: WorkspaceLeaf | null): void {
     if (!targetWin || targetWin.closed) return;
 
-    const doFocusAndReveal = async () => {
+    const doFocusAndReveal = async (focusWindow: boolean) => {
       try {
-        if (typeof targetWin.focus === "function") {
+        if (focusWindow && typeof targetWin.focus === "function") {
           targetWin.focus();
         }
+        if (!focusWindow && !this.isWindowFocused(targetWin)) return;
 
         const freshLeaves = this.getLeavesForWindow(targetWin);
         if (freshLeaves.length === 0) return;
@@ -875,16 +919,19 @@ export class WindowLayoutManager {
 
         if (targetLeaf) {
           await this.app.workspace.revealLeaf(targetLeaf);
-          this.app.workspace.setActiveLeaf(targetLeaf, { focus: true });
+          // revealLeaf() is asynchronous; the user may have switched to the
+          // main window while it was pending. Never steal that focus back.
+          if (!this.isWindowFocused(targetWin)) return;
+          this.app.workspace.setActiveLeaf(targetLeaf, { focus: focusWindow });
         }
       } catch {
         // Ignore focus error
       }
     };
 
-    void doFocusAndReveal();
-    targetWin.setTimeout(() => { void doFocusAndReveal(); }, 50);
-    targetWin.setTimeout(() => { void doFocusAndReveal(); }, 200);
+    void doFocusAndReveal(true);
+    targetWin.setTimeout(() => { void doFocusAndReveal(false); }, 50);
+    targetWin.setTimeout(() => { void doFocusAndReveal(false); }, 200);
   }
 
   /**
@@ -1318,8 +1365,14 @@ export class WindowLayoutManager {
         this.layoutWindows.set(layout, targetWin);
         this.restoreWindowGeometry(targetWin, layout.windowState, layout.includeGeometry);
 
+        // 若使用者在 restore 的非同步等待期間已切回主視窗，就不能再把全域
+        // activeLeaf 指到 popout leaf，否則下一次主視窗 File Explorer 點擊
+        // note 會被導向 popout（需點兩下才切換）。僅當 popout 仍持有焦點、
+        // 或主視窗也未持有焦點（Obsidian 在背景）時才啟動 popout。
+        const canActivatePopout = this.isWindowFocused(targetWin) || !this.isMainWindowFocused();
+
         const winLeaves = this.getLeavesForWindow(targetWin);
-        if (winLeaves.length > 0) {
+        if (winLeaves.length > 0 && canActivatePopout) {
           try {
             this.app.workspace.setActiveLeaf(winLeaves[0], { focus: true });
           } catch {
@@ -1329,16 +1382,18 @@ export class WindowLayoutManager {
 
         if (typeof targetWin.focus === "function") {
           try {
-            targetWin.focus();
+            if (canActivatePopout) {
+              targetWin.focus();
+            }
           } catch (e) {
             console.warn("Failed to focus target window:", e);
           }
           targetWin.setTimeout(() => {
             try {
-              targetWin.focus();
+              if (!this.isWindowFocused(targetWin)) return;
               const freshLeaves = this.getLeavesForWindow(targetWin);
               if (freshLeaves.length > 0) {
-                this.app.workspace.setActiveLeaf(freshLeaves[0], { focus: true });
+                this.app.workspace.setActiveLeaf(freshLeaves[0], { focus: false });
               }
             } catch {
               // Ignore focus error
@@ -1346,10 +1401,10 @@ export class WindowLayoutManager {
           }, 100);
           targetWin.setTimeout(() => {
             try {
-              targetWin.focus();
+              if (!this.isWindowFocused(targetWin)) return;
               const freshLeaves = this.getLeavesForWindow(targetWin);
               if (freshLeaves.length > 0) {
-                this.app.workspace.setActiveLeaf(freshLeaves[0], { focus: true });
+                this.app.workspace.setActiveLeaf(freshLeaves[0], { focus: false });
               }
             } catch {
               // Ignore focus error
@@ -2480,11 +2535,55 @@ export class WindowLayoutManager {
     })();
   }
 
-  /** 單次檢查：若 view 未渲染內容則強制重新渲染。 */
+  /**
+   * 單次檢查：先載入 deferred view，再於 DOM 仍為空時最多重建一次。
+   * 多個 lifecycle retry 不得因 DOM 尚未及時更新而連續重建同一個 leaf。
+   */
   ensureViewRendered(leaf: WorkspaceLeaf | null): void {
     if (!leaf || this.isFileView(leaf)) return;
-    if (this.hasRenderedContent(leaf)) return;
+    if (this.hasRenderedContent(leaf)) {
+      this.renderAttemptedLeaves.delete(leaf);
+      return;
+    }
+
+    if (leaf.isDeferred) {
+      if (this.deferredViewLoads.has(leaf)) return;
+      const pendingLoad = leaf
+        .loadIfDeferred()
+        .then(() => {
+          this.deferredViewLoads.delete(leaf);
+          if (!this.hasRenderedContent(leaf)) this.rebuildViewIfNeeded(leaf);
+        })
+        .catch(() => {
+          this.deferredViewLoads.delete(leaf);
+          this.rebuildViewIfNeeded(leaf);
+        });
+      this.deferredViewLoads.set(leaf, pendingLoad);
+      return;
+    }
+
+    this.rebuildViewIfNeeded(leaf);
+  }
+
+  private rebuildViewIfNeeded(leaf: WorkspaceLeaf): void {
+    if (this.hasRenderedContent(leaf) || this.renderAttemptedLeaves.has(leaf)) return;
+    this.renderAttemptedLeaves.add(leaf);
     this.forceRenderView(leaf);
+  }
+
+  /**
+   * 在 Popout tab 切換完成後延遲檢查 DOM，避免 active-leaf-change 的
+   * mousedown/mouseup 階段重建 view 而吞掉原生 click 事件。
+   */
+  scheduleViewRenderAfterActivation(leaf: WorkspaceLeaf, targetWin: Window): void {
+    if (!leaf || !targetWin || targetWin.closed) return;
+
+    targetWin.setTimeout(() => {
+      if (targetWin.closed) return;
+      const container = (leaf as unknown as ExtendedWorkspaceLeaf).containerEl;
+      if (!container?.isConnected) return;
+      this.ensureViewRendered(leaf);
+    }, 150);
   }
 
   /** 以延遲重試方式確保非檔案 view 已渲染（restore 後 DOM 尚未穩定）。 */

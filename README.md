@@ -37,6 +37,7 @@ Obsidian's built-in **Workspaces** plugin is designed for **global application s
 - **Per-Layout Auto-Save**: Toggle 🔄 auto-save on specific layouts with a 5-second debounced background update and immediate save on window close.
 - **Unified Quick-Switch & Management Modal**: Search layouts in real-time, view hover file tooltips, sort by 6 dimensions (gear menu ⚙️), rename, edit, auto-save, or delete. Opens as a popup window (with the same toolbar in its title bar), an editor-tab panel, or a sidebar panel.
 - **Safe Placement & Guardrails**: Prevents off-screen windows on monitor changes and guards against accidental 0-file layout overwrites.
+- **Popout Panel Support**: Supports Activity Bar and sidebar/panel rendering inside Popout windows without changing the main window layout.
 
 ### 🖼️ Screenshots
 
@@ -93,5 +94,5 @@ Once saved, a single click (or `Enter`) restores the whole cabin into a fresh po
 - Arrow-key navigation only engages while the panel itself is focused; keys typed into the command palette, a rename dialog, a dropdown menu, or another window are never intercepted.
 
 ### 💻 Compatibility
-- **Obsidian Version**: `v0.15.0+`
+- **Obsidian Version**: `v1.12.7+`
 - **Platform**: Desktop only (Windows, macOS, Linux)

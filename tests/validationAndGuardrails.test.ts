@@ -76,12 +76,50 @@ describe("Validation & Auto-Save Guardrails (validationAndGuardrails.test.ts)", 
     manager.ensureViewRendered(leaf as any);
     expect(leaf.rebuildView).not.toHaveBeenCalled();
 
+    // DOM 仍空白時，多次 lifecycle retry 也只允許一次 rebuild，避免 view 抖動
+    contentEl.innerHTML = "";
+    leaf.rebuildView.mockClear();
+    manager.ensureViewRendered(leaf as any);
+    manager.ensureViewRendered(leaf as any);
+    expect(leaf.rebuildView).toHaveBeenCalledTimes(1);
+
     // 檔案類 view（.file 存在）→ 即使空白也不重建
     leaf.rebuildView.mockClear();
     contentEl.innerHTML = "";
     (leaf as any).view.file = { path: "a.md" };
     manager.ensureViewRendered(leaf as any);
     expect(leaf.rebuildView).not.toHaveBeenCalled();
+  });
+
+  test("delays Popout tab rendering until after activation events", () => {
+    const contentEl = document.createElement("div");
+    contentEl.classList.add("view-content");
+    const leafEl = document.createElement("div");
+    leafEl.appendChild(contentEl);
+    document.body.appendChild(leafEl);
+
+    const leaf = {
+      containerEl: leafEl,
+      view: { containerEl: leafEl, file: undefined },
+      rebuildView: vi.fn(),
+      getViewState: () => ({ type: "search", state: {} }),
+      setViewState: vi.fn().mockResolvedValue(undefined),
+    };
+    const callbacks: Array<() => void> = [];
+    const popoutWindow = {
+      closed: false,
+      setTimeout: (callback: () => void) => {
+        callbacks.push(callback);
+        return 0;
+      },
+    } as unknown as Window;
+
+    manager.scheduleViewRenderAfterActivation(leaf as any, popoutWindow);
+    expect(leaf.rebuildView).not.toHaveBeenCalled();
+
+    callbacks[0]();
+    expect(leaf.rebuildView).toHaveBeenCalledTimes(1);
+    leafEl.remove();
   });
 
   test("openNewPopoutWindow waits for the leaf view before resolving its Window", async () => {
@@ -170,6 +208,23 @@ describe("Validation & Auto-Save Guardrails (validationAndGuardrails.test.ts)", 
 
     expect(focusSpy).toHaveBeenCalledWith(existingWindow);
     expect(openPopoutLeaf).not.toHaveBeenCalled();
+  });
+
+  test("delayed popout focus retries yield after the user switches windows", () => {
+    const hasFocus = vi.fn(() => false);
+    const popoutWindow = {
+      document: { hasFocus },
+      focus: vi.fn(),
+      setTimeout: (callback: () => void) => {
+        callback();
+        return 0;
+      },
+    } as unknown as Window;
+
+    manager.focusTargetWindow(popoutWindow);
+
+    expect(popoutWindow.focus).toHaveBeenCalledTimes(1);
+    expect(hasFocus).toHaveBeenCalled();
   });
 
   test("clone restore (forceNewWindow without focusExistingWindow) still creates a new popout for an already-open space", async () => {
@@ -868,5 +923,118 @@ describe("Validation & Auto-Save Guardrails (validationAndGuardrails.test.ts)", 
 
     expect(manager.getLayoutNameForWindow(pop1.win)).toBe("Existing Space");
     expect(manager.getLayoutNameForWindow(pop2.win)).toBeNull();
+  });
+
+  test("restore skips setting the popout leaf active when the user is already in the main window", async () => {
+    const setActiveLeaf = vi.fn();
+    const targetWin = {
+      document: {
+        hasFocus: vi.fn(() => false), // popout 未持有焦點
+        body: { classList: { contains: (cls: string) => cls === "is-popout-window" } },
+      },
+      focus: vi.fn(),
+      setTimeout: () => 0, // 不執行延遲重試
+      closed: false,
+    } as unknown as Window;
+    const popoutLeaf = {
+      containerEl: { ownerDocument: { defaultView: targetWin } },
+    };
+    const hasFocusSpy = vi.spyOn(document, "hasFocus").mockReturnValue(true); // 主視窗持有焦點
+
+    mockPlugin.settings.showNotifications = false;
+    mockPlugin.app.workspace = {
+      getLayout: () => ({ floating: [] }),
+      openPopoutLeaf: () => popoutLeaf,
+      changeLayout: vi.fn().mockResolvedValue(undefined),
+      setActiveLeaf,
+      iterateAllLeaves: () => {},
+    };
+
+    vi.spyOn(manager as any, "getOpenWindowForLayout").mockReturnValue(null);
+    vi.spyOn(manager as any, "capturePreservedWindowLayouts").mockReturnValue([]);
+    vi.spyOn(manager as any, "getSavedViewStates").mockReturnValue([]);
+    vi.spyOn(manager, "getLivePopoutWindows")
+      .mockReturnValueOnce([]) // popoutWinsBefore：尚未建立任何視窗
+      .mockReturnValue([targetWin]); // 輪詢 + step 4
+    vi.spyOn(manager as any, "getLeavesForWindow").mockReturnValue([popoutLeaf]);
+    vi.spyOn(manager as any, "restoreWindowGeometry").mockImplementation(() => {});
+    vi.spyOn(manager as any, "restorePreservedWindowLabels").mockImplementation(() => {});
+    vi.spyOn(manager as any, "setLayoutLabelForWindow").mockImplementation(() => {});
+    vi.spyOn(manager as any, "refreshLayoutLabels").mockImplementation(() => {});
+
+    const layout: WindowLayout = {
+      id: "poison-guard",
+      name: "Poison Guard",
+      timestamp: Date.now(),
+      windowState: { size: { width: 800, height: 600 } },
+      workspace: {
+        layout: { type: "leaf", id: "leaf-poison", state: { type: "empty", state: {} } },
+        leaves: [],
+      },
+      metadata: { fileCount: 0, tabCount: 0, splitCount: 0 },
+    };
+
+    await manager.restoreLayout(layout, { forceNewWindow: true, showNotifications: false });
+
+    // 主視窗持有焦點時，不得把全域 activeLeaf 指到 popout leaf，也不得搶回焦點
+    expect(setActiveLeaf).not.toHaveBeenCalled();
+    expect(targetWin.focus).not.toHaveBeenCalled();
+    hasFocusSpy.mockRestore();
+  });
+
+  test("restore still activates the popout leaf when the popout has focus", async () => {
+    const setActiveLeaf = vi.fn();
+    const targetWin = {
+      document: {
+        hasFocus: vi.fn(() => true), // popout 持有焦點
+        body: { classList: { contains: (cls: string) => cls === "is-popout-window" } },
+      },
+      focus: vi.fn(),
+      setTimeout: () => 0,
+      closed: false,
+    } as unknown as Window;
+    const popoutLeaf = {
+      containerEl: { ownerDocument: { defaultView: targetWin } },
+    };
+    const hasFocusSpy = vi.spyOn(document, "hasFocus").mockReturnValue(false); // 主視窗未持有焦點
+
+    mockPlugin.settings.showNotifications = false;
+    mockPlugin.app.workspace = {
+      getLayout: () => ({ floating: [] }),
+      openPopoutLeaf: () => popoutLeaf,
+      changeLayout: vi.fn().mockResolvedValue(undefined),
+      setActiveLeaf,
+      iterateAllLeaves: () => {},
+    };
+
+    vi.spyOn(manager as any, "getOpenWindowForLayout").mockReturnValue(null);
+    vi.spyOn(manager as any, "capturePreservedWindowLayouts").mockReturnValue([]);
+    vi.spyOn(manager as any, "getSavedViewStates").mockReturnValue([]);
+    vi.spyOn(manager, "getLivePopoutWindows")
+      .mockReturnValueOnce([])
+      .mockReturnValue([targetWin]);
+    vi.spyOn(manager as any, "getLeavesForWindow").mockReturnValue([popoutLeaf]);
+    vi.spyOn(manager as any, "restoreWindowGeometry").mockImplementation(() => {});
+    vi.spyOn(manager as any, "restorePreservedWindowLabels").mockImplementation(() => {});
+    vi.spyOn(manager as any, "setLayoutLabelForWindow").mockImplementation(() => {});
+    vi.spyOn(manager as any, "refreshLayoutLabels").mockImplementation(() => {});
+
+    const layout: WindowLayout = {
+      id: "focus-ok",
+      name: "Focus OK",
+      timestamp: Date.now(),
+      windowState: { size: { width: 800, height: 600 } },
+      workspace: {
+        layout: { type: "leaf", id: "leaf-focus-ok", state: { type: "empty", state: {} } },
+        leaves: [],
+      },
+      metadata: { fileCount: 0, tabCount: 0, splitCount: 0 },
+    };
+
+    await manager.restoreLayout(layout, { forceNewWindow: true, showNotifications: false });
+
+    expect(setActiveLeaf).toHaveBeenCalledWith(popoutLeaf, { focus: true });
+    expect(targetWin.focus).toHaveBeenCalledTimes(1);
+    hasFocusSpy.mockRestore();
   });
 });

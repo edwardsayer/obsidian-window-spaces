@@ -38,8 +38,12 @@ const requiredFiles = [
   'src/modals/restoreModal.ts',
   'styles.css',
   'README.md',
-  'doc/PLANNING.md',
-  'doc/AGENT_TODO.md'
+  'doc/TESTING_GUIDE.md',
+  'doc/TESTING_I18N.md',
+  'src/shared/popoutLayout.ts',
+  'src/shared/popoutLayoutRegistry.ts',
+  'src/shared/sharedVersion.ts',
+  'src/shared/workspaceInterceptor.ts'
 ];
 
 let allFilesExist = true;

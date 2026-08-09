@@ -1375,7 +1375,7 @@ class WindowLayoutsModal extends obsidian.Modal {
             this.initialSearchQuery = undefined;
         }
         this.clearSearchBtn = searchContainer.createDiv("window-layouts-search-clear");
-        this.clearSearchBtn.setAttribute("aria-label", t("manageModal.clearSearch") || "Clear search");
+        obsidian.setIcon(this.clearSearchBtn, "x");
         obsidian.setTooltip(this.clearSearchBtn, t("manageModal.clearSearch") || "Clear search");
         this.clearSearchBtn.onclick = (e) => {
             e.stopPropagation();
@@ -2444,6 +2444,8 @@ class WindowLayoutManager {
         this.layoutLabels = new Map();
         this.activeRestorePromise = null;
         this.isMatchingUnlabeled = false;
+        this.renderAttemptedLeaves = new WeakSet();
+        this.deferredViewLoads = new WeakMap();
         this.autoSaveTimers = new Map();
         this.lastValidSnapshots = new Map();
         this.plugin = plugin;
@@ -2457,6 +2459,7 @@ class WindowLayoutManager {
         this.matchUnlabeledPopoutWindows();
         this.refreshLayoutStatusBar(targetWin);
         this.hookPopoutWindowTitle(targetWin);
+        this.schedulePopoutViewRendering(targetWin);
         // window-open 觸發時 Popout DOM 可能仍在建立中，再補多次確保狀態列與視窗標題 100% 正確反映。
         targetWin.setTimeout(() => {
             this.matchUnlabeledPopoutWindows();
@@ -2478,6 +2481,25 @@ class WindowLayoutManager {
             this.refreshLayoutStatusBar(targetWin);
             this.hookPopoutWindowTitle(targetWin);
         }, 800);
+    }
+    /**
+     * 在 Popout 建立/重新註冊後，以延遲生命週期工作重建尚未渲染的非檔案 view。
+     * 不可掛在 active-leaf-change：File Explorer 的 mousedown/mouseup 期間重建
+     * view 會阻止 Chromium 產生 click，造成使用者必須點兩次。
+     */
+    schedulePopoutViewRendering(targetWin) {
+        const render = () => {
+            if (targetWin.closed)
+                return;
+            this.getLeavesForWindow(targetWin).forEach((leaf) => {
+                // ensureViewRendered 會先檢查 .view-content 是否已有子元素，只有
+                // 空的非檔案 view 才會進行 rebuild。
+                this.ensureViewRendered(leaf);
+            });
+        };
+        targetWin.setTimeout(render, 150);
+        targetWin.setTimeout(render, 400);
+        targetWin.setTimeout(render, 900);
     }
     /** 插件重新載入時，補註冊已經存在的 Popout。 */
     registerExistingPopoutWindows() {
@@ -3133,17 +3155,41 @@ class WindowLayoutManager {
             this.layoutWindows.get(layout) ||
             this.findWindowForSavedLeaves(this.getSavedViewStates(layout));
     }
+    /** 確認 Popout 仍持有原生焦點，避免延遲重試搶回主視窗焦點。 */
+    isWindowFocused(targetWin) {
+        var _a;
+        try {
+            const hasFocus = (_a = targetWin.document) === null || _a === void 0 ? void 0 : _a.hasFocus;
+            return typeof hasFocus === "function" ? hasFocus.call(targetWin.document) : true;
+        }
+        catch (_b) {
+            return true;
+        }
+    }
+    /** 確認主視窗 (plugin realm) 是否持有原生焦點。 */
+    isMainWindowFocused() {
+        var _a;
+        try {
+            const hasFocus = (_a = window.document) === null || _a === void 0 ? void 0 : _a.hasFocus;
+            return typeof hasFocus === "function" ? hasFocus.call(window.document) : true;
+        }
+        catch (_b) {
+            return true;
+        }
+    }
     /**
      * 聚焦 (Focus) 指定 Popout 視窗並啟用合適的 Leaf (顯式呼叫 revealLeaf 確保分頁真實切換為可見)
      */
     focusTargetWindow(targetWin, preferredLeaf) {
         if (!targetWin || targetWin.closed)
             return;
-        const doFocusAndReveal = () => __awaiter(this, void 0, void 0, function* () {
+        const doFocusAndReveal = (focusWindow) => __awaiter(this, void 0, void 0, function* () {
             try {
-                if (typeof targetWin.focus === "function") {
+                if (focusWindow && typeof targetWin.focus === "function") {
                     targetWin.focus();
                 }
+                if (!focusWindow && !this.isWindowFocused(targetWin))
+                    return;
                 const freshLeaves = this.getLeavesForWindow(targetWin);
                 if (freshLeaves.length === 0)
                     return;
@@ -3165,16 +3211,20 @@ class WindowLayoutManager {
                 }
                 if (targetLeaf) {
                     yield this.app.workspace.revealLeaf(targetLeaf);
-                    this.app.workspace.setActiveLeaf(targetLeaf, { focus: true });
+                    // revealLeaf() is asynchronous; the user may have switched to the
+                    // main window while it was pending. Never steal that focus back.
+                    if (!this.isWindowFocused(targetWin))
+                        return;
+                    this.app.workspace.setActiveLeaf(targetLeaf, { focus: focusWindow });
                 }
             }
             catch (_a) {
                 // Ignore focus error
             }
         });
-        void doFocusAndReveal();
-        targetWin.setTimeout(() => { void doFocusAndReveal(); }, 50);
-        targetWin.setTimeout(() => { void doFocusAndReveal(); }, 200);
+        void doFocusAndReveal(true);
+        targetWin.setTimeout(() => { void doFocusAndReveal(false); }, 50);
+        targetWin.setTimeout(() => { void doFocusAndReveal(false); }, 200);
     }
     /**
      * 獲取目前活動視窗 (activeWindow) 中真正的 activeLeaf
@@ -3555,8 +3605,13 @@ class WindowLayoutManager {
                 if (targetWin) {
                     this.layoutWindows.set(layout, targetWin);
                     this.restoreWindowGeometry(targetWin, layout.windowState, layout.includeGeometry);
+                    // 若使用者在 restore 的非同步等待期間已切回主視窗，就不能再把全域
+                    // activeLeaf 指到 popout leaf，否則下一次主視窗 File Explorer 點擊
+                    // note 會被導向 popout（需點兩下才切換）。僅當 popout 仍持有焦點、
+                    // 或主視窗也未持有焦點（Obsidian 在背景）時才啟動 popout。
+                    const canActivatePopout = this.isWindowFocused(targetWin) || !this.isMainWindowFocused();
                     const winLeaves = this.getLeavesForWindow(targetWin);
-                    if (winLeaves.length > 0) {
+                    if (winLeaves.length > 0 && canActivatePopout) {
                         try {
                             this.app.workspace.setActiveLeaf(winLeaves[0], { focus: true });
                         }
@@ -3566,17 +3621,20 @@ class WindowLayoutManager {
                     }
                     if (typeof targetWin.focus === "function") {
                         try {
-                            targetWin.focus();
+                            if (canActivatePopout) {
+                                targetWin.focus();
+                            }
                         }
                         catch (e) {
                             console.warn("Failed to focus target window:", e);
                         }
                         targetWin.setTimeout(() => {
                             try {
-                                targetWin.focus();
+                                if (!this.isWindowFocused(targetWin))
+                                    return;
                                 const freshLeaves = this.getLeavesForWindow(targetWin);
                                 if (freshLeaves.length > 0) {
-                                    this.app.workspace.setActiveLeaf(freshLeaves[0], { focus: true });
+                                    this.app.workspace.setActiveLeaf(freshLeaves[0], { focus: false });
                                 }
                             }
                             catch (_a) {
@@ -3585,10 +3643,11 @@ class WindowLayoutManager {
                         }, 100);
                         targetWin.setTimeout(() => {
                             try {
-                                targetWin.focus();
+                                if (!this.isWindowFocused(targetWin))
+                                    return;
                                 const freshLeaves = this.getLeavesForWindow(targetWin);
                                 if (freshLeaves.length > 0) {
-                                    this.app.workspace.setActiveLeaf(freshLeaves[0], { focus: true });
+                                    this.app.workspace.setActiveLeaf(freshLeaves[0], { focus: false });
                                 }
                             }
                             catch (_a) {
@@ -4600,13 +4659,57 @@ class WindowLayoutManager {
             }
         }))();
     }
-    /** 單次檢查：若 view 未渲染內容則強制重新渲染。 */
+    /**
+     * 單次檢查：先載入 deferred view，再於 DOM 仍為空時最多重建一次。
+     * 多個 lifecycle retry 不得因 DOM 尚未及時更新而連續重建同一個 leaf。
+     */
     ensureViewRendered(leaf) {
         if (!leaf || this.isFileView(leaf))
             return;
-        if (this.hasRenderedContent(leaf))
+        if (this.hasRenderedContent(leaf)) {
+            this.renderAttemptedLeaves.delete(leaf);
             return;
+        }
+        if (leaf.isDeferred) {
+            if (this.deferredViewLoads.has(leaf))
+                return;
+            const pendingLoad = leaf
+                .loadIfDeferred()
+                .then(() => {
+                this.deferredViewLoads.delete(leaf);
+                if (!this.hasRenderedContent(leaf))
+                    this.rebuildViewIfNeeded(leaf);
+            })
+                .catch(() => {
+                this.deferredViewLoads.delete(leaf);
+                this.rebuildViewIfNeeded(leaf);
+            });
+            this.deferredViewLoads.set(leaf, pendingLoad);
+            return;
+        }
+        this.rebuildViewIfNeeded(leaf);
+    }
+    rebuildViewIfNeeded(leaf) {
+        if (this.hasRenderedContent(leaf) || this.renderAttemptedLeaves.has(leaf))
+            return;
+        this.renderAttemptedLeaves.add(leaf);
         this.forceRenderView(leaf);
+    }
+    /**
+     * 在 Popout tab 切換完成後延遲檢查 DOM，避免 active-leaf-change 的
+     * mousedown/mouseup 階段重建 view 而吞掉原生 click 事件。
+     */
+    scheduleViewRenderAfterActivation(leaf, targetWin) {
+        if (!leaf || !targetWin || targetWin.closed)
+            return;
+        targetWin.setTimeout(() => {
+            if (targetWin.closed)
+                return;
+            const container = leaf.containerEl;
+            if (!(container === null || container === void 0 ? void 0 : container.isConnected))
+                return;
+            this.ensureViewRendered(leaf);
+        }, 150);
     }
     /** 以延遲重試方式確保非檔案 view 已渲染（restore 後 DOM 尚未穩定）。 */
     ensureViewRenderedWithRetries(targetWin, leaf) {
@@ -5470,7 +5573,7 @@ const INITIAL_SPLIT_RATIO = 0.34;
 /** 判斷 DOM Window 是否為 Popout。 */
 function isPopoutWindow(win) {
     var _a;
-    if (!win || win === window)
+    if (!win || (typeof window !== "undefined" && win === window))
         return false;
     const body = (_a = win.document) === null || _a === void 0 ? void 0 : _a.body;
     return !!body && (body.classList.contains("is-popout-window") || body.classList.contains("mod-popout"));
@@ -5972,6 +6075,8 @@ class PopoutLayoutEngine {
         if (leaves.length === 0)
             return [];
         const leaf = leaves[0];
+        if (!leaf)
+            return [];
         const container = leaf.containerEl ||
             ((_a = leaf.view) === null || _a === void 0 ? void 0 : _a.containerEl);
         if (!(container instanceof HTMLElement))
@@ -5988,12 +6093,13 @@ class PopoutLayoutEngine {
     }
     /** 取得指定側的頂層欄位元素（DOM 結構優先，display-independent）。 */
     getColumnElement(win, side) {
+        var _a, _b;
         // 幾何測量（collectPopoutColumns）量不到 display:none 的欄位，側欄隱藏時會被
         // 誤判為最右/最左的可見欄位；因此一律先以 root split 的 direct children
         // （DOM 順序）定位左右側欄，隱藏中的側欄仍在 DOM 中，不受影響。
         const topEls = this.getTopLevelColumnElements(win);
         if (topEls.length >= 2) {
-            return side === "left" ? topEls[0] : topEls[topEls.length - 1];
+            return side === "left" ? (_a = topEls[0]) !== null && _a !== void 0 ? _a : null : (_b = topEls[topEls.length - 1]) !== null && _b !== void 0 ? _b : null;
         }
         return null;
     }
@@ -6060,6 +6166,177 @@ class PopoutLayoutEngine {
         }
     }
 }
+
+/** Fixed cross-bundle key. Both plugins must use this exact namespace. */
+const POPOUT_LAYOUT_REGISTRY_KEY = "__obsidian_popout_layout_registry_v1__";
+function compareRevisions(left, right) {
+    return left === right ? 0 : left > right ? 1 : -1;
+}
+function compareCandidatePriority(left, right) {
+    // Prefer the newest API, then the implementation that supports the broadest
+    // compatible range, and finally the newest implementation revision.
+    if (left.apiVersion !== right.apiVersion) {
+        return right.apiVersion - left.apiVersion;
+    }
+    if (left.compatibleFrom !== right.compatibleFrom) {
+        return left.compatibleFrom - right.compatibleFrom;
+    }
+    const revisionOrder = compareRevisions(left.implementationRevision, right.implementationRevision);
+    return revisionOrder === 0 ? 0 : -revisionOrder;
+}
+function compareCandidates(left, right) {
+    const priorityOrder = compareCandidatePriority(left, right);
+    if (priorityOrder !== 0)
+        return priorityOrder;
+    return left.id < right.id ? -1 : left.id > right.id ? 1 : 0;
+}
+function supportsApiVersion(candidate, apiVersion) {
+    return candidate.compatibleFrom <= apiVersion && apiVersion <= candidate.apiVersion;
+}
+/**
+ * A candidate may become active only when it can serve every older API version
+ * currently registered. Registered candidates represent active consumers: this
+ * prevents a v2 implementation with compatibleFrom=2 from replacing the v1
+ * implementation that an already-loaded plugin still requires.
+ */
+function isBackwardCompatibleWithRegisteredConsumers(candidate, candidates) {
+    return candidates
+        .filter((consumer) => consumer.apiVersion < candidate.apiVersion)
+        .every((consumer) => supportsApiVersion(candidate, consumer.apiVersion));
+}
+function selectActiveCandidate(state) {
+    var _a, _b, _c, _d;
+    // acquirePopoutLayoutEngine validates each candidate's own range. Selection
+    // must now evaluate it against the other registered API consumers.
+    const candidates = Array.from(state.candidates.values());
+    const compatibleCandidates = candidates
+        .filter((candidate) => isBackwardCompatibleWithRegisteredConsumers(candidate, candidates))
+        .sort(compareCandidates);
+    const currentActive = state.activeId ? (_a = state.candidates.get(state.activeId)) !== null && _a !== void 0 ? _a : null : null;
+    const currentRemainsBest = currentActive !== null &&
+        compatibleCandidates.some((candidate) => candidate.id === currentActive.id) &&
+        compatibleCandidates.every((candidate) => compareCandidatePriority(currentActive, candidate) <= 0);
+    const active = currentRemainsBest ? currentActive : (_b = compatibleCandidates[0]) !== null && _b !== void 0 ? _b : null;
+    state.activeId = (_c = active === null || active === void 0 ? void 0 : active.id) !== null && _c !== void 0 ? _c : null;
+    state.activeEngine = (_d = active === null || active === void 0 ? void 0 : active.engine) !== null && _d !== void 0 ? _d : null;
+}
+function createStableProxy(state) {
+    const target = Object.create(null);
+    return new Proxy(target, {
+        get(proxyTarget, property, receiver) {
+            // Let test instrumentation or an explicitly attached property behave
+            // normally without changing the delegate held by the registry.
+            if (property in proxyTarget) {
+                return Reflect.get(proxyTarget, property, receiver);
+            }
+            const delegate = state.activeEngine;
+            if (!delegate)
+                return undefined;
+            const value = Reflect.get(delegate, property, delegate);
+            if (typeof value !== "function")
+                return value;
+            let wrapper = state.methodWrappers.get(property);
+            if (!wrapper) {
+                wrapper = (...args) => {
+                    const current = state.activeEngine;
+                    if (!current)
+                        throw new Error("No active Popout layout engine candidate");
+                    const currentMethod = Reflect.get(current, property, current);
+                    if (typeof currentMethod !== "function") {
+                        throw new Error(`Active Popout layout engine has no method '${String(property)}'`);
+                    }
+                    return currentMethod.apply(current, args);
+                };
+                state.methodWrappers.set(property, wrapper);
+            }
+            return wrapper;
+        },
+        has(proxyTarget, property) {
+            return property in proxyTarget || Boolean(state.activeEngine && property in state.activeEngine);
+        },
+        getOwnPropertyDescriptor(proxyTarget, property) {
+            const own = Reflect.getOwnPropertyDescriptor(proxyTarget, property);
+            if (own)
+                return own;
+            const delegate = state.activeEngine;
+            if (delegate && property in delegate) {
+                return {
+                    configurable: true,
+                    enumerable: false,
+                    writable: true,
+                    value: Reflect.get(delegate, property, delegate),
+                };
+            }
+            return undefined;
+        },
+        set(proxyTarget, property, value, receiver) {
+            return Reflect.set(proxyTarget, property, value, receiver);
+        },
+    });
+}
+function getRegistryState() {
+    const namespace = globalThis;
+    const existing = namespace[POPOUT_LAYOUT_REGISTRY_KEY];
+    if (existing)
+        return existing;
+    const state = {
+        candidates: new Map(),
+        activeId: null,
+        activeEngine: null,
+        methodWrappers: new Map(),
+        proxy: undefined,
+    };
+    state.proxy = createStableProxy(state);
+    namespace[POPOUT_LAYOUT_REGISTRY_KEY] = state;
+    return state;
+}
+/**
+ * Register an implementation candidate and return the cross-bundle stable
+ * singleton proxy. A later compatible candidate only changes the proxy's
+ * delegate; existing references therefore remain valid after an upgrade.
+ */
+function acquirePopoutLayoutEngine(candidate) {
+    if (!candidate.id)
+        throw new Error("Popout layout candidate id is required");
+    if (!Number.isInteger(candidate.apiVersion) || candidate.apiVersion < 1) {
+        throw new Error("Popout layout candidate apiVersion must be a positive integer");
+    }
+    if (!Number.isInteger(candidate.compatibleFrom) || candidate.compatibleFrom < 1) {
+        throw new Error("Popout layout candidate compatibleFrom must be a positive integer");
+    }
+    if (candidate.compatibleFrom > candidate.apiVersion) {
+        throw new Error("Popout layout candidate compatibleFrom cannot exceed apiVersion");
+    }
+    if (typeof candidate.create !== "function") {
+        throw new Error("Popout layout candidate create must be a function");
+    }
+    const state = getRegistryState();
+    const engine = candidate.create();
+    if (!engine)
+        throw new Error(`Popout layout candidate '${candidate.id}' returned no engine`);
+    state.candidates.set(candidate.id, {
+        id: candidate.id,
+        apiVersion: candidate.apiVersion,
+        compatibleFrom: candidate.compatibleFrom,
+        implementationRevision: candidate.implementationRevision,
+        engine,
+    });
+    selectActiveCandidate(state);
+    return state.proxy;
+}
+/** Remove a candidate and fall back to the best remaining implementation. */
+function releasePopoutLayoutEngine(id) {
+    const state = getRegistryState();
+    state.candidates.delete(id);
+    selectActiveCandidate(state);
+}
+
+/** Shared Popout layout library API version. */
+const SHARED_API_VERSION = 2;
+/** Oldest shared API version implemented by this copy. */
+const SHARED_COMPATIBLE_FROM_VERSION = 1;
+/** Monotonic implementation identifier used when API versions are equal. */
+const SHARED_IMPLEMENTATION_REVISION = "2026-08-09T13:20:06Z";
 
 /**
  * Popout Activity Bar 控制器。
@@ -6502,154 +6779,263 @@ class PopoutActivityBarManager {
     }
 }
 
+function getState(app) {
+    const namespace = globalThis;
+    const existing = namespace.__obsidian_workspace_interceptor_state_v1__;
+    if (existing) {
+        if (existing.participants.size === 0 && !existing.installed) {
+            existing.workspace = app.workspace;
+        }
+        return existing;
+    }
+    const state = {
+        workspace: app.workspace,
+        participants: new Map(),
+        installed: false,
+        originalMethods: undefined,
+    };
+    namespace.__obsidian_workspace_interceptor_state_v1__ = state;
+    return state;
+}
+function hasWindowFocus(win) {
+    const document = win === null || win === void 0 ? void 0 : win.document;
+    if (!document)
+        return false;
+    if (typeof document.hasFocus !== "function")
+        return true;
+    return document.hasFocus();
+}
+function getActivePopoutWindow(state) {
+    const mainWindow = typeof window !== "undefined" ? window : null;
+    if (hasWindowFocus(mainWindow))
+        return null;
+    const focusedWindow = typeof activeWindow !== "undefined" ? activeWindow : null;
+    if (focusedWindow === mainWindow)
+        return null;
+    if (focusedWindow &&
+        focusedWindow !== mainWindow &&
+        isPopoutWindow(focusedWindow) &&
+        hasWindowFocus(focusedWindow)) {
+        return focusedWindow;
+    }
+    let focusedPopout = null;
+    const iterateAllLeaves = state.workspace.iterateAllLeaves;
+    iterateAllLeaves === null || iterateAllLeaves === void 0 ? void 0 : iterateAllLeaves((leaf) => {
+        const win = getWindowOfLeaf(leaf);
+        if (!focusedPopout && win && isPopoutWindow(win) && hasWindowFocus(win)) {
+            focusedPopout = win;
+        }
+    });
+    return focusedPopout;
+}
+function isParticipantEnabled(participant) {
+    try {
+        return participant.isEnabled ? participant.isEnabled() : true;
+    }
+    catch (_a) {
+        return false;
+    }
+}
+function getParticipantForWindow(state, win) {
+    for (const participant of state.participants.values()) {
+        if (!isParticipantEnabled(participant))
+            continue;
+        try {
+            if (!participant.isManagedWindow || participant.isManagedWindow(win))
+                return participant;
+        }
+        catch (_a) {
+            // A failing plugin policy must not affect other participants.
+        }
+    }
+    return null;
+}
+function routeSideLeaf(state, side) {
+    var _a;
+    const activeWindow = getActivePopoutWindow(state);
+    const participant = activeWindow ? getParticipantForWindow(state, activeWindow) : null;
+    const engine = (_a = participant === null || participant === void 0 ? void 0 : participant.engine) !== null && _a !== void 0 ? _a : null;
+    if (!activeWindow || !engine)
+        return null;
+    try {
+        return engine.openSideLeafSync(activeWindow, side);
+    }
+    catch (_b) {
+        return null;
+    }
+}
+function routeEnsureSideLeaf(state, viewType, side, options) {
+    var _a, _b, _c, _d, _e, _f, _g;
+    return __awaiter(this, void 0, void 0, function* () {
+        const activeWindow = getActivePopoutWindow(state);
+        const participant = activeWindow ? getParticipantForWindow(state, activeWindow) : null;
+        const engine = (_a = participant === null || participant === void 0 ? void 0 : participant.engine) !== null && _a !== void 0 ? _a : null;
+        if (!activeWindow || !engine)
+            return null;
+        // Popout windows have no native sidebar split tree. The shared engine's
+        // side-column semantics are therefore used for both split=true and false;
+        // active/reveal/state are still applied exactly from the caller options.
+        const column = engine.getColumnElement(activeWindow, side);
+        const existing = column
+            ? engine.findLeafOfTypeInColumn(activeWindow, column, viewType)
+            : null;
+        const leaf = existing !== null && existing !== void 0 ? existing : engine.openSideLeafSync(activeWindow, side);
+        if (!leaf)
+            return null;
+        if (!existing) {
+            yield leaf.setViewState({
+                type: viewType,
+                active: options.active,
+                state: options.state,
+            });
+        }
+        else if (options.state) {
+            yield leaf.setViewState({ type: viewType, state: options.state });
+        }
+        yield leaf.loadIfDeferred();
+        if (options.reveal !== false) {
+            yield ((_c = (_b = state.workspace).revealLeaf) === null || _c === void 0 ? void 0 : _c.call(_b, leaf));
+        }
+        if (options.active) {
+            (_e = (_d = state.workspace).setActiveLeaf) === null || _e === void 0 ? void 0 : _e.call(_d, leaf, { focus: true });
+        }
+        if (!existing) {
+            yield ((_g = (_f = state.workspace).requestSaveLayout) === null || _g === void 0 ? void 0 : _g.call(_f));
+        }
+        return leaf;
+    });
+}
+function hasOwnMethod(workspace, key) {
+    return Object.prototype.hasOwnProperty.call(workspace, key);
+}
+function restoreMethod(workspace, key, original) {
+    if (original.hadOwn) {
+        workspace[key] = original.value;
+    }
+    else {
+        delete workspace[key];
+    }
+}
+function install(state) {
+    if (state.installed)
+        return;
+    const workspace = state.workspace;
+    state.originalMethods = {
+        getLeftLeaf: { hadOwn: hasOwnMethod(workspace, "getLeftLeaf"), value: workspace.getLeftLeaf },
+        getRightLeaf: { hadOwn: hasOwnMethod(workspace, "getRightLeaf"), value: workspace.getRightLeaf },
+        getLeavesOfType: { hadOwn: hasOwnMethod(workspace, "getLeavesOfType"), value: workspace.getLeavesOfType },
+        ensureSideLeaf: { hadOwn: hasOwnMethod(workspace, "ensureSideLeaf"), value: workspace.ensureSideLeaf },
+    };
+    workspace.__workspaceInterceptorOriginalGetLeftLeaf = workspace.getLeftLeaf;
+    workspace.__workspaceInterceptorOriginalGetRightLeaf = workspace.getRightLeaf;
+    workspace.__workspaceInterceptorOriginalGetLeavesOfType = workspace.getLeavesOfType;
+    workspace.__workspaceInterceptorOriginalEnsureSideLeaf = workspace.ensureSideLeaf;
+    workspace.getLeftLeaf = function (split) {
+        var _a, _b, _c;
+        const original = (_a = state.originalMethods) === null || _a === void 0 ? void 0 : _a.getLeftLeaf.value;
+        return (_c = (_b = routeSideLeaf(state, "left")) !== null && _b !== void 0 ? _b : original === null || original === void 0 ? void 0 : original.call(workspace, split)) !== null && _c !== void 0 ? _c : null;
+    };
+    workspace.getRightLeaf = function (split) {
+        var _a, _b, _c;
+        const original = (_a = state.originalMethods) === null || _a === void 0 ? void 0 : _a.getRightLeaf.value;
+        return (_c = (_b = routeSideLeaf(state, "right")) !== null && _b !== void 0 ? _b : original === null || original === void 0 ? void 0 : original.call(workspace, split)) !== null && _c !== void 0 ? _c : null;
+    };
+    workspace.getLeavesOfType = function (type) {
+        var _a, _b;
+        const original = (_a = state.originalMethods) === null || _a === void 0 ? void 0 : _a.getLeavesOfType.value;
+        const leaves = (_b = original === null || original === void 0 ? void 0 : original.call(workspace, type)) !== null && _b !== void 0 ? _b : [];
+        const activeWindow = getActivePopoutWindow(state);
+        const participant = activeWindow ? getParticipantForWindow(state, activeWindow) : null;
+        return participant ? leaves.filter((leaf) => getWindowOfLeaf(leaf) === activeWindow) : leaves;
+    };
+    workspace.ensureSideLeaf = function (viewType, side, options = {}) {
+        var _a;
+        const original = (_a = state.originalMethods) === null || _a === void 0 ? void 0 : _a.ensureSideLeaf.value;
+        return routeEnsureSideLeaf(state, viewType, side, options).then((leaf) => {
+            if (leaf)
+                return leaf;
+            if (original)
+                return original.call(workspace, viewType, side, options);
+            return Promise.reject(new Error("Workspace.ensureSideLeaf is unavailable"));
+        });
+    };
+    workspace.__workspaceInterceptorInstalled = true;
+    state.installed = true;
+}
+function uninstall(state) {
+    if (!state.installed)
+        return;
+    const workspace = state.workspace;
+    const original = state.originalMethods;
+    if (original) {
+        restoreMethod(workspace, "getLeftLeaf", original.getLeftLeaf);
+        restoreMethod(workspace, "getRightLeaf", original.getRightLeaf);
+        restoreMethod(workspace, "getLeavesOfType", original.getLeavesOfType);
+        restoreMethod(workspace, "ensureSideLeaf", original.ensureSideLeaf);
+    }
+    delete workspace.__workspaceInterceptorOriginalGetLeftLeaf;
+    delete workspace.__workspaceInterceptorOriginalGetRightLeaf;
+    delete workspace.__workspaceInterceptorOriginalGetLeavesOfType;
+    delete workspace.__workspaceInterceptorOriginalEnsureSideLeaf;
+    delete workspace.__workspaceInterceptorInstalled;
+    state.originalMethods = undefined;
+    state.installed = false;
+}
+/** Register one plugin policy with the process-wide coordinator. */
+function acquireWorkspaceInterceptor(app, participant) {
+    if (!participant.id)
+        throw new Error("Workspace interceptor participant id is required");
+    const state = getState(app);
+    state.participants.set(participant.id, participant);
+    install(state);
+}
+/** Release one plugin policy; restore the original APIs after the last release. */
+function releaseWorkspaceInterceptor(id) {
+    const namespace = globalThis;
+    const state = namespace.__obsidian_workspace_interceptor_state_v1__;
+    if (!state)
+        return;
+    state.participants.delete(id);
+    if (state.participants.size === 0)
+        uninstall(state);
+}
+
 /**
- * Workspace API 攔截器（Monkey Patch）。
- *
- * 攔截 `app.workspace.getLeftLeaf(split)` 與 `getRightLeaf(split)`：
- * 當呼叫發生於 Popout 視窗（active window 為 Popout）時，將結果路由至該
- * Popout 的模擬側欄，讓第三方外掛（AI Chatbox、Calendar 等）零修改地把 view
- * 開到 Popout 側欄，而非跳回主視窗。
- *
- * 安全要求（cheatsheet）：
- * - 薄補丁：僅做「判定 → 路由 → fallback」。
- * - `onunload()` 時精準還原原始方法；重載防呆避免重複 patch。
- * - 提供可關閉開關（由 plugin 設定驅動）。
+ * Window Spaces compatibility wrapper for the shared Workspace coordinator.
+ * The actual monkey patch is installed once per workspace by the shared
+ * coordinator, so Folder Spaces and Window Spaces cannot overwrite each other.
  */
 class WorkspaceInterceptor {
-    constructor(app) {
+    constructor(app, engine) {
         this.installed = false;
-        this.originalGetLeftLeaf = null;
-        this.originalGetRightLeaf = null;
-        this.originalGetLeavesOfType = null;
-        /** 是否啟用（由 plugin 設定動態讀取）。 */
         this.enabled = true;
-        /**
-         * 判斷指定視窗是否為「本外掛管理的 Popout」。
-         * 僅對受管理的視窗進行攔截，避免影響 Obsidian 自己的 UI 視窗（如設定 popout）。
-         */
         this.isManagedWindow = null;
         this.app = app;
-        this.engine = new PopoutLayoutEngine(app);
+        this.engine =
+            engine !== null && engine !== void 0 ? engine : acquirePopoutLayoutEngine({
+                id: "window-spaces",
+                apiVersion: SHARED_API_VERSION,
+                compatibleFrom: SHARED_COMPATIBLE_FROM_VERSION,
+                implementationRevision: SHARED_IMPLEMENTATION_REVISION,
+                create: () => new PopoutLayoutEngine(app),
+            });
     }
     install() {
-        var _a, _b, _c;
-        const ws = this.app.workspace;
-        if (!ws || this.installed)
+        if (this.installed)
             return;
-        if (ws._windowSpacesInterceptorInstalled) {
-            // 重載防呆：若上次卸載未完整還原，先還原再重新安裝
-            this.forceRestore();
-        }
-        this.originalGetLeftLeaf = (_a = ws.getLeftLeaf) !== null && _a !== void 0 ? _a : null;
-        this.originalGetRightLeaf = (_b = ws.getRightLeaf) !== null && _b !== void 0 ? _b : null;
-        this.originalGetLeavesOfType = (_c = ws.getLeavesOfType) !== null && _c !== void 0 ? _c : null;
-        ws._windowSpacesOriginalGetLeftLeaf = ws.getLeftLeaf;
-        ws._windowSpacesOriginalGetRightLeaf = ws.getRightLeaf;
-        ws._windowSpacesOriginalGetLeavesOfType = ws.getLeavesOfType;
-        const self = this;
-        ws.getLeftLeaf = function (split) {
-            const intercepted = self.tryIntercept("left");
-            if (intercepted)
-                return intercepted;
-            const original = ws._windowSpacesOriginalGetLeftLeaf;
-            return original ? original.call(ws, split) : null;
-        };
-        ws.getRightLeaf = function (split) {
-            const intercepted = self.tryIntercept("right");
-            if (intercepted)
-                return intercepted;
-            const original = ws._windowSpacesOriginalGetRightLeaf;
-            return original ? original.call(ws, split) : null;
-        };
-        ws.getLeavesOfType = function (type) {
-            const original = ws._windowSpacesOriginalGetLeavesOfType;
-            const leaves = original ? original.call(ws, type) : [];
-            if (!self.enabled || !leaves || leaves.length === 0)
-                return leaves;
-            // 取得目前活動視窗 (activeWindow / window)
-            const currentWin = typeof activeWindow !== "undefined" ? activeWindow : window;
-            // 嚴格過濾：僅傳回與當前活動視窗相同的 leaves，避免外掛跨視窗取得並 active 異地頁籤
-            return leaves.filter((leaf) => {
-                const leafWin = getWindowOfLeaf(leaf);
-                return leafWin === currentWin;
-            });
-        };
-        ws._windowSpacesInterceptorInstalled = true;
+        acquireWorkspaceInterceptor(this.app, {
+            id: "window-spaces",
+            engine: this.engine,
+            isEnabled: () => this.enabled,
+            isManagedWindow: (win) => { var _a, _b; return (_b = (_a = this.isManagedWindow) === null || _a === void 0 ? void 0 : _a.call(this, win)) !== null && _b !== void 0 ? _b : true; },
+        });
         this.installed = true;
     }
     uninstall() {
-        this.forceRestore();
-        this.installed = false;
-    }
-    forceRestore() {
-        const ws = this.app.workspace;
-        if (!ws)
+        if (!this.installed)
             return;
-        if (ws._windowSpacesOriginalGetLeftLeaf) {
-            ws.getLeftLeaf = ws._windowSpacesOriginalGetLeftLeaf;
-        }
-        else if (this.originalGetLeftLeaf) {
-            ws.getLeftLeaf = this.originalGetLeftLeaf;
-        }
-        if (ws._windowSpacesOriginalGetRightLeaf) {
-            ws.getRightLeaf = ws._windowSpacesOriginalGetRightLeaf;
-        }
-        else if (this.originalGetRightLeaf) {
-            ws.getRightLeaf = this.originalGetRightLeaf;
-        }
-        if (ws._windowSpacesOriginalGetLeavesOfType) {
-            ws.getLeavesOfType = ws._windowSpacesOriginalGetLeavesOfType;
-        }
-        else if (this.originalGetLeavesOfType) {
-            ws.getLeavesOfType = this.originalGetLeavesOfType;
-        }
-        delete ws._windowSpacesOriginalGetLeftLeaf;
-        delete ws._windowSpacesOriginalGetRightLeaf;
-        delete ws._windowSpacesOriginalGetLeavesOfType;
-        ws._windowSpacesInterceptorInstalled = false;
-    }
-    tryIntercept(side) {
-        if (!this.enabled)
-            return null;
-        const activeWin = this.getActivePopoutWindow();
-        if (!activeWin)
-            return null;
-        // 只攔截受本外掛管理的 Popout，避免誤攔 Obsidian 自己的 UI 視窗
-        if (this.isManagedWindow && !this.isManagedWindow(activeWin)) {
-            return null;
-        }
-        try {
-            return this.engine.openSideLeafSync(activeWin, side);
-        }
-        catch (_a) {
-            return null;
-        }
-    }
-    /** 判定當前 active window 是否為 Popout（三級判定）。 */
-    getActivePopoutWindow() {
-        var _a, _b;
-        // 1. Obsidian 官方 activeWindow 全域
-        if (typeof activeWindow !== "undefined" && activeWindow !== window && isPopoutWindow(activeWindow)) {
-            return activeWindow;
-        }
-        // 2. mostRecentLeaf 的 owner window
-        const ws = this.app.workspace;
-        const leaf = typeof ws.getMostRecentLeaf === "function" ? ws.getMostRecentLeaf() : null;
-        if (leaf) {
-            const win = getWindowOfLeaf(leaf);
-            if (win && isPopoutWindow(win))
-                return win;
-        }
-        // 3. 遍歷 leaf 找 focus 的 Popout
-        let focusedPopout = null;
-        (_b = (_a = this.app.workspace).iterateAllLeaves) === null || _b === void 0 ? void 0 : _b.call(_a, (candidate) => {
-            var _a, _b;
-            const win = getWindowOfLeaf(candidate);
-            if (!focusedPopout && win && isPopoutWindow(win) && ((_b = (_a = win.document) === null || _a === void 0 ? void 0 : _a.hasFocus) === null || _b === void 0 ? void 0 : _b.call(_a))) {
-                focusedPopout = win;
-            }
-        });
-        return focusedPopout;
+        releaseWorkspaceInterceptor("window-spaces");
+        this.installed = false;
     }
 }
 
@@ -6691,9 +7077,15 @@ class WindowSpacesPlugin extends obsidian.Plugin {
             this.manager = new WindowLayoutManager(this);
             this.manager.registerExistingPopoutWindows();
             // 初始化 Popout 工作空間增強（Activity Bar + API 攔截器）
-            this.popoutLayout = new PopoutLayoutEngine(this.app);
+            this.popoutLayout = acquirePopoutLayoutEngine({
+                id: "window-spaces",
+                apiVersion: SHARED_API_VERSION,
+                compatibleFrom: SHARED_COMPATIBLE_FROM_VERSION,
+                implementationRevision: SHARED_IMPLEMENTATION_REVISION,
+                create: () => new PopoutLayoutEngine(this.app),
+            });
             this.activityBars = new PopoutActivityBarManager(this, this.popoutLayout);
-            this.workspaceInterceptor = new WorkspaceInterceptor(this.app);
+            this.workspaceInterceptor = new WorkspaceInterceptor(this.app, this.popoutLayout);
             this.workspaceInterceptor.enabled = this.settings.workspaceInterceptorEnabled !== false;
             // 僅對已注入 Activity Bar 且非 Obsidian UI 視窗（如設定 popout）攔截
             this.workspaceInterceptor.isManagedWindow = (win) => {
@@ -6735,6 +7127,7 @@ class WindowSpacesPlugin extends obsidian.Plugin {
         if (this.autoSaveCleanup) {
             this.autoSaveCleanup();
         }
+        releasePopoutLayoutEngine("window-spaces");
     }
     refreshRibbonIcons() {
         if (this.settings.showWindowLayoutsRibbonIcon) {
@@ -7011,8 +7404,12 @@ class WindowSpacesPlugin extends obsidian.Plugin {
         this.registerEvent(this.app.workspace.on("active-leaf-change", (leaf) => {
             this.manager.checkAndDebouncedAutoSaveAll();
             this.activityBars.updateActiveStatesAll();
-            // 當 view 的 tab 被點選/成為 active 時，若其內容未渲染則強制重新渲染
-            this.manager.ensureViewRendered(leaf);
+            // 等待 mousedown/mouseup/click 完成後，才檢查剛切換到的 Popout tab
+            // 是否仍是空 DOM；主視窗不走此路徑，避免 File Explorer 單擊失效。
+            const leafWindow = leaf ? getWindowOfLeaf(leaf) : null;
+            if (leaf && leafWindow && isPopoutWindow(leafWindow)) {
+                this.manager.scheduleViewRenderAfterActivation(leaf, leafWindow);
+            }
         }));
     }
     addStatusBarIndicator() {

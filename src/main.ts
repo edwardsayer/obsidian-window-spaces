@@ -17,7 +17,17 @@ import {
   WindowLayoutsPanelLocation,
   WindowLayoutsView,
 } from "./views/windowLayoutsView";
-import { PopoutLayoutEngine } from "./popout/popoutLayout";
+import {
+  getWindowOfLeaf,
+  isPopoutWindow,
+  PopoutLayoutEngine,
+} from "./shared/popoutLayout";
+import { acquirePopoutLayoutEngine, releasePopoutLayoutEngine } from "./shared/popoutLayoutRegistry";
+import {
+  SHARED_API_VERSION,
+  SHARED_COMPATIBLE_FROM_VERSION,
+  SHARED_IMPLEMENTATION_REVISION,
+} from "./shared/sharedVersion";
 import { PopoutActivityBarManager } from "./popout/activityBar";
 import { WorkspaceInterceptor } from "./popout/workspaceInterceptor";
 import { BUILTIN_SIDEBAR_VIEWS } from "./popout/viewRegistry";
@@ -65,9 +75,15 @@ export default class WindowSpacesPlugin extends Plugin {
     this.manager.registerExistingPopoutWindows();
 
     // 初始化 Popout 工作空間增強（Activity Bar + API 攔截器）
-    this.popoutLayout = new PopoutLayoutEngine(this.app);
+    this.popoutLayout = acquirePopoutLayoutEngine({
+      id: "window-spaces",
+      apiVersion: SHARED_API_VERSION,
+      compatibleFrom: SHARED_COMPATIBLE_FROM_VERSION,
+      implementationRevision: SHARED_IMPLEMENTATION_REVISION,
+      create: () => new PopoutLayoutEngine(this.app),
+    });
     this.activityBars = new PopoutActivityBarManager(this, this.popoutLayout);
-    this.workspaceInterceptor = new WorkspaceInterceptor(this.app);
+    this.workspaceInterceptor = new WorkspaceInterceptor(this.app, this.popoutLayout);
     this.workspaceInterceptor.enabled = this.settings.workspaceInterceptorEnabled !== false;
     // 僅對已注入 Activity Bar 且非 Obsidian UI 視窗（如設定 popout）攔截
     this.workspaceInterceptor.isManagedWindow = (win) => {
@@ -118,6 +134,8 @@ export default class WindowSpacesPlugin extends Plugin {
     if (this.autoSaveCleanup) {
       this.autoSaveCleanup();
     }
+
+    releasePopoutLayoutEngine("window-spaces");
   }
 
   refreshRibbonIcons() {
@@ -433,8 +451,13 @@ export default class WindowSpacesPlugin extends Plugin {
       this.app.workspace.on("active-leaf-change", (leaf: WorkspaceLeaf | null) => {
         this.manager.checkAndDebouncedAutoSaveAll();
         this.activityBars.updateActiveStatesAll();
-        // 當 view 的 tab 被點選/成為 active 時，若其內容未渲染則強制重新渲染
-        this.manager.ensureViewRendered(leaf);
+
+        // 等待 mousedown/mouseup/click 完成後，才檢查剛切換到的 Popout tab
+        // 是否仍是空 DOM；主視窗不走此路徑，避免 File Explorer 單擊失效。
+        const leafWindow = leaf ? getWindowOfLeaf(leaf) : null;
+        if (leaf && leafWindow && isPopoutWindow(leafWindow)) {
+          this.manager.scheduleViewRenderAfterActivation(leaf, leafWindow);
+        }
       })
     );
   }

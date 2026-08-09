@@ -1247,6 +1247,27 @@ body.is-popout-window .workspace-tab-header-spacer {
   display: none !important;
 }
 
+/* 側欄視圖內容容器：防止 Popout 側欄（all properties, tags, file explorer, outline 等）出現不必要的橫向捲軸 */
+.window-spaces-sidebar-column .view-content,
+.window-spaces-sidebar-column .tag-container,
+.window-spaces-sidebar-column .search-result-container,
+.window-spaces-sidebar-column .outgoing-link-pane,
+.window-spaces-sidebar-column .backlink-pane,
+.window-spaces-sidebar-column .workspace-leaf-content,
+.window-spaces-sidebar-column .workspace-tab-header-container-inner {
+  overflow-x: hidden !important;
+}
+
+/* Popout 右側欄：隱藏 `.mod-right-split` 欄位層級自帶的左側 col-resize handle。
+   避免使用者在 Popout 右側欄分隔線靠右側處拖曳時，觸發 mod-right-split 錯誤的 flex 縮放
+   （導致右邊框脫離 Activity Bar 並露出底層黑色背景）。隱藏後由左側相鄰欄位（中央編輯區）
+   的右側 handle 統一進行平滑縮放。 */
+.window-spaces-sidebar-column.mod-right-split > .workspace-leaf-resize-handle {
+  display: none !important;
+}
+
+
+
 /* 頂層欄位是巢狀 split（如側欄被分割成上下兩個 tab group）時，Obsidian 的
    `.workspace-split.mod-left-split/mod-right-split { flex: 0 0 auto }` 會把容器壓扁成
    width 0（sidebar 消失）。這裡用非 important 的 `flex: 1 1 0` 蓋過該規則
