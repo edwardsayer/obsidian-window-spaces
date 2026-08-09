@@ -1067,16 +1067,25 @@ body.is-popout-window.window-spaces-has-right-activity .workspace-split.mod-root
   font-size: 16px;
 }
 
-/* 左上角拖曳區：以 space 識別色套用左上→右下的對角漸層底色，
-   讓空間色在 icon 區域形成柔和的漸層光暈（同時保留 --background-secondary 基底）。 */
-body.is-popout-window.has-window-space-color .window-spaces-activity-drag {
-  background-image: linear-gradient(
-    135deg,
-    var(--window-space-color) 0%,
-    color-mix(in srgb, var(--window-space-color) 30%, transparent) 40%,
-    color-mix(in srgb, var(--window-space-color) 8%, transparent) 75%,
-    transparent 100%
-  ) !important;
+/* 在視窗左上角（space icon 區域範圍）以 space 識別色呈現「折頁」效果：
+   左上角的對角三角形實色，模擬 sticky note 的折角。
+   放在 body::before（獨立於上層 drag 元件），不受 drag 元件邊框與尺寸限制。
+   z-index 需高於 activity bar（--layer-side-dock, 10）才能浮在 icon 之上、
+   呈現透明的疊層；同時低於邊框 ::after（999999）以免遮住邊框。 */
+body.is-popout-window.has-window-space-color::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 24px;
+  height: 18px;
+  background: linear-gradient(
+    to bottom right,
+    var(--window-space-color) 50%,
+    transparent 50.5%
+  );
+  pointer-events: none;
+  z-index: 100;
 }
 
 /* Popout 視窗 4 邊全方向自訂主題顏色邊框 (使用 fixed ::after 頂層 inset box-shadow 覆蓋，動態適應各 OS/主題之視窗圓角) */
