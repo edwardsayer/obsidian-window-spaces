@@ -628,6 +628,94 @@ describe("PopoutActivityBarManager toggle behavior", () => {
     document.body.removeChild(rootEl);
   });
 
+  test("deferred sync re-applies sidebar classes after Obsidian rebuilds a tab group", async () => {
+    const rootEl = document.createElement("div");
+    rootEl.classList.add("workspace-split", "mod-root");
+
+    const leftColEl = document.createElement("div");
+    leftColEl.classList.add("workspace-tabs");
+    const leftLeafEl = document.createElement("div");
+    leftColEl.appendChild(leftLeafEl);
+    rootEl.appendChild(leftColEl);
+
+    const centerColEl = document.createElement("div");
+    centerColEl.classList.add("workspace-tabs");
+    const centerLeafEl = document.createElement("div");
+    centerColEl.appendChild(centerLeafEl);
+    rootEl.appendChild(centerColEl);
+
+    const rightSplitEl = document.createElement("div");
+    rightSplitEl.classList.add("workspace-split", "mod-horizontal");
+    const rightTabsEl = document.createElement("div");
+    rightTabsEl.classList.add("workspace-tabs");
+    const rightLeafEl = document.createElement("div");
+    rightTabsEl.appendChild(rightLeafEl);
+    rightSplitEl.appendChild(rightTabsEl);
+    rootEl.appendChild(rightSplitEl);
+    document.body.appendChild(rootEl);
+
+    const leftLeaf = { containerEl: leftLeafEl, view: { containerEl: leftLeafEl } } as any;
+    const centerLeaf = { containerEl: centerLeafEl, view: { containerEl: centerLeafEl } } as any;
+    const rightLeaf = { containerEl: rightLeafEl, view: { containerEl: rightLeafEl } } as any;
+
+    const workspace = {
+      iterateAllLeaves: (cb: (leaf: any) => void) => {
+        cb(leftLeaf);
+        cb(centerLeaf);
+        cb(rightLeaf);
+      },
+      revealLeaf: vi.fn().mockResolvedValue(undefined),
+      setActiveLeaf: vi.fn(),
+    } as any;
+    const app = { workspace } as any;
+    const engine = new PopoutLayoutEngine(app);
+    const manager = new PopoutActivityBarManager(
+      {
+        app,
+        settings: { showActivityBars: true, activityBars: { left: [], right: [] } },
+      } as any,
+      engine
+    );
+
+    const bars = {
+      left: document.createElement("div"),
+      right: document.createElement("div"),
+      viewButtons: new Map(),
+      columnButtons: {
+        left: document.createElement("button"),
+        right: document.createElement("button"),
+      },
+    } as any;
+    (manager as any).barsByWindow.set(window, bars);
+
+    // 透過 updateActiveStates 觸發首次 sync + 排程 deferred rAF sync
+    (manager as any).updateActiveStates(window);
+    expect(rightSplitEl.classList.contains("mod-right-split")).toBe(true);
+
+    // 模擬 Obsidian 拖 tab 後重建：新增一個沒有 sidebar class 的 tab group，
+    // 且不再手動呼叫 sync（只有先前排程的 deferred sync 會執行）
+    const newTabsEl = document.createElement("div");
+    newTabsEl.classList.add("workspace-tabs");
+    const newLeafEl = document.createElement("div");
+    newTabsEl.appendChild(newLeafEl);
+    rightSplitEl.appendChild(newTabsEl);
+    const newLeaf = { containerEl: newLeafEl, view: { containerEl: newLeafEl } } as any;
+    (workspace.iterateAllLeaves as any) = (cb: (leaf: any) => void) => {
+      cb(leftLeaf);
+      cb(centerLeaf);
+      cb(rightLeaf);
+      cb(newLeaf);
+    };
+
+    // 等待 deferred rAF sync（2 幀後）執行完畢
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(newTabsEl.classList.contains("mod-sidedock")).toBe(true);
+    expect(newTabsEl.classList.contains("mod-right-split")).toBe(true);
+
+    document.body.removeChild(rootEl);
+  });
+
   test("view button hides the sidebar when its view is displayed even if another view is workspace-active", async () => {
     const { manager, win, rightColEl, bookmarksLeaf, tagLeaf } = buildManager();
     // 模擬：使用者先點擊側欄外的 view（center 為 workspace active），bookmarks 的 tab

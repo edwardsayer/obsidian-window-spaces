@@ -262,6 +262,10 @@ export class PopoutActivityBarManager {
     if (!bars) return;
 
     this.syncSidebarColumnClasses(win);
+    // 拖曳 tab 後 Obsidian 會非同步重建頂層欄位結構（例如把 workspace-tabs 拆成
+    // 巢狀 workspace-split），且可能在 layout-change 事件之後才完成。因此延遲到
+    // 下一幀再重新同步一次，確保新產生的容器 / tab group 也套用到 sidebar class。
+    this.scheduleDeferredSync(win);
 
     bars.viewButtons.forEach((btn, viewType) => {
       // 以按鈕所屬的 bar 判定側（同側的 view 按鈕只反映自己側欄的狀態）
@@ -341,6 +345,28 @@ export class PopoutActivityBarManager {
       return [columnEl];
     }
     return Array.from(columnEl.querySelectorAll<HTMLElement>(".workspace-tabs"));
+  }
+
+  /**
+   * 於下一幀重新同步 sidebar class。Obsidian 拖曳 tab 時會非同步重建頂層欄位
+   * 結構（例如把單一 workspace-tabs 拆成巢狀 workspace-split），重建可能在
+   * layout-change 事件之後才完成；此延遲確保新節點也能套用到 sidebar 樣式，
+   * 避免 sidebar 視覺樣式在拖曳後失效。
+   */
+  private scheduleDeferredSync(win: Window): void {
+    const raf =
+      (win && typeof win.requestAnimationFrame === "function" ? win.requestAnimationFrame : window.requestAnimationFrame).bind(
+        win && typeof win.requestAnimationFrame === "function" ? win : window
+      );
+    raf(() => {
+      if (win.closed) return;
+      raf(() => {
+        if (win.closed) return;
+        if (this.barsByWindow.has(win)) {
+          this.syncSidebarColumnClasses(win);
+        }
+      });
+    });
   }
 
   /** DOM fallback：側欄中頁籤若無 icon（部分情境 Obsidian 不渲染），補上 icon。 */

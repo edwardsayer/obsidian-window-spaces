@@ -502,7 +502,7 @@ export class WindowLayoutManager {
         layout.color = existing.color;
       }
 
-      this.plugin.openSaveLayoutModal(layout);
+      this.plugin.openSaveLayoutModal(layout, targetWin);
     } catch (error: unknown) {
       console.error("Failed to capture layout from Popout:", error);
       const message = error instanceof Error ? error.message : String(error);

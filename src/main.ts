@@ -249,7 +249,7 @@ export default class WindowSpacesPlugin extends Plugin {
     this.activityBars.updateActiveStates(win);
   }
 
-  openSaveLayoutModal(layout: WindowLayout) {
+  openSaveLayoutModal(layout: WindowLayout, targetWindow?: Window) {
     const modal = new SaveLayoutModal(
       this.app,
       this,
@@ -265,13 +265,21 @@ export default class WindowSpacesPlugin extends Plugin {
         })();
       }
     );
+    // Popout 視窗開啟儲存對話框時，Obsidian 的 Modal.open() 預設掛載到 main window 的
+    // document.body（plugin 的 JS realm 在主視窗，讀取的 activeWindow 也是主視窗），
+    // 導致對話框被 popout 蓋住、看不到。此處明確將 modal 容器掛載到目標視窗的 body，
+    // 讓對話框在使用者所在（點擊 Save 的）popout 最上層顯示。
+    if (targetWindow && targetWindow !== window) {
+      (modal as unknown as { open(parent?: HTMLElement): void }).open(targetWindow.document.body);
+      return;
+    }
     modal.open();
   }
 
   async openSaveCurrentLayoutModal(targetWindow?: Window): Promise<void> {
     try {
       const layout = await this.manager.captureCurrentLayout({}, targetWindow);
-      this.openSaveLayoutModal(layout);
+      this.openSaveLayoutModal(layout, targetWindow);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       new Notice(`${t("errors.failedToSave")}: ${message}`);

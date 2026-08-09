@@ -2828,7 +2828,7 @@ class WindowLayoutManager {
                     layout.icon = existing.icon;
                     layout.color = existing.color;
                 }
-                this.plugin.openSaveLayoutModal(layout);
+                this.plugin.openSaveLayoutModal(layout, targetWin);
             }
             catch (error) {
                 console.error("Failed to capture layout from Popout:", error);
@@ -6146,6 +6146,10 @@ class PopoutActivityBarManager {
         if (!bars)
             return;
         this.syncSidebarColumnClasses(win);
+        // 拖曳 tab 後 Obsidian 會非同步重建頂層欄位結構（例如把 workspace-tabs 拆成
+        // 巢狀 workspace-split），且可能在 layout-change 事件之後才完成。因此延遲到
+        // 下一幀再重新同步一次，確保新產生的容器 / tab group 也套用到 sidebar class。
+        this.scheduleDeferredSync(win);
         bars.viewButtons.forEach((btn, viewType) => {
             // 以按鈕所屬的 bar 判定側（同側的 view 按鈕只反映自己側欄的狀態）
             const side = bars.left.contains(btn) ? "left" : "right";
@@ -6219,6 +6223,26 @@ class PopoutActivityBarManager {
             return [columnEl];
         }
         return Array.from(columnEl.querySelectorAll(".workspace-tabs"));
+    }
+    /**
+     * 於下一幀重新同步 sidebar class。Obsidian 拖曳 tab 時會非同步重建頂層欄位
+     * 結構（例如把單一 workspace-tabs 拆成巢狀 workspace-split），重建可能在
+     * layout-change 事件之後才完成；此延遲確保新節點也能套用到 sidebar 樣式，
+     * 避免 sidebar 視覺樣式在拖曳後失效。
+     */
+    scheduleDeferredSync(win) {
+        const raf = (win && typeof win.requestAnimationFrame === "function" ? win.requestAnimationFrame : window.requestAnimationFrame).bind(win && typeof win.requestAnimationFrame === "function" ? win : window);
+        raf(() => {
+            if (win.closed)
+                return;
+            raf(() => {
+                if (win.closed)
+                    return;
+                if (this.barsByWindow.has(win)) {
+                    this.syncSidebarColumnClasses(win);
+                }
+            });
+        });
     }
     /** DOM fallback：側欄中頁籤若無 icon（部分情境 Obsidian 不渲染），補上 icon。 */
     ensureSidebarFileTabIcons(win, columnEl) {
@@ -6668,7 +6692,7 @@ class WindowSpacesPlugin extends obsidian.Plugin {
         }
         this.activityBars.updateActiveStates(win);
     }
-    openSaveLayoutModal(layout) {
+    openSaveLayoutModal(layout, targetWindow) {
         const modal = new SaveLayoutModal(this.app, this, layout, (savedLayout) => {
             void (() => __awaiter(this, void 0, void 0, function* () {
                 try {
@@ -6680,13 +6704,21 @@ class WindowSpacesPlugin extends obsidian.Plugin {
                 }
             }))();
         });
+        // Popout 視窗開啟儲存對話框時，Obsidian 的 Modal.open() 預設掛載到 main window 的
+        // document.body（plugin 的 JS realm 在主視窗，讀取的 activeWindow 也是主視窗），
+        // 導致對話框被 popout 蓋住、看不到。此處明確將 modal 容器掛載到目標視窗的 body，
+        // 讓對話框在使用者所在（點擊 Save 的）popout 最上層顯示。
+        if (targetWindow && targetWindow !== window) {
+            modal.open(targetWindow.document.body);
+            return;
+        }
         modal.open();
     }
     openSaveCurrentLayoutModal(targetWindow) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 const layout = yield this.manager.captureCurrentLayout({}, targetWindow);
-                this.openSaveLayoutModal(layout);
+                this.openSaveLayoutModal(layout, targetWindow);
             }
             catch (error) {
                 const message = error instanceof Error ? error.message : String(error);

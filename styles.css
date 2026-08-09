@@ -1067,6 +1067,18 @@ body.is-popout-window.window-spaces-has-right-activity .workspace-split.mod-root
   font-size: 16px;
 }
 
+/* 左上角拖曳區：以 space 識別色套用左上→右下的對角漸層底色，
+   讓空間色在 icon 區域形成柔和的漸層光暈（同時保留 --background-secondary 基底）。 */
+body.is-popout-window.has-window-space-color .window-spaces-activity-drag {
+  background-image: linear-gradient(
+    135deg,
+    var(--window-space-color) 0%,
+    color-mix(in srgb, var(--window-space-color) 30%, transparent) 40%,
+    color-mix(in srgb, var(--window-space-color) 8%, transparent) 75%,
+    transparent 100%
+  ) !important;
+}
+
 /* Popout 視窗 4 邊全方向自訂主題顏色邊框 (使用 fixed ::after 頂層 inset box-shadow 覆蓋，動態適應各 OS/主題之視窗圓角) */
 body.is-popout-window.has-window-space-color::after {
   content: "";
@@ -1078,7 +1090,10 @@ body.is-popout-window.has-window-space-color::after {
   box-shadow: inset 0 0 0 3px var(--window-space-color) !important;
   pointer-events: none !important;
   z-index: 999999 !important;
-  border-radius: inherit;
+  /* 視窗本身由 OS（Windows 11 DWM）套用圓角，若 ::after 維持直角會讓四個角落
+     的邊框被圓角裁切、角落看不到顏色。此處以相同圓角讓邊框沿角落弧線延伸。
+     預設 8px 對應 Windows 11 frameless 視窗圓角，可依 OS/主題調整。 */
+  border-radius: var(--window-space-corner-radius, 8px) !important;
 }
 
 body.is-popout-window.has-window-space-color .window-spaces-activity-left {
@@ -1157,6 +1172,15 @@ body.is-popout-window .workspace-tab-header-spacer {
    讓其上層的 `--background-secondary` 透出，與主視窗側欄一致。 */
 .window-spaces-sidebar-column .workspace-leaf-content .view-content {
   background-color: transparent;
+}
+
+/* 隱藏側欄 view 的標準標題列（黑色 View 名稱列）。主視窗側欄是獨立的
+   `.workspace-split.mod-left-split/mod-right-split`，Obsidian 用
+   `.workspace-split.mod-left-split .view-header { display: none }` 隱藏；
+   popout 的側欄欄位可能是 `.workspace-tabs`（非 split），該規則不命中，
+   因此這裡統一以 `.window-spaces-sidebar-column` 為錨點隱藏。 */
+.window-spaces-sidebar-column .view-header {
+  display: none !important;
 }
 
 /* 頂層欄位是巢狀 split（如側欄被分割成上下兩個 tab group）時，Obsidian 的
