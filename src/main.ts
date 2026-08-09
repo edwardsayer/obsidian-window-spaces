@@ -423,6 +423,7 @@ export default class WindowSpacesPlugin extends Plugin {
     // 監聽 Workspace 分頁與佈局變化（用於特定 Layout 的 5 秒 Debounced 自動儲存）
     this.registerEvent(
       this.app.workspace.on("layout-change", () => {
+        this.manager.matchUnlabeledPopoutWindows();
         this.manager.checkAndDebouncedAutoSaveAll();
         this.activityBars.refreshAll();
       })

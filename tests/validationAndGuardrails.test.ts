@@ -716,4 +716,157 @@ describe("Validation & Auto-Save Guardrails (validationAndGuardrails.test.ts)", 
     expect(noticeSpy).not.toHaveBeenCalled();
     noticeSpy.mockRestore();
   });
+
+  test("matchUnlabeledPopoutWindows automatically identifies popout space names on startup matching open leaves/files", () => {
+    const createMockPopout = (file: string, id: string) => {
+      const attributes = new Map<string, string>();
+      const body = {
+        classList: { contains: (cls: string) => cls === "is-popout-window" },
+        getAttribute: (attr: string) => attributes.get(attr) || null,
+        setAttribute: (attr: string, val: string) => attributes.set(attr, val),
+        querySelectorAll: () => [],
+        createDiv: () => document.createElement("div"),
+      };
+      const win: any = {
+        outerWidth: 1000,
+        outerHeight: 800,
+        setTimeout: (cb: () => void) => {
+          cb();
+          return 0;
+        },
+      };
+      const doc: any = {
+        body,
+        defaultView: win,
+      };
+      win.document = doc;
+
+      const leafEl = { ownerDocument: doc };
+      const leaf = {
+        containerEl: leafEl,
+        id,
+        getViewState: () => ({
+          type: "markdown",
+          state: { file },
+        }),
+      };
+      return { win: win as Window, leaf, doc, body };
+    };
+
+    const pop1 = createMockPopout("projectA/note1.md", "leaf-p1");
+    const pop2 = createMockPopout("projectB/note2.md", "leaf-p2");
+
+    mockPlugin.app.workspace.iterateAllLeaves = (cb: (leaf: any) => void) => {
+      cb(pop1.leaf);
+      cb(pop2.leaf);
+    };
+
+    mockPlugin.settings.spaces = [
+      {
+        id: "space-alpha",
+        name: "Alpha Workspace",
+        timestamp: 1000,
+        windowState: { size: { width: 1000, height: 800 } },
+        workspace: {
+          layout: {},
+          leaves: [
+            {
+              id: "leaf-p1",
+              type: "markdown",
+              state: { file: "projectA/note1.md" },
+            },
+          ],
+        },
+        metadata: { fileCount: 1, tabCount: 1, splitCount: 0 },
+      },
+      {
+        id: "space-beta",
+        name: "Beta Workspace",
+        timestamp: 2000,
+        windowState: { size: { width: 1000, height: 800 } },
+        workspace: {
+          layout: {},
+          leaves: [
+            {
+              id: "leaf-p2",
+              type: "markdown",
+              state: { file: "projectB/note2.md" },
+            },
+          ],
+        },
+        metadata: { fileCount: 1, tabCount: 1, splitCount: 0 },
+      },
+    ];
+
+    manager.matchUnlabeledPopoutWindows();
+
+    expect(manager.getLayoutNameForWindow(pop1.win)).toBe("Alpha Workspace");
+    expect(manager.getLayoutNameForWindow(pop2.win)).toBe("Beta Workspace");
+    expect(pop1.body.getAttribute("data-layout-name")).toBe("Alpha Workspace");
+    expect(pop2.body.getAttribute("data-layout-name")).toBe("Beta Workspace");
+  });
+
+  test("matchUnlabeledPopoutWindows does not overwrite existing space names or match zero-score windows", () => {
+    const createMockPopout = (file: string, id: string, initialName?: string) => {
+      const attributes = new Map<string, string>();
+      if (initialName) attributes.set("data-layout-name", initialName);
+      const body = {
+        classList: { contains: (cls: string) => cls === "is-popout-window" },
+        getAttribute: (attr: string) => attributes.get(attr) || null,
+        setAttribute: (attr: string, val: string) => attributes.set(attr, val),
+        querySelectorAll: () => [],
+        createDiv: () => document.createElement("div"),
+      };
+      const win: any = {
+        outerWidth: 1000,
+        outerHeight: 800,
+        setTimeout: (cb: () => void) => {
+          cb();
+          return 0;
+        },
+      };
+      const doc: any = {
+        body,
+        defaultView: win,
+      };
+      win.document = doc;
+
+      const leafEl = { ownerDocument: doc };
+      const leaf = {
+        containerEl: leafEl,
+        id,
+        getViewState: () => ({
+          type: "markdown",
+          state: { file },
+        }),
+      };
+      return { win: win as Window, leaf, doc, body };
+    };
+
+    const pop1 = createMockPopout("existing.md", "leaf-existing", "Existing Space");
+    const pop2 = createMockPopout("unknown.md", "leaf-unknown");
+
+    mockPlugin.app.workspace.iterateAllLeaves = (cb: (leaf: any) => void) => {
+      cb(pop1.leaf);
+      cb(pop2.leaf);
+    };
+
+    mockPlugin.settings.spaces = [
+      {
+        id: "space-gamma",
+        name: "Gamma Space",
+        timestamp: 1000,
+        workspace: {
+          layout: {},
+          leaves: [{ id: "leaf-other", type: "markdown", state: { file: "other.md" } }],
+        },
+        metadata: { fileCount: 1, tabCount: 1, splitCount: 0 },
+      },
+    ];
+
+    manager.matchUnlabeledPopoutWindows();
+
+    expect(manager.getLayoutNameForWindow(pop1.win)).toBe("Existing Space");
+    expect(manager.getLayoutNameForWindow(pop2.win)).toBeNull();
+  });
 });
