@@ -1375,7 +1375,7 @@ class WindowLayoutsModal extends obsidian.Modal {
             this.initialSearchQuery = undefined;
         }
         this.clearSearchBtn = searchContainer.createDiv("window-layouts-search-clear");
-        obsidian.setIcon(this.clearSearchBtn, "x");
+        this.clearSearchBtn.setAttribute("aria-label", t("manageModal.clearSearch") || "Clear search");
         obsidian.setTooltip(this.clearSearchBtn, t("manageModal.clearSearch") || "Clear search");
         this.clearSearchBtn.onclick = (e) => {
             e.stopPropagation();
@@ -6089,15 +6089,36 @@ class PopoutActivityBarManager {
         return (_b = (_a = this.settings.activityBars) === null || _a === void 0 ? void 0 : _a[side]) !== null && _b !== void 0 ? _b : [];
     }
     /**
-     * 套用 sidebar toggle icon（設計階段決定的靜態 Lucide icon，與主視窗一致）：
-     * - 欄位開啟（可收合）：`panel-left` / `panel-right`
-     * - 欄位隱藏（可展開）：`panel-left-open` / `panel-right-open`
+     * 套用 sidebar toggle icon（對齊 Obsidian 主視窗原生按鈕 SVG 結構與 CSS）：
+     * 包含外框 <rect> 與內部側欄指示條 <rect class="sidebar-toggle-icon-inner">，
+     * 透過 mod-left / mod-right 與 is-open / is-collapsed 類別控制側欄開合狀態與方向。
      */
     applySidebarToggleIcon(btn, side, hidden) {
-        const openIcon = side === "left" ? "panel-left" : "panel-right";
-        const closedIcon = side === "left" ? "panel-left-open" : "panel-right-open";
-        if (!setIconWithCheck(btn, hidden ? closedIcon : openIcon)) {
-            obsidian.setIcon(btn, openIcon);
+        btn.classList.add("window-spaces-sidebar-toggle-btn");
+        btn.classList.toggle("mod-left", side === "left");
+        btn.classList.toggle("mod-right", side === "right");
+        btn.classList.toggle("is-collapsed", hidden);
+        btn.classList.toggle("is-open", !hidden);
+        let svg = btn.querySelector("svg.sidebar-toggle-button-icon");
+        if (!svg) {
+            btn.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon sidebar-toggle-button-icon">
+          <rect x="1" y="2" width="22" height="20" rx="4"></rect>
+          <rect x="4" y="5" width="2" height="14" rx="2" fill="currentColor" class="sidebar-toggle-icon-inner"></rect>
+        </svg>
+      `.trim();
+            svg = btn.querySelector("svg.sidebar-toggle-button-icon");
+        }
+        const innerRect = svg === null || svg === void 0 ? void 0 : svg.querySelector(".sidebar-toggle-icon-inner");
+        if (innerRect) {
+            if (hidden) {
+                innerRect.setAttribute("width", "2");
+                innerRect.style.setProperty("width", "var(--sidebar-left-toggle-inner-width, 8.33%)");
+            }
+            else {
+                innerRect.setAttribute("width", "5.76");
+                innerRect.style.setProperty("width", "var(--sidebar-left-toggle-inner-width-open, 24%)");
+            }
         }
     }
     /** 針對單一 Popout 注入（若已注入且仍連接著 DOM 則重新渲染按鈕）。 */

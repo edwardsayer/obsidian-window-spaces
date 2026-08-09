@@ -333,30 +333,50 @@
 .window-layouts-modal .window-layouts-search-container input[type="search"] {
   width: 100%;
   box-sizing: border-box;
-  padding-left: 28px !important;
-  padding-right: 36px !important;
+  height: var(--input-height);
+  min-height: 0;
+  padding: var(--input-padding);
+  padding-left: calc(var(--search-icon-size) * 2 - 2px);
+  padding-right: 36px;
+  border-radius: var(--search-input-radius);
+  background: var(--background-modifier-form-field);
+  border: var(--input-border-width) solid var(--background-modifier-border);
 }
 
 .window-layouts-modal .window-layouts-search-clear {
   position: absolute;
-  right: 8px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 20px;
-  height: 20px;
+  top: 0px;
+  bottom: 0px;
+  inset-inline-end: 2px;
+  margin: auto;
+  width: 28px;
+  height: var(--input-height);
   border-radius: 50%;
-  display: none;
+  display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
-  color: var(--text-muted);
+  cursor: var(--cursor);
+  color: var(--search-clear-button-color, var(--text-muted));
   background-color: transparent;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  border: none;
+  padding: 0;
+  line-height: 0;
+  text-align: center;
+  transition: color var(--anim-duration-fast, 140ms) ease-in-out;
   z-index: 2;
 }
 
+.window-layouts-modal .window-layouts-search-clear::after {
+  content: "";
+  display: block;
+  width: var(--search-clear-button-size, 13px);
+  height: var(--search-clear-button-size, 13px);
+  background-color: currentcolor;
+  -webkit-mask-image: url("data:image/svg+xml,<svg viewBox='0 0 12 12' fill='none' xmlns='http://www.w3.org/2000/svg'><path fill-rule='evenodd' clip-rule='evenodd' d='M6 12C9.31371 12 12 9.31371 12 6C12 2.68629 9.31371 0 6 0C2.68629 0 0 2.68629 0 6C0 9.31371 2.68629 12 6 12ZM3.8705 3.09766L6.00003 5.22718L8.12955 3.09766L8.9024 3.8705L6.77287 6.00003L8.9024 8.12955L8.12955 8.9024L6.00003 6.77287L3.8705 8.9024L3.09766 8.12955L5.22718 6.00003L3.09766 3.8705L3.8705 3.09766Z' fill='currentColor'/></svg>");
+  mask-image: url("data:image/svg+xml,<svg viewBox='0 0 12 12' fill='none' xmlns='http://www.w3.org/2000/svg'><path fill-rule='evenodd' clip-rule='evenodd' d='M6 12C9.31371 12 12 9.31371 12 6C12 2.68629 9.31371 0 6 0C2.68629 0 0 2.68629 0 6C0 9.31371 2.68629 12 6 12ZM3.8705 3.09766L6.00003 5.22718L8.12955 3.09766L8.9024 3.8705L6.77287 6.00003L8.9024 8.12955L8.12955 8.9024L6.00003 6.77287L3.8705 8.9024L3.09766 8.12955L5.22718 6.00003L3.09766 3.8705L3.8705 3.09766Z' fill='currentColor'/></svg>");
+}
+
 .window-layouts-modal .window-layouts-search-clear:hover {
-  background-color: var(--background-modifier-hover);
   color: var(--text-normal);
 }
 
@@ -448,7 +468,9 @@
   flex-wrap: nowrap;
   max-width: 100%;
   box-sizing: border-box;
-  overflow-x: hidden;
+  /* overflow-x: clip keeps horizontal clipping without forcing the Y axis to
+     auto (which would clip the focused input's focus ring on the top edge). */
+  overflow-x: clip;
   flex-shrink: 0 !important;
   min-height: 32px;
 }
@@ -1156,6 +1178,39 @@ body.is-popout-window .workspace-tab-header-spacer {
 .window-spaces-activity-btn svg {
   width: var(--icon-s, 16px);
   height: var(--icon-s, 16px);
+}
+
+/* Popout Activity Bar Native Sidebar Toggle Button Styling */
+.window-spaces-sidebar-toggle-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.window-spaces-sidebar-toggle-btn .sidebar-toggle-icon-inner {
+  stroke: none;
+  transition: width 0.15s ease;
+}
+
+.window-spaces-sidebar-toggle-btn.mod-left .sidebar-toggle-icon-inner {
+  width: var(--sidebar-left-toggle-inner-width, 8.33%);
+}
+
+.window-spaces-sidebar-toggle-btn.mod-left.is-open .sidebar-toggle-icon-inner {
+  width: var(--sidebar-left-toggle-inner-width-open, 24%);
+}
+
+.window-spaces-sidebar-toggle-btn.mod-right svg {
+  transform: scale(-1, 1);
+}
+
+.window-spaces-sidebar-toggle-btn.mod-right .sidebar-toggle-icon-inner {
+  width: var(--sidebar-right-toggle-inner-width, 8.33%);
+}
+
+.window-spaces-sidebar-toggle-btn.mod-right.is-open .sidebar-toggle-icon-inner {
+  width: var(--sidebar-right-toggle-inner-width-open, 24%);
 }
 
 /* 固定控制與 view 按鈕之間的分隔線 */
