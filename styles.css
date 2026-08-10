@@ -1497,11 +1497,3 @@ body.is-popout-window .workspace-tab-header-spacer {
   gap: 8px;
 }
 
-/* Restore 期間的視覺遮罩，避免出現兩階段鋸齒 jump 與全域重繪閃爍 */
-html.is-restoring-layout,
-body.is-restoring-layout {
-  opacity: 0 !important;
-  pointer-events: none !important;
-  transition: opacity 0.15s ease-out !important;
-}
-

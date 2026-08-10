@@ -44,42 +44,6 @@ export class WindowLayoutManager {
     this.app = plugin.app;
   }
 
-  /** 在 Popout 建立與 Restore 期間套用視覺透明遮罩，消除兩階段鋸齒 jump 與全域重繪閃爍。 */
-  maskWindowVisually(win: Window): void {
-    if (!win || !win.document?.documentElement) return;
-    try {
-      const el = win.document.documentElement;
-      el.classList.add("is-restoring-layout");
-      const extWin = win as unknown as { _windowSpacesUnmaskTimer?: number };
-      if (!extWin._windowSpacesUnmaskTimer) {
-        extWin._windowSpacesUnmaskTimer = win.setTimeout(() => {
-          this.unmaskWindowVisually(win);
-        }, 3000);
-      }
-    } catch {
-      // Ignore mask error
-    }
-  }
-
-  /** 在雙重 rAF 影格繪製同步後解鎖視覺透明遮罩，實現滑順淡入。 */
-  unmaskWindowVisually(win: Window): void {
-    if (!win || !win.document?.documentElement) return;
-    try {
-      const extWin = win as unknown as { _windowSpacesUnmaskTimer?: number };
-      if (extWin._windowSpacesUnmaskTimer) {
-        win.clearTimeout(extWin._windowSpacesUnmaskTimer);
-        delete extWin._windowSpacesUnmaskTimer;
-      }
-      win.requestAnimationFrame(() => {
-        win.requestAnimationFrame(() => {
-          win.document?.documentElement?.classList?.remove("is-restoring-layout");
-        });
-      });
-    } catch {
-      // Ignore unmask error
-    }
-  }
-
   /** 記錄 Obsidian 建立的 Popout，供 label 與 title 生命週期管理使用。 */
   registerPopoutWindow(targetWin: Window): void {
     if (!targetWin) return;
@@ -1286,7 +1250,6 @@ export class WindowLayoutManager {
           targetWin,
           floatingWindows
         );
-        this.maskWindowVisually(targetWin);
       } else if (savedLeafId && floatingWindows.length > 0) {
         for (let i = 0; i < floatingWindows.length; i++) {
           if (this.floatingWindowContainsLeaf(floatingWindows[i], savedLeafId)) {
@@ -1297,9 +1260,6 @@ export class WindowLayoutManager {
 
         const existingTargetLeaf = this.findLeafById(savedLeafId);
         targetWin = this.getWindowForLeaf(existingTargetLeaf);
-        if (targetWin) {
-          this.maskWindowVisually(targetWin);
-        }
       }
 
       // 2. 若找不到現有視窗，且非明確指定取代的 Popout 視窗，建立一個新 Popout 視窗
@@ -1312,7 +1272,6 @@ export class WindowLayoutManager {
           if (targetIndex < 0) {
             throw new Error(t("errors.cannotRestore"));
           }
-          this.maskWindowVisually(targetWin);
         } else {
           // 記錄開啟前的 Popout 視窗集合
           const popoutWinsBefore = new Set(this.getLivePopoutWindows());
@@ -1334,8 +1293,7 @@ export class WindowLayoutManager {
           targetWin = newlyCreatedWin || extPopoutLeaf?.containerEl?.ownerDocument?.defaultView || null;
 
           if (targetWin) {
-            // 【幾何前置 & 遮罩】新視窗一誕生立即進行座標移動/尺寸縮放並套用遮罩，消弭兩階段鋸齒 jump
-            this.maskWindowVisually(targetWin);
+            // 【幾何前置】新視窗一誕生立即進行座標移動與尺寸縮放，消弭兩階段鋸齒 jump
             this.restoreWindowGeometry(targetWin, layout.windowState, layout.includeGeometry);
           }
 
@@ -1436,9 +1394,6 @@ export class WindowLayoutManager {
             console.warn("Failed to focus target window:", e);
           }
         }
-
-        // 於 DOM 繪製與狀態就緒後解除遮罩，淡入登場
-        this.unmaskWindowVisually(targetWin);
       }
 
       this.setLayoutLabelForWindow(targetWin, layout.name);

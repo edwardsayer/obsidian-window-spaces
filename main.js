@@ -2455,47 +2455,6 @@ class WindowLayoutManager {
         this.plugin = plugin;
         this.app = plugin.app;
     }
-    /** 在 Popout 建立與 Restore 期間套用視覺透明遮罩，消除兩階段鋸齒 jump 與全域重繪閃爍。 */
-    maskWindowVisually(win) {
-        var _a;
-        if (!win || !((_a = win.document) === null || _a === void 0 ? void 0 : _a.documentElement))
-            return;
-        try {
-            const el = win.document.documentElement;
-            el.classList.add("is-restoring-layout");
-            const extWin = win;
-            if (!extWin._windowSpacesUnmaskTimer) {
-                extWin._windowSpacesUnmaskTimer = win.setTimeout(() => {
-                    this.unmaskWindowVisually(win);
-                }, 3000);
-            }
-        }
-        catch (_b) {
-            // Ignore mask error
-        }
-    }
-    /** 在雙重 rAF 影格繪製同步後解鎖視覺透明遮罩，實現滑順淡入。 */
-    unmaskWindowVisually(win) {
-        var _a;
-        if (!win || !((_a = win.document) === null || _a === void 0 ? void 0 : _a.documentElement))
-            return;
-        try {
-            const extWin = win;
-            if (extWin._windowSpacesUnmaskTimer) {
-                win.clearTimeout(extWin._windowSpacesUnmaskTimer);
-                delete extWin._windowSpacesUnmaskTimer;
-            }
-            win.requestAnimationFrame(() => {
-                win.requestAnimationFrame(() => {
-                    var _a, _b, _c;
-                    (_c = (_b = (_a = win.document) === null || _a === void 0 ? void 0 : _a.documentElement) === null || _b === void 0 ? void 0 : _b.classList) === null || _c === void 0 ? void 0 : _c.remove("is-restoring-layout");
-                });
-            });
-        }
-        catch (_b) {
-            // Ignore unmask error
-        }
-    }
     /** 記錄 Obsidian 建立的 Popout，供 label 與 title 生命週期管理使用。 */
     registerPopoutWindow(targetWin) {
         if (!targetWin)
@@ -3557,7 +3516,6 @@ class WindowLayoutManager {
                     // 優先還原至傳入的當前 Popout 視窗 (取代當前視窗)
                     targetWin = options.targetWindow;
                     targetIndex = this.findFloatingWindowIndexForWindow(targetWin, floatingWindows);
-                    this.maskWindowVisually(targetWin);
                 }
                 else if (savedLeafId && floatingWindows.length > 0) {
                     for (let i = 0; i < floatingWindows.length; i++) {
@@ -3568,9 +3526,6 @@ class WindowLayoutManager {
                     }
                     const existingTargetLeaf = this.findLeafById(savedLeafId);
                     targetWin = this.getWindowForLeaf(existingTargetLeaf);
-                    if (targetWin) {
-                        this.maskWindowVisually(targetWin);
-                    }
                 }
                 // 2. 若找不到現有視窗，且非明確指定取代的 Popout 視窗，建立一個新 Popout 視窗
                 if (targetIndex < 0) {
@@ -3582,7 +3537,6 @@ class WindowLayoutManager {
                         if (targetIndex < 0) {
                             throw new Error(t("errors.cannotRestore"));
                         }
-                        this.maskWindowVisually(targetWin);
                     }
                     else {
                         // 記錄開啟前的 Popout 視窗集合
@@ -3602,8 +3556,7 @@ class WindowLayoutManager {
                         const extPopoutLeaf = popoutLeaf;
                         targetWin = newlyCreatedWin || ((_e = (_d = extPopoutLeaf === null || extPopoutLeaf === void 0 ? void 0 : extPopoutLeaf.containerEl) === null || _d === void 0 ? void 0 : _d.ownerDocument) === null || _e === void 0 ? void 0 : _e.defaultView) || null;
                         if (targetWin) {
-                            // 【幾何前置 & 遮罩】新視窗一誕生立即進行座標移動/尺寸縮放並套用遮罩，消弭兩階段鋸齒 jump
-                            this.maskWindowVisually(targetWin);
+                            // 【幾何前置】新視窗一誕生立即進行座標移動與尺寸縮放，消弭兩階段鋸齒 jump
                             this.restoreWindowGeometry(targetWin, layout.windowState, layout.includeGeometry);
                         }
                         // 重新讀取最新的 Layout
@@ -3683,8 +3636,6 @@ class WindowLayoutManager {
                             console.warn("Failed to focus target window:", e);
                         }
                     }
-                    // 於 DOM 繪製與狀態就緒後解除遮罩，淡入登場
-                    this.unmaskWindowVisually(targetWin);
                 }
                 this.setLayoutLabelForWindow(targetWin, layout.name);
                 this.restorePreservedWindowLabels(preservedWindowLayouts, targetWin);
