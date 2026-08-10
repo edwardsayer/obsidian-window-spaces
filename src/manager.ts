@@ -1389,7 +1389,7 @@ export class WindowLayoutManager {
       // 5. 調整視窗尺寸與座標，並聚焦視窗
       if (targetWin) {
         this.layoutWindows.set(layout, targetWin);
-        this.restoreWindowGeometry(targetWin, layout.windowState, layout.includeGeometry, false);
+        this.restoreWindowGeometry(targetWin, layout.windowState, layout.includeGeometry, true);
 
         // 若使用者在 restore 的非同步等待期間已切回主視窗，就不能再把全域
         // activeLeaf 指到 popout leaf，否則下一次主視窗 File Explorer 點擊
@@ -2425,8 +2425,8 @@ export class WindowLayoutManager {
   }
 
   /**
-   * 將 restore 前保存的所有 layout 名稱，一對一重新綁定到 restore 後的
-   * live popout。目標新視窗與已配對視窗不會被重複使用。
+   * 將 restore 前保存的所有 layout 名稱與視窗幾何座標，一對一重新套用至 restore 後的
+   * live popout。避免跨螢幕/異質 DPI 下 changeLayout 導至既有視窗尺寸微幅縮小。
    */
   private restorePreservedWindowLabels(
     snapshots: PreservedWindowLayout[],
@@ -2444,6 +2444,9 @@ export class WindowLayoutManager {
       );
       if (!currentWindow) return;
       this.setLayoutLabelForWindow(currentWindow, snapshot.layoutName);
+      if (snapshot.windowState) {
+        this.restoreWindowGeometry(currentWindow, snapshot.windowState, true, true);
+      }
       claimedWindows.add(currentWindow);
     });
   }
