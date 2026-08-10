@@ -621,6 +621,90 @@ export class PopoutLayoutEngine {
     return viewType ? this.openPanelInTabs(tabs, viewType) : this.createLeafInTabs(tabs);
   }
 
+  /** 判斷 leaf 是否位於 Popout 視窗的「偽側欄」（左側或右側頂層欄位）中。 */
+  isLeafInSideColumn(win: Window, leaf: WorkspaceLeaf | null | undefined): boolean {
+    if (!leaf || getWindowOfLeaf(leaf) !== win) return false;
+    const extLeaf = leaf as unknown as ExtendedWorkspaceLeaf;
+    const container = extLeaf.containerEl || (leaf.view as { containerEl?: HTMLElement } | null)?.containerEl;
+    if (!(container instanceof HTMLElement)) return false;
+
+    const leftCol = this.getColumnElement(win, "left");
+    if (leftCol && leftCol.contains(container)) return true;
+
+    const rightCol = this.getColumnElement(win, "right");
+    if (rightCol && rightCol.contains(container)) return true;
+
+    return false;
+  }
+
+  /**
+   * 取得 Popout 視窗非側欄的「中央編輯區」Tabs 群組。
+   * 排除包含在左側欄位或右側欄位內的 Tabs。
+   */
+  getCenterPanes(win: Window): PopoutPane[] {
+    const panes = this.collectPopoutPanes(win);
+    if (panes.length === 0) return [];
+
+    const leftCol = this.getColumnElement(win, "left");
+    const rightCol = this.getColumnElement(win, "right");
+
+    const centerPanes = panes.filter((pane) => {
+      const tabs = pane.tabs;
+      const container = tabs.containerEl;
+      if (container instanceof HTMLElement) {
+        if (leftCol && leftCol.contains(container)) return false;
+        if (rightCol && rightCol.contains(container)) return false;
+      }
+      const children = (tabs.children ?? []) as WorkspaceLeaf[];
+      for (const leaf of children) {
+        const extLeaf = leaf as unknown as ExtendedWorkspaceLeaf;
+        const leafContainer = extLeaf.containerEl || (leaf.view as { containerEl?: HTMLElement } | null)?.containerEl;
+        if (leafContainer instanceof HTMLElement) {
+          if (leftCol && leftCol.contains(leafContainer)) return false;
+          if (rightCol && rightCol.contains(leafContainer)) return false;
+        }
+      }
+      return true;
+    });
+
+    return centerPanes;
+  }
+
+  /**
+   * 同步取得/建立位於 Popout 視窗「中央編輯區」的 WorkspaceLeaf。
+   * 用於避免側欄觸發開啟檔案時覆蓋側欄 View。
+   */
+  getCenterLeafSync(win: Window, newLeaf?: boolean | string): WorkspaceLeaf {
+    const workspace = this.workspace;
+    const centerPanes = this.getCenterPanes(win);
+    const targetPane = this.pickCenterPopoutPane(centerPanes, win);
+
+    if (targetPane) {
+      const isNewTabRequested = newLeaf === true || newLeaf === "tab" || newLeaf === "split";
+      if (!isNewTabRequested) {
+        const children = (targetPane.tabs.children ?? []) as WorkspaceLeaf[];
+        for (const leaf of children) {
+          const extLeaf = leaf as unknown as ExtendedWorkspaceLeaf & { pinned?: boolean };
+          const isPinned = Boolean(extLeaf.pinned || (leaf.getViewState() as { pinned?: boolean })?.pinned);
+          if (!isPinned) {
+            return leaf;
+          }
+        }
+      }
+      return this.createLeafInTabs(targetPane.tabs);
+    }
+
+    // 尚無中央編輯區 (例如 Popout 視窗目前只有側欄欄位)：建立垂直 Split 放置中央區
+    const baseLeaf = this.getActiveLeafInWindow(win) || this.getLastLeafInWindow(win);
+    if (!baseLeaf) {
+      return workspace.getLeaf("tab");
+    }
+
+    const targetNode = getTopLevelNodeInWindow(baseLeaf) || baseLeaf;
+    const centerLeaf = workspace.createLeafBySplit(targetNode as WorkspaceLeaf, "vertical", false);
+    return centerLeaf;
+  }
+
   // ===== 隱藏/還原 =====
 
   /**

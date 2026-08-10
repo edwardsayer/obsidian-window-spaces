@@ -6064,6 +6064,90 @@ class PopoutLayoutEngine {
             return viewType ? this.openPanelInTabs(tabs, viewType) : this.createLeafInTabs(tabs);
         });
     }
+    /** 判斷 leaf 是否位於 Popout 視窗的「偽側欄」（左側或右側頂層欄位）中。 */
+    isLeafInSideColumn(win, leaf) {
+        var _a;
+        if (!leaf || getWindowOfLeaf(leaf) !== win)
+            return false;
+        const extLeaf = leaf;
+        const container = extLeaf.containerEl || ((_a = leaf.view) === null || _a === void 0 ? void 0 : _a.containerEl);
+        if (!(container instanceof HTMLElement))
+            return false;
+        const leftCol = this.getColumnElement(win, "left");
+        if (leftCol && leftCol.contains(container))
+            return true;
+        const rightCol = this.getColumnElement(win, "right");
+        if (rightCol && rightCol.contains(container))
+            return true;
+        return false;
+    }
+    /**
+     * 取得 Popout 視窗非側欄的「中央編輯區」Tabs 群組。
+     * 排除包含在左側欄位或右側欄位內的 Tabs。
+     */
+    getCenterPanes(win) {
+        const panes = this.collectPopoutPanes(win);
+        if (panes.length === 0)
+            return [];
+        const leftCol = this.getColumnElement(win, "left");
+        const rightCol = this.getColumnElement(win, "right");
+        const centerPanes = panes.filter((pane) => {
+            var _a, _b;
+            const tabs = pane.tabs;
+            const container = tabs.containerEl;
+            if (container instanceof HTMLElement) {
+                if (leftCol && leftCol.contains(container))
+                    return false;
+                if (rightCol && rightCol.contains(container))
+                    return false;
+            }
+            const children = ((_a = tabs.children) !== null && _a !== void 0 ? _a : []);
+            for (const leaf of children) {
+                const extLeaf = leaf;
+                const leafContainer = extLeaf.containerEl || ((_b = leaf.view) === null || _b === void 0 ? void 0 : _b.containerEl);
+                if (leafContainer instanceof HTMLElement) {
+                    if (leftCol && leftCol.contains(leafContainer))
+                        return false;
+                    if (rightCol && rightCol.contains(leafContainer))
+                        return false;
+                }
+            }
+            return true;
+        });
+        return centerPanes;
+    }
+    /**
+     * 同步取得/建立位於 Popout 視窗「中央編輯區」的 WorkspaceLeaf。
+     * 用於避免側欄觸發開啟檔案時覆蓋側欄 View。
+     */
+    getCenterLeafSync(win, newLeaf) {
+        var _a, _b;
+        const workspace = this.workspace;
+        const centerPanes = this.getCenterPanes(win);
+        const targetPane = this.pickCenterPopoutPane(centerPanes, win);
+        if (targetPane) {
+            const isNewTabRequested = newLeaf === true || newLeaf === "tab" || newLeaf === "split";
+            if (!isNewTabRequested) {
+                const children = ((_a = targetPane.tabs.children) !== null && _a !== void 0 ? _a : []);
+                for (const leaf of children) {
+                    const extLeaf = leaf;
+                    const isPinned = Boolean(extLeaf.pinned || ((_b = leaf.getViewState()) === null || _b === void 0 ? void 0 : _b.pinned));
+                    if (!isPinned) {
+                        return leaf;
+                    }
+                }
+            }
+            return this.createLeafInTabs(targetPane.tabs);
+        }
+        // 尚無中央編輯區 (例如 Popout 視窗目前只有側欄欄位)：建立垂直 Split 放置中央區
+        const baseLeaf = this.getActiveLeafInWindow(win) || this.getLastLeafInWindow(win);
+        if (!baseLeaf) {
+            return workspace.getLeaf("tab");
+        }
+        const targetNode = getTopLevelNodeInWindow(baseLeaf) || baseLeaf;
+        const centerLeaf = workspace.createLeafBySplit(targetNode, "vertical", false);
+        return centerLeaf;
+    }
     // ===== 隱藏/還原 =====
     /**
      * 取得 Popout 視窗 Root split 的頂層欄位元素（依 DOM 結構，不依賴幾何測量，
@@ -6864,6 +6948,28 @@ function routeSideLeaf(state, side) {
         return null;
     }
 }
+function routeGetLeaf(state, newLeaf) {
+    var _a;
+    const activeWindow = getActivePopoutWindow(state);
+    const participant = activeWindow ? getParticipantForWindow(state, activeWindow) : null;
+    const engine = (_a = participant === null || participant === void 0 ? void 0 : participant.engine) !== null && _a !== void 0 ? _a : null;
+    if (!activeWindow || !engine)
+        return null;
+    if (newLeaf === "left" || newLeaf === "right") {
+        return engine.openSideLeafSync(activeWindow, newLeaf);
+    }
+    if (newLeaf === "window") {
+        return null;
+    }
+    const activeLeaf = engine.getActiveLeafInWindow(activeWindow);
+    if (activeLeaf && engine.isLeafInSideColumn(activeWindow, activeLeaf)) {
+        return engine.getCenterLeafSync(activeWindow, newLeaf);
+    }
+    if (!activeLeaf || getWindowOfLeaf(activeLeaf) !== activeWindow) {
+        return engine.getCenterLeafSync(activeWindow, newLeaf);
+    }
+    return null;
+}
 function routeEnsureSideLeaf(state, viewType, side, options) {
     var _a, _b, _c, _d, _e, _f, _g;
     return __awaiter(this, void 0, void 0, function* () {
@@ -6923,11 +7029,13 @@ function install(state) {
     state.originalMethods = {
         getLeftLeaf: { hadOwn: hasOwnMethod(workspace, "getLeftLeaf"), value: workspace.getLeftLeaf },
         getRightLeaf: { hadOwn: hasOwnMethod(workspace, "getRightLeaf"), value: workspace.getRightLeaf },
+        getLeaf: { hadOwn: hasOwnMethod(workspace, "getLeaf"), value: workspace.getLeaf },
         getLeavesOfType: { hadOwn: hasOwnMethod(workspace, "getLeavesOfType"), value: workspace.getLeavesOfType },
         ensureSideLeaf: { hadOwn: hasOwnMethod(workspace, "ensureSideLeaf"), value: workspace.ensureSideLeaf },
     };
     workspace.__workspaceInterceptorOriginalGetLeftLeaf = workspace.getLeftLeaf;
     workspace.__workspaceInterceptorOriginalGetRightLeaf = workspace.getRightLeaf;
+    workspace.__workspaceInterceptorOriginalGetLeaf = workspace.getLeaf;
     workspace.__workspaceInterceptorOriginalGetLeavesOfType = workspace.getLeavesOfType;
     workspace.__workspaceInterceptorOriginalEnsureSideLeaf = workspace.ensureSideLeaf;
     workspace.getLeftLeaf = function (split) {
@@ -6939,6 +7047,11 @@ function install(state) {
         var _a, _b, _c;
         const original = (_a = state.originalMethods) === null || _a === void 0 ? void 0 : _a.getRightLeaf.value;
         return (_c = (_b = routeSideLeaf(state, "right")) !== null && _b !== void 0 ? _b : original === null || original === void 0 ? void 0 : original.call(workspace, split)) !== null && _c !== void 0 ? _c : null;
+    };
+    workspace.getLeaf = function (newLeaf) {
+        var _a, _b, _c;
+        const original = (_a = state.originalMethods) === null || _a === void 0 ? void 0 : _a.getLeaf.value;
+        return (_c = (_b = routeGetLeaf(state, newLeaf)) !== null && _b !== void 0 ? _b : original === null || original === void 0 ? void 0 : original.call(workspace, newLeaf)) !== null && _c !== void 0 ? _c : null;
     };
     workspace.getLeavesOfType = function (type) {
         var _a, _b;
@@ -6970,11 +7083,13 @@ function uninstall(state) {
     if (original) {
         restoreMethod(workspace, "getLeftLeaf", original.getLeftLeaf);
         restoreMethod(workspace, "getRightLeaf", original.getRightLeaf);
+        restoreMethod(workspace, "getLeaf", original.getLeaf);
         restoreMethod(workspace, "getLeavesOfType", original.getLeavesOfType);
         restoreMethod(workspace, "ensureSideLeaf", original.ensureSideLeaf);
     }
     delete workspace.__workspaceInterceptorOriginalGetLeftLeaf;
     delete workspace.__workspaceInterceptorOriginalGetRightLeaf;
+    delete workspace.__workspaceInterceptorOriginalGetLeaf;
     delete workspace.__workspaceInterceptorOriginalGetLeavesOfType;
     delete workspace.__workspaceInterceptorOriginalEnsureSideLeaf;
     delete workspace.__workspaceInterceptorInstalled;

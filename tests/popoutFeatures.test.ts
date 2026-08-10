@@ -458,6 +458,97 @@ describe("WorkspaceInterceptor", () => {
     }
   });
 
+  test("routes getLeaf away from side column in popout to center editor leaf", () => {
+    const popoutWin = {
+      document: {
+        body: { classList: { contains: (cls: string) => cls === "is-popout-window" } },
+        hasFocus: () => true,
+      },
+    } as unknown as Window;
+
+    const centerLeaf = { id: "center-editor-leaf", getViewState: () => ({ type: "markdown" }) } as any;
+    const sideLeaf = { id: "file-explorer-leaf", getViewState: () => ({ type: "file-explorer" }) } as any;
+
+    const originalGetLeaf = vi.fn().mockReturnValue("main-editor-leaf");
+    const app = {
+      workspace: {
+        getLeftLeaf: vi.fn(),
+        getRightLeaf: vi.fn(),
+        getLeaf: originalGetLeaf,
+        revealLeaf: vi.fn(),
+        setActiveLeaf: vi.fn(),
+      },
+    } as any;
+
+    const engine = {
+      getActiveLeafInWindow: vi.fn().mockReturnValue(sideLeaf),
+      isLeafInSideColumn: vi.fn().mockImplementation((win, leaf) => leaf === sideLeaf),
+      getCenterLeafSync: vi.fn().mockReturnValue(centerLeaf),
+      openSideLeafSync: vi.fn(),
+    } as any;
+
+    const interceptor = new WorkspaceInterceptor(app, engine);
+    interceptor.isManagedWindow = () => true;
+    interceptor.install();
+    (globalThis as any).activeWindow = popoutWin;
+
+    try {
+      const leaf = app.workspace.getLeaf(false);
+      expect(leaf).toBe(centerLeaf);
+      expect(engine.isLeafInSideColumn).toHaveBeenCalledWith(popoutWin, sideLeaf);
+      expect(engine.getCenterLeafSync).toHaveBeenCalledWith(popoutWin, false);
+      expect(originalGetLeaf).not.toHaveBeenCalled();
+    } finally {
+      interceptor.uninstall();
+      delete (globalThis as any).activeWindow;
+    }
+  });
+
+  test("isLeafInSideColumn detects whether leaf is inside left or right column", () => {
+    const rootEl = document.createElement("div");
+    rootEl.classList.add("workspace-split", "mod-root");
+
+    const leftColEl = document.createElement("div");
+    leftColEl.classList.add("workspace-tabs");
+    const leftLeafEl = document.createElement("div");
+    leftColEl.appendChild(leftLeafEl);
+
+    const centerColEl = document.createElement("div");
+    centerColEl.classList.add("workspace-tabs");
+    const centerLeafEl = document.createElement("div");
+    centerColEl.appendChild(centerLeafEl);
+
+    const rightColEl = document.createElement("div");
+    rightColEl.classList.add("workspace-tabs");
+    const rightLeafEl = document.createElement("div");
+    rightColEl.appendChild(rightLeafEl);
+
+    rootEl.appendChild(leftColEl);
+    rootEl.appendChild(centerColEl);
+    rootEl.appendChild(rightColEl);
+    document.body.appendChild(rootEl);
+
+    const leftLeaf = { containerEl: leftLeafEl, view: { containerEl: leftLeafEl } } as any;
+    const centerLeaf = { containerEl: centerLeafEl, view: { containerEl: centerLeafEl } } as any;
+    const rightLeaf = { containerEl: rightLeafEl, view: { containerEl: rightLeafEl } } as any;
+
+    const workspace = {
+      activeLeaf: leftLeaf,
+      iterateAllLeaves: (cb: (leaf: any) => void) => {
+        cb(leftLeaf);
+        cb(centerLeaf);
+        cb(rightLeaf);
+      },
+    } as any;
+
+    const engine = new PopoutLayoutEngine({ workspace } as any);
+    expect(engine.isLeafInSideColumn(window, leftLeaf)).toBe(true);
+    expect(engine.isLeafInSideColumn(window, rightLeaf)).toBe(true);
+    expect(engine.isLeafInSideColumn(window, centerLeaf)).toBe(false);
+
+    document.body.removeChild(rootEl);
+  });
+
   test("routes through the participant whose policy manages the active window", () => {
     const popoutWin = {
       document: {

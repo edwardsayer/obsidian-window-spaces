@@ -25,6 +25,7 @@ interface InterceptableWorkspace {
   requestSaveLayout?: () => Promise<void>;
   getLeftLeaf?: (split: boolean) => WorkspaceLeaf | null;
   getRightLeaf?: (split: boolean) => WorkspaceLeaf | null;
+  getLeaf?: (newLeaf?: boolean | string) => WorkspaceLeaf;
   getLeavesOfType?: (type: string) => WorkspaceLeaf[];
   ensureSideLeaf?: (
     viewType: string,
@@ -34,6 +35,7 @@ interface InterceptableWorkspace {
   __workspaceInterceptorInstalled?: boolean;
   __workspaceInterceptorOriginalGetLeftLeaf?: (split: boolean) => WorkspaceLeaf | null;
   __workspaceInterceptorOriginalGetRightLeaf?: (split: boolean) => WorkspaceLeaf | null;
+  __workspaceInterceptorOriginalGetLeaf?: (newLeaf?: boolean | string) => WorkspaceLeaf;
   __workspaceInterceptorOriginalGetLeavesOfType?: (type: string) => WorkspaceLeaf[];
   __workspaceInterceptorOriginalEnsureSideLeaf?: (
     viewType: string,
@@ -45,6 +47,7 @@ interface InterceptableWorkspace {
 interface OriginalWorkspaceMethods {
   getLeftLeaf: { hadOwn: boolean; value?: InterceptableWorkspace["getLeftLeaf"] };
   getRightLeaf: { hadOwn: boolean; value?: InterceptableWorkspace["getRightLeaf"] };
+  getLeaf: { hadOwn: boolean; value?: InterceptableWorkspace["getLeaf"] };
   getLeavesOfType: { hadOwn: boolean; value?: InterceptableWorkspace["getLeavesOfType"] };
   ensureSideLeaf: { hadOwn: boolean; value?: InterceptableWorkspace["ensureSideLeaf"] };
 }
@@ -151,6 +154,35 @@ function routeSideLeaf(state: InterceptorState, side: "left" | "right"): Workspa
   }
 }
 
+function routeGetLeaf(
+  state: InterceptorState,
+  newLeaf?: boolean | string
+): WorkspaceLeaf | null {
+  const activeWindow = getActivePopoutWindow(state);
+  const participant = activeWindow ? getParticipantForWindow(state, activeWindow) : null;
+  const engine = participant?.engine ?? null;
+  if (!activeWindow || !engine) return null;
+
+  if (newLeaf === "left" || newLeaf === "right") {
+    return engine.openSideLeafSync(activeWindow, newLeaf);
+  }
+
+  if (newLeaf === "window") {
+    return null;
+  }
+
+  const activeLeaf = engine.getActiveLeafInWindow(activeWindow);
+  if (activeLeaf && engine.isLeafInSideColumn(activeWindow, activeLeaf)) {
+    return engine.getCenterLeafSync(activeWindow, newLeaf);
+  }
+
+  if (!activeLeaf || getWindowOfLeaf(activeLeaf) !== activeWindow) {
+    return engine.getCenterLeafSync(activeWindow, newLeaf);
+  }
+
+  return null;
+}
+
 async function routeEnsureSideLeaf(
   state: InterceptorState,
   viewType: string,
@@ -217,11 +249,13 @@ function install(state: InterceptorState): void {
   state.originalMethods = {
     getLeftLeaf: { hadOwn: hasOwnMethod(workspace, "getLeftLeaf"), value: workspace.getLeftLeaf },
     getRightLeaf: { hadOwn: hasOwnMethod(workspace, "getRightLeaf"), value: workspace.getRightLeaf },
+    getLeaf: { hadOwn: hasOwnMethod(workspace, "getLeaf"), value: workspace.getLeaf },
     getLeavesOfType: { hadOwn: hasOwnMethod(workspace, "getLeavesOfType"), value: workspace.getLeavesOfType },
     ensureSideLeaf: { hadOwn: hasOwnMethod(workspace, "ensureSideLeaf"), value: workspace.ensureSideLeaf },
   };
   workspace.__workspaceInterceptorOriginalGetLeftLeaf = workspace.getLeftLeaf;
   workspace.__workspaceInterceptorOriginalGetRightLeaf = workspace.getRightLeaf;
+  workspace.__workspaceInterceptorOriginalGetLeaf = workspace.getLeaf;
   workspace.__workspaceInterceptorOriginalGetLeavesOfType = workspace.getLeavesOfType;
   workspace.__workspaceInterceptorOriginalEnsureSideLeaf = workspace.ensureSideLeaf;
 
@@ -232,6 +266,10 @@ function install(state: InterceptorState): void {
   workspace.getRightLeaf = function (split: boolean): WorkspaceLeaf | null {
     const original = state.originalMethods?.getRightLeaf.value;
     return routeSideLeaf(state, "right") ?? original?.call(workspace, split) ?? null;
+  };
+  workspace.getLeaf = function (newLeaf?: boolean | string): WorkspaceLeaf {
+    const original = state.originalMethods?.getLeaf.value;
+    return routeGetLeaf(state, newLeaf) ?? original?.call(workspace, newLeaf) ?? (null as unknown as WorkspaceLeaf);
   };
   workspace.getLeavesOfType = function (type: string): WorkspaceLeaf[] {
     const original = state.originalMethods?.getLeavesOfType.value;
@@ -264,11 +302,13 @@ function uninstall(state: InterceptorState): void {
   if (original) {
     restoreMethod(workspace, "getLeftLeaf", original.getLeftLeaf);
     restoreMethod(workspace, "getRightLeaf", original.getRightLeaf);
+    restoreMethod(workspace, "getLeaf", original.getLeaf);
     restoreMethod(workspace, "getLeavesOfType", original.getLeavesOfType);
     restoreMethod(workspace, "ensureSideLeaf", original.ensureSideLeaf);
   }
   delete workspace.__workspaceInterceptorOriginalGetLeftLeaf;
   delete workspace.__workspaceInterceptorOriginalGetRightLeaf;
+  delete workspace.__workspaceInterceptorOriginalGetLeaf;
   delete workspace.__workspaceInterceptorOriginalGetLeavesOfType;
   delete workspace.__workspaceInterceptorOriginalEnsureSideLeaf;
   delete workspace.__workspaceInterceptorInstalled;
