@@ -2447,12 +2447,54 @@ class WindowLayoutManager {
         this.layoutLabels = new Map();
         this.activeRestorePromise = null;
         this.isMatchingUnlabeled = false;
+        this.isRestoringLayout = false;
         this.renderAttemptedLeaves = new WeakSet();
         this.deferredViewLoads = new WeakMap();
         this.autoSaveTimers = new Map();
         this.lastValidSnapshots = new Map();
         this.plugin = plugin;
         this.app = plugin.app;
+    }
+    /** 在 Popout 建立與 Restore 期間套用視覺透明遮罩，消除兩階段鋸齒 jump 與全域重繪閃爍。 */
+    maskWindowVisually(win) {
+        var _a;
+        if (!win || !((_a = win.document) === null || _a === void 0 ? void 0 : _a.documentElement))
+            return;
+        try {
+            const el = win.document.documentElement;
+            el.classList.add("is-restoring-layout");
+            const extWin = win;
+            if (!extWin._windowSpacesUnmaskTimer) {
+                extWin._windowSpacesUnmaskTimer = win.setTimeout(() => {
+                    this.unmaskWindowVisually(win);
+                }, 3000);
+            }
+        }
+        catch (_b) {
+            // Ignore mask error
+        }
+    }
+    /** 在雙重 rAF 影格繪製同步後解鎖視覺透明遮罩，實現滑順淡入。 */
+    unmaskWindowVisually(win) {
+        var _a;
+        if (!win || !((_a = win.document) === null || _a === void 0 ? void 0 : _a.documentElement))
+            return;
+        try {
+            const extWin = win;
+            if (extWin._windowSpacesUnmaskTimer) {
+                win.clearTimeout(extWin._windowSpacesUnmaskTimer);
+                delete extWin._windowSpacesUnmaskTimer;
+            }
+            win.requestAnimationFrame(() => {
+                win.requestAnimationFrame(() => {
+                    var _a, _b, _c;
+                    (_c = (_b = (_a = win.document) === null || _a === void 0 ? void 0 : _a.documentElement) === null || _b === void 0 ? void 0 : _b.classList) === null || _c === void 0 ? void 0 : _c.remove("is-restoring-layout");
+                });
+            });
+        }
+        catch (_b) {
+            // Ignore unmask error
+        }
     }
     /** 記錄 Obsidian 建立的 Popout，供 label 與 title 生命週期管理使用。 */
     registerPopoutWindow(targetWin) {
@@ -3472,6 +3514,7 @@ class WindowLayoutManager {
     restoreLayoutInternal(layout, options = {}) {
         var _a, _b, _c, _d, _e, _f, _g;
         return __awaiter(this, void 0, void 0, function* () {
+            this.isRestoringLayout = true;
             try {
                 // 驗證佈局數據
                 if (!this.validateLayout(layout)) {
@@ -3514,6 +3557,7 @@ class WindowLayoutManager {
                     // 優先還原至傳入的當前 Popout 視窗 (取代當前視窗)
                     targetWin = options.targetWindow;
                     targetIndex = this.findFloatingWindowIndexForWindow(targetWin, floatingWindows);
+                    this.maskWindowVisually(targetWin);
                 }
                 else if (savedLeafId && floatingWindows.length > 0) {
                     for (let i = 0; i < floatingWindows.length; i++) {
@@ -3524,6 +3568,9 @@ class WindowLayoutManager {
                     }
                     const existingTargetLeaf = this.findLeafById(savedLeafId);
                     targetWin = this.getWindowForLeaf(existingTargetLeaf);
+                    if (targetWin) {
+                        this.maskWindowVisually(targetWin);
+                    }
                 }
                 // 2. 若找不到現有視窗，且非明確指定取代的 Popout 視窗，建立一個新 Popout 視窗
                 if (targetIndex < 0) {
@@ -3535,6 +3582,7 @@ class WindowLayoutManager {
                         if (targetIndex < 0) {
                             throw new Error(t("errors.cannotRestore"));
                         }
+                        this.maskWindowVisually(targetWin);
                     }
                     else {
                         // 記錄開啟前的 Popout 視窗集合
@@ -3553,6 +3601,11 @@ class WindowLayoutManager {
                         }
                         const extPopoutLeaf = popoutLeaf;
                         targetWin = newlyCreatedWin || ((_e = (_d = extPopoutLeaf === null || extPopoutLeaf === void 0 ? void 0 : extPopoutLeaf.containerEl) === null || _d === void 0 ? void 0 : _d.ownerDocument) === null || _e === void 0 ? void 0 : _e.defaultView) || null;
+                        if (targetWin) {
+                            // 【幾何前置 & 遮罩】新視窗一誕生立即進行座標移動/尺寸縮放並套用遮罩，消弭兩階段鋸齒 jump
+                            this.maskWindowVisually(targetWin);
+                            this.restoreWindowGeometry(targetWin, layout.windowState, layout.includeGeometry);
+                        }
                         // 重新讀取最新的 Layout
                         currentLayout = workspace.getLayout();
                         floatingWindows = this.getFloatingWindows(currentLayout);
@@ -3622,42 +3675,16 @@ class WindowLayoutManager {
                             // Ignore focus error
                         }
                     }
-                    if (typeof targetWin.focus === "function") {
+                    if (typeof targetWin.focus === "function" && canActivatePopout) {
                         try {
-                            if (canActivatePopout) {
-                                targetWin.focus();
-                            }
+                            targetWin.focus();
                         }
                         catch (e) {
                             console.warn("Failed to focus target window:", e);
                         }
-                        targetWin.setTimeout(() => {
-                            try {
-                                if (!this.isWindowFocused(targetWin))
-                                    return;
-                                const freshLeaves = this.getLeavesForWindow(targetWin);
-                                if (freshLeaves.length > 0) {
-                                    this.app.workspace.setActiveLeaf(freshLeaves[0], { focus: false });
-                                }
-                            }
-                            catch (_a) {
-                                // Ignore focus error
-                            }
-                        }, 100);
-                        targetWin.setTimeout(() => {
-                            try {
-                                if (!this.isWindowFocused(targetWin))
-                                    return;
-                                const freshLeaves = this.getLeavesForWindow(targetWin);
-                                if (freshLeaves.length > 0) {
-                                    this.app.workspace.setActiveLeaf(freshLeaves[0], { focus: false });
-                                }
-                            }
-                            catch (_a) {
-                                // Ignore focus error
-                            }
-                        }, 300);
                     }
+                    // 於 DOM 繪製與狀態就緒後解除遮罩，淡入登場
+                    this.unmaskWindowVisually(targetWin);
                 }
                 this.setLayoutLabelForWindow(targetWin, layout.name);
                 this.restorePreservedWindowLabels(preservedWindowLayouts, targetWin);
@@ -3681,6 +3708,9 @@ class WindowLayoutManager {
                 console.error("Failed to restore layout:", error);
                 const message = error instanceof Error ? error.message : String(error);
                 throw new Error(`${t("errors.failedToRestore")}: ${message}`);
+            }
+            finally {
+                this.isRestoringLayout = false;
             }
         });
     }
@@ -4599,7 +4629,7 @@ class WindowLayoutManager {
             targetWin.moveTo(windowState.position.x, windowState.position.y);
         }
     }
-    /** changeLayout 重建期間 DOM 尚未穩定，以延遲重試方式套用隱藏狀態。 */
+    /** changeLayout 重建期間 DOM 尚未穩定，單次安全套用並於 200ms 做單次保險檢查。 */
     applyHiddenStateAfterRestore(targetWin, hidden) {
         const engine = this.plugin.popoutLayout;
         const apply = () => {
@@ -4607,13 +4637,13 @@ class WindowLayoutManager {
                 engine.applyHiddenState(targetWin, hidden);
             }
             catch (_a) {
-                // DOM 尚未就緒，交由後續 setTimeout 重試
+                // Ignore DOM not ready error
             }
         };
         apply();
-        targetWin.setTimeout(apply, 100);
-        targetWin.setTimeout(apply, 300);
-        targetWin.setTimeout(apply, 800);
+        if (typeof targetWin.setTimeout === "function") {
+            targetWin.setTimeout(apply, 200);
+        }
     }
     /** 是否為檔案類 view（markdown / pdf / 圖片等），此類 view 不參與強制渲染。 */
     isFileView(leaf) {
@@ -4714,20 +4744,18 @@ class WindowLayoutManager {
             this.ensureViewRendered(leaf);
         }, 150);
     }
-    /** 以延遲重試方式確保非檔案 view 已渲染（restore 後 DOM 尚未穩定）。 */
+    /** 以受管控方式確保非檔案 view 已渲染，所有重試皆通過 per-leaf guard 防止重複 DOM 重建。 */
     ensureViewRenderedWithRetries(targetWin, leaf) {
-        const check = () => {
-            var _a;
-            if (!leaf || !((_a = leaf.containerEl) === null || _a === void 0 ? void 0 : _a.isConnected))
-                return;
-            if (this.hasRenderedContent(leaf))
-                return;
-            this.forceRenderView(leaf);
-        };
-        check();
-        targetWin.setTimeout(check, 150);
-        targetWin.setTimeout(check, 400);
-        targetWin.setTimeout(check, 900);
+        if (!leaf || !targetWin || targetWin.closed)
+            return;
+        this.ensureViewRendered(leaf);
+        if (typeof targetWin.setTimeout === "function") {
+            targetWin.setTimeout(() => {
+                if (targetWin.closed)
+                    return;
+                this.ensureViewRendered(leaf);
+            }, 200);
+        }
     }
     /**
      * 根據 ID 查找 leaf
@@ -7574,11 +7602,17 @@ class WindowSpacesPlugin extends obsidian.Plugin {
         }));
         // 監聽 Workspace 分頁與佈局變化（用於特定 Layout 的 5 秒 Debounced 自動儲存）
         this.registerEvent(this.app.workspace.on("layout-change", () => {
+            var _a;
+            if ((_a = this.manager) === null || _a === void 0 ? void 0 : _a.isRestoringLayout)
+                return;
             this.manager.matchUnlabeledPopoutWindows();
             this.manager.checkAndDebouncedAutoSaveAll();
             this.activityBars.refreshAll();
         }));
         this.registerEvent(this.app.workspace.on("active-leaf-change", (leaf) => {
+            var _a;
+            if ((_a = this.manager) === null || _a === void 0 ? void 0 : _a.isRestoringLayout)
+                return;
             this.manager.checkAndDebouncedAutoSaveAll();
             this.activityBars.updateActiveStatesAll();
             // 等待 mousedown/mouseup/click 完成後，才檢查剛切換到的 Popout tab
