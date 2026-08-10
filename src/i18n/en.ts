@@ -170,6 +170,7 @@ export const en: TranslationStrings = {
     accentSection: "Window Accent & Icons",
     defaultIcon: "Default Popout Icon",
     defaultIconDesc: "Icon to use when a Space does not specify a custom icon",
+    dragToReorder: "Drag to reorder",
   },
 
   notifications: {

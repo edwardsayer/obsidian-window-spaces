@@ -222,6 +222,7 @@ const en = {
         accentSection: "Window Accent & Icons",
         defaultIcon: "Default Popout Icon",
         defaultIconDesc: "Icon to use when a Space does not specify a custom icon",
+        dragToReorder: "Drag to reorder",
     },
     notifications: {
         layoutSaved: "Space saved successfully",
@@ -422,6 +423,7 @@ const zhTW = {
         accentSection: "視窗外觀與圖示",
         defaultIcon: "預設 Popout 圖示",
         defaultIconDesc: "當 Space 未指定自訂 Icon 時使用的預設圖示",
+        dragToReorder: "拖曳排序",
     },
     notifications: {
         layoutSaved: "空間儲存成功",
@@ -622,6 +624,7 @@ const zhCN = {
         accentSection: "窗口外观与图标",
         defaultIcon: "默认 Popout 图标",
         defaultIconDesc: "当 Space 未指定自定义 Icon 时使用的默认图标",
+        dragToReorder: "拖放排序",
     },
     notifications: {
         layoutSaved: "空间保存成功",
@@ -5016,7 +5019,7 @@ class WindowSpacesSettingTab extends obsidian.PluginSettingTab {
         this.renderActivityBarSide(section, "right", t("settings.rightBar"));
     }
     /** 渲染單一側欄 view 項目列，回傳用於 surgical 更新的 handle。 */
-    renderSideItemRow(container, side, item, onChanged) {
+    renderSideItemRow(container, side, item, index, onChanged) {
         let iconBtn = null;
         const row = this.createSettingIn(container, (s) => {
             const resolvedLabel = resolveViewLabel(this.app, item.viewType);
@@ -5042,7 +5045,6 @@ class WindowSpacesSettingTab extends obsidian.PluginSettingTab {
                     item.icon = undefined;
                     void this.plugin.saveSettings().then(() => {
                         this.plugin.activityBars.refreshAll();
-                        // 先以既有快取顯示；再重新動態偵測預設 icon（不持久化，維持「還原預設」語義）
                         iconBtn === null || iconBtn === void 0 ? void 0 : iconBtn.setIcon(resolveViewIcon(this.app, item.viewType));
                         void ensureViewIcon(this.app, item.viewType).then((icon) => {
                             if (!icon || item.icon)
@@ -5070,6 +5072,24 @@ class WindowSpacesSettingTab extends obsidian.PluginSettingTab {
                 });
             });
         });
+        row.settingEl.setAttr("data-window-spaces-activity-item", side);
+        row.settingEl.setAttr("data-drag-index", String(index));
+        row.settingEl.setAttr("draggable", "true");
+        row.settingEl.addEventListener("dragstart", (e) => {
+            row.settingEl.classList.add("drag-source");
+            e.dataTransfer.effectAllowed = "move";
+            e.dataTransfer.setData("application/x-window-spaces-index", String(index));
+        });
+        row.settingEl.addEventListener("dragend", () => {
+            row.settingEl.classList.remove("drag-source");
+        });
+        row.settingEl.querySelectorAll("button, input, select, .checkbox-container, .slider").forEach((el) => {
+            el.setAttribute("draggable", "false");
+        });
+        const gripEl = row.settingEl.createDiv({ cls: "window-spaces-activity-drag-handle" });
+        gripEl.setAttr("aria-label", t("settings.dragToReorder"));
+        obsidian.setIcon(gripEl, "grip-vertical");
+        row.settingEl.insertBefore(gripEl, row.settingEl.firstChild);
         return { row, updateIcon: (icon) => iconBtn === null || iconBtn === void 0 ? void 0 : iconBtn.setIcon(icon) };
     }
     /** 重建「新增 view」下拉選單的選項（排除已加入的 view type）。 */
@@ -5133,18 +5153,14 @@ class WindowSpacesSettingTab extends obsidian.PluginSettingTab {
                     this.plugin.settings.activityBars[side] = current;
                     void this.plugin.saveSettings().then(() => {
                         this.plugin.activityBars.refreshAll();
-                        // surgical：在 add-row 前插入新列，並重建下拉（移除已加入的 type）
-                        const { row, updateIcon } = this.renderSideItemRow(group, side, newItem);
-                        addRow.settingEl.before(row.settingEl);
+                        renderItemRows();
                         customInput.value = "";
-                        refreshSelect();
-                        // 該 view 之前未找到/設定 icon（落入通用 fallback）→ 重新動態偵測並補上真實 icon
                         if (newItem.icon === "layout") {
                             void ensureViewIcon(this.app, viewType).then((icon) => {
                                 if (!icon || icon === newItem.icon)
                                     return;
                                 newItem.icon = icon;
-                                updateIcon(icon);
+                                renderItemRows();
                                 void this.plugin.saveSettings();
                             });
                         }
@@ -5153,12 +5169,58 @@ class WindowSpacesSettingTab extends obsidian.PluginSettingTab {
             });
         });
         const refreshSelect = () => this.rebuildViewSelect(selectEl, side);
-        items.forEach((item) => {
-            this.renderSideItemRow(group, side, item, refreshSelect);
-        });
+        const renderItemRows = () => {
+            var _a, _b;
+            section.querySelectorAll(`[data-window-spaces-activity-item="${side}"]`).forEach((el) => el.remove());
+            const current = (_b = (_a = this.plugin.settings.activityBars) === null || _a === void 0 ? void 0 : _a[side]) !== null && _b !== void 0 ? _b : [];
+            current.forEach((item, index) => {
+                const handle = this.renderSideItemRow(group, side, item, index, () => {
+                    renderItemRows();
+                    refreshSelect();
+                    this.plugin.activityBars.refreshAll();
+                });
+                addRow.settingEl.before(handle.row.settingEl);
+            });
+            refreshSelect();
+        };
+        renderItemRows();
         // 把 add-row 移到 items 之後（保持「view 列 → add-row」順序）
         (_d = addRow.settingEl.parentElement) === null || _d === void 0 ? void 0 : _d.appendChild(addRow.settingEl);
-        refreshSelect();
+        section.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            section.querySelectorAll(`[data-window-spaces-activity-item="${side}"].drag-over-top, [data-window-spaces-activity-item="${side}"].drag-over-bottom`).forEach((el) => { el.classList.remove("drag-over-top", "drag-over-bottom"); });
+            const target = e.target.closest(`[data-window-spaces-activity-item="${side}"]`);
+            if (!target)
+                return;
+            const rect = target.getBoundingClientRect();
+            const isBottom = e.clientY > rect.top + rect.height / 2;
+            target.classList.add(isBottom ? "drag-over-bottom" : "drag-over-top");
+        });
+        section.addEventListener("drop", (e) => {
+            var _a, _b, _c, _d, _e;
+            e.preventDefault();
+            const indicatorEl = section.querySelector(`[data-window-spaces-activity-item="${side}"].drag-over-top, [data-window-spaces-activity-item="${side}"].drag-over-bottom`);
+            section.querySelectorAll(`[data-window-spaces-activity-item="${side}"].drag-over-top, [data-window-spaces-activity-item="${side}"].drag-over-bottom`).forEach((el) => { el.classList.remove("drag-over-top", "drag-over-bottom"); });
+            if (!indicatorEl)
+                return;
+            const fromIndex = parseInt((_b = (_a = e.dataTransfer) === null || _a === void 0 ? void 0 : _a.getData("application/x-window-spaces-index")) !== null && _b !== void 0 ? _b : "", 10);
+            if (isNaN(fromIndex))
+                return;
+            const toIndex = parseInt((_c = indicatorEl.getAttribute("data-drag-index")) !== null && _c !== void 0 ? _c : "", 10);
+            if (isNaN(toIndex))
+                return;
+            const isBottom = indicatorEl.classList.contains("drag-over-bottom");
+            const insertIndex = isBottom ? toIndex + 1 : toIndex;
+            if (fromIndex === insertIndex)
+                return;
+            const current = (_e = (_d = this.plugin.settings.activityBars) === null || _d === void 0 ? void 0 : _d[side]) !== null && _e !== void 0 ? _e : [];
+            const [moved] = current.splice(fromIndex, 1);
+            current.splice(insertIndex > fromIndex ? insertIndex - 1 : insertIndex, 0, moved);
+            void this.plugin.saveSettings().then(() => {
+                this.plugin.activityBars.refreshAll();
+                renderItemRows();
+            });
+        });
     }
     setupAutoSave() {
         this.plugin.registerEvent(this.app.workspace.on("layout-change", () => {

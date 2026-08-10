@@ -166,6 +166,7 @@ export const zhTW: TranslationStrings = {
     accentSection: "視窗外觀與圖示",
     defaultIcon: "預設 Popout 圖示",
     defaultIconDesc: "當 Space 未指定自訂 Icon 時使用的預設圖示",
+    dragToReorder: "拖曳排序",
   },
 
   notifications: {

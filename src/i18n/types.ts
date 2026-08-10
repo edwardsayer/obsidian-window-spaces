@@ -169,6 +169,7 @@ export interface TranslationStrings {
     accentSection: string;
     defaultIcon: string;
     defaultIconDesc: string;
+    dragToReorder: string;
   };
 
   // 通知

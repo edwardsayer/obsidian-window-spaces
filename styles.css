@@ -1351,6 +1351,40 @@ body.is-popout-window .workspace-tab-header-spacer {
   display: none !important;
 }
 
+/* 設定頁：Activity Bar view 項目拖曳排序 */
+.setting-item[data-window-spaces-activity-item] {
+  cursor: grab;
+  position: relative;
+}
+.setting-item[data-window-spaces-activity-item]:active {
+  cursor: grabbing;
+}
+.window-spaces-activity-drag-handle {
+  display: flex;
+  align-items: center;
+  color: var(--text-muted);
+  margin-right: 6px;
+  opacity: 0.4;
+  flex-shrink: 0;
+  pointer-events: none;
+}
+.window-spaces-activity-drag-handle:hover {
+  opacity: 0.8;
+}
+.window-spaces-activity-drag-handle svg {
+  width: 16px;
+  height: 16px;
+}
+.setting-item.drag-source {
+  opacity: 0.35;
+}
+.setting-item.drag-over-top {
+  border-top: 2px solid var(--interactive-accent) !important;
+}
+.setting-item.drag-over-bottom {
+  border-bottom: 2px solid var(--interactive-accent) !important;
+}
+
 /* 設定頁：view type 輸入 */
 .window-spaces-view-type-input {
   min-width: 0;

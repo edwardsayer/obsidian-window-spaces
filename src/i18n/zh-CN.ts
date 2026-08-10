@@ -166,6 +166,7 @@ export const zhCN: TranslationStrings = {
     accentSection: "窗口外观与图标",
     defaultIcon: "默认 Popout 图标",
     defaultIconDesc: "当 Space 未指定自定义 Icon 时使用的默认图标",
+    dragToReorder: "拖放排序",
   },
 
   notifications: {
