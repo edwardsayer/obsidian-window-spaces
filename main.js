@@ -2790,9 +2790,9 @@ class WindowLayoutManager {
                     if (winFiles.size > 0 && winFiles.size === savedFiles.size && matchingFilesCount === winFiles.size) {
                         score += 50;
                     }
-                    // (d) 視窗幾何尺寸與位置相似度 (+5)
+                    // (d) 視窗幾何尺寸與位置相似度 (已有內容匹配時才作為加分項 +5)
                     const savedWindow = space.windowState;
-                    if (savedWindow && savedWindow.size) {
+                    if (score > 0 && savedWindow && savedWindow.size) {
                         const widthDiff = Math.abs(win.outerWidth - savedWindow.size.width);
                         const heightDiff = Math.abs(win.outerHeight - savedWindow.size.height);
                         if (widthDiff < 50 && heightDiff < 50) {
@@ -2804,8 +2804,8 @@ class WindowLayoutManager {
                         bestSpace = space;
                     }
                 }
-                // 嚴格門檻：必須至少有一項 match (score > 0)
-                if (bestSpace && bestScore > 0) {
+                // 嚴格門檻：必須至少有一項 Leaf / 檔案內容 match (score >= 10)
+                if (bestSpace && bestScore >= 10) {
                     claimedLayoutNames.add(bestSpace.name);
                     this.setLayoutLabelForWindow(win, bestSpace.name);
                     this.layoutWindows.set(bestSpace, win);
