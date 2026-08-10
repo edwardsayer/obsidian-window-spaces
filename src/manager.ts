@@ -1294,7 +1294,7 @@ export class WindowLayoutManager {
 
           if (targetWin) {
             // 【幾何前置】新視窗一誕生立即進行座標移動與尺寸縮放，消弭兩階段鋸齒 jump
-            this.restoreWindowGeometry(targetWin, layout.windowState, layout.includeGeometry);
+            this.restoreWindowGeometry(targetWin, layout.windowState, layout.includeGeometry, true);
           }
 
           // 重新讀取最新的 Layout
@@ -1322,10 +1322,20 @@ export class WindowLayoutManager {
           currentFloatingWindow,
           layout.includeGeometry
         );
+        const livePopoutsBeforeLayout = this.getLivePopoutWindows();
         const floatingObj = currentLayout.floating as { type?: string; children?: unknown[] } | unknown[];
         if (typeof floatingObj === "object" && floatingObj !== null && "type" in floatingObj && (floatingObj as { type?: string }).type === "floating" && Array.isArray((floatingObj as { children?: unknown[] }).children)) {
           (floatingObj as { children: unknown[] }).children = (floatingObj as { children: unknown[] }).children.map(
-            (child: unknown, idx: number) => (idx === targetIndex ? restoredWindow : child)
+            (child: unknown, idx: number) => {
+              if (idx === targetIndex) return restoredWindow;
+              const liveWin = livePopoutsBeforeLayout.find(
+                (w) => this.findFloatingWindowIndexForWindow(w, floatingWindows) === idx
+              ) || livePopoutsBeforeLayout[idx];
+              if (liveWin && !liveWin.closed && this.isPopoutDocument(liveWin.document)) {
+                return this.syncLiveWindowBoundsToFloatingChild(child, liveWin);
+              }
+              return child;
+            }
           );
         } else if (Array.isArray(floatingObj)) {
           floatingObj[targetIndex] = restoredWindow;
@@ -1367,10 +1377,19 @@ export class WindowLayoutManager {
         );
       }
 
+      this.setLayoutLabelForWindow(targetWin, layout.name);
+      this.restorePreservedWindowLabels(preservedWindowLayouts, targetWin);
+      this.refreshLayoutLabels();
+
+      // 先套用隱藏的側欄/分頁群組，避免幾何對齊後再縮放側欄觸發橫向位移
+      if (targetWin && layout.hidden) {
+        this.applyHiddenStateAfterRestore(targetWin, layout.hidden);
+      }
+
       // 5. 調整視窗尺寸與座標，並聚焦視窗
       if (targetWin) {
         this.layoutWindows.set(layout, targetWin);
-        this.restoreWindowGeometry(targetWin, layout.windowState, layout.includeGeometry);
+        this.restoreWindowGeometry(targetWin, layout.windowState, layout.includeGeometry, false);
 
         // 若使用者在 restore 的非同步等待期間已切回主視窗，就不能再把全域
         // activeLeaf 指到 popout leaf，否則下一次主視窗 File Explorer 點擊
@@ -1394,15 +1413,6 @@ export class WindowLayoutManager {
             console.warn("Failed to focus target window:", e);
           }
         }
-      }
-
-      this.setLayoutLabelForWindow(targetWin, layout.name);
-      this.restorePreservedWindowLabels(preservedWindowLayouts, targetWin);
-      this.refreshLayoutLabels();
-
-      // 於 restore 完成後重新套用隱藏的側欄/分頁群組
-      if (targetWin && layout.hidden) {
-        this.applyHiddenStateAfterRestore(targetWin, layout.hidden);
       }
 
       WindowLayoutsModal.renderAllInstances();
@@ -2438,13 +2448,14 @@ export class WindowLayoutManager {
     });
   }
 
-  /** 在 changeLayout 重建 popout 後恢復實際視窗尺寸與座標。 */
+  /** 在 changeLayout 重建 popout 後恢復實際視窗尺寸與座標（僅在幾何有顯著差異或強制時呼叫，防止重複無謂位移與 OS 邊框重算）。 */
   private restoreWindowGeometry(
     targetWin: Window,
     windowState: WindowState | null | undefined,
-    includeGeometry = true
+    includeGeometry = true,
+    force = true
   ): void {
-    if (!windowState || includeGeometry === false) return;
+    if (!windowState || includeGeometry === false || !targetWin) return;
 
     const size = windowState.size;
     if (
@@ -2453,11 +2464,45 @@ export class WindowLayoutManager {
       size.height > 0 &&
       typeof targetWin.resizeTo === "function"
     ) {
-      targetWin.resizeTo(size.width, size.height);
+      const currentWidth = typeof targetWin.outerWidth === "number" ? targetWin.outerWidth : 0;
+      const currentHeight = typeof targetWin.outerHeight === "number" ? targetWin.outerHeight : 0;
+      if (force || currentWidth === 0 || Math.abs(currentWidth - size.width) > 2 || Math.abs(currentHeight - size.height) > 2) {
+        targetWin.resizeTo(size.width, size.height);
+      }
     }
 
     if (windowState.position && typeof targetWin.moveTo === "function") {
-      targetWin.moveTo(windowState.position.x, windowState.position.y);
+      const currentX = typeof targetWin.screenX === "number" ? targetWin.screenX : 0;
+      const currentY = typeof targetWin.screenY === "number" ? targetWin.screenY : 0;
+      if (force || currentX === 0 || Math.abs(currentX - windowState.position.x) > 2 || Math.abs(currentY - windowState.position.y) > 2) {
+        targetWin.moveTo(windowState.position.x, windowState.position.y);
+      }
+    }
+  }
+
+  /**
+   * 當發動 changeLayout 時，將非 Restore 目標之活體 Popout 視窗最新實際 outerWidth/outerHeight/screenX/screenY 帶入 floating schema，
+   * 避免多螢幕異質 DPI 縮放率下呼叫全域 changeLayout 時，其他存活 Popout 視窗尺寸被重複縮放衰減。
+   */
+  private syncLiveWindowBoundsToFloatingChild(child: unknown, liveWin: Window): unknown {
+    if (!child || typeof child !== "object" || !liveWin || liveWin.closed) return child;
+    try {
+      const cloned = { ...(child as Record<string, unknown>) };
+      if (typeof liveWin.outerWidth === "number" && liveWin.outerWidth > 0) {
+        cloned.width = liveWin.outerWidth;
+      }
+      if (typeof liveWin.outerHeight === "number" && liveWin.outerHeight > 0) {
+        cloned.height = liveWin.outerHeight;
+      }
+      if (typeof liveWin.screenX === "number") {
+        cloned.x = liveWin.screenX;
+      }
+      if (typeof liveWin.screenY === "number") {
+        cloned.y = liveWin.screenY;
+      }
+      return cloned;
+    } catch {
+      return child;
     }
   }
 
