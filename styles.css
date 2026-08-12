@@ -374,6 +374,8 @@
   background-color: currentcolor;
   -webkit-mask-image: url("data:image/svg+xml,<svg viewBox='0 0 12 12' fill='none' xmlns='http://www.w3.org/2000/svg'><path fill-rule='evenodd' clip-rule='evenodd' d='M6 12C9.31371 12 12 9.31371 12 6C12 2.68629 9.31371 0 6 0C2.68629 0 0 2.68629 0 6C0 9.31371 2.68629 12 6 12ZM3.8705 3.09766L6.00003 5.22718L8.12955 3.09766L8.9024 3.8705L6.77287 6.00003L8.9024 8.12955L8.12955 8.9024L6.00003 6.77287L3.8705 8.9024L3.09766 8.12955L5.22718 6.00003L3.09766 3.8705L3.8705 3.09766Z' fill='currentColor'/></svg>");
   mask-image: url("data:image/svg+xml,<svg viewBox='0 0 12 12' fill='none' xmlns='http://www.w3.org/2000/svg'><path fill-rule='evenodd' clip-rule='evenodd' d='M6 12C9.31371 12 12 9.31371 12 6C12 2.68629 9.31371 0 6 0C2.68629 0 0 2.68629 0 6C0 9.31371 2.68629 12 6 12ZM3.8705 3.09766L6.00003 5.22718L8.12955 3.09766L8.9024 3.8705L6.77287 6.00003L8.9024 8.12955L8.12955 8.9024L6.00003 6.77287L3.8705 8.9024L3.09766 8.12955L5.22718 6.00003L3.09766 3.8705L3.8705 3.09766Z' fill='currentColor'/></svg>");
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
 }
 
 .window-layouts-modal .window-layouts-search-clear:hover {
@@ -581,6 +583,8 @@
 }
 
 .window-layouts-modal .suggestion-title.qsp-title {
+  display: flex;
+  align-items: center;
   font-weight: var(--font-semibold, 500);
   font-size: var(--font-ui-medium, 14px);
   color: var(--text-normal);
@@ -591,6 +595,35 @@
   white-space: nowrap;
   max-width: 100%;
   min-width: 0;
+}
+
+/* Match the Space identity in the switcher with the popout corner treatment. */
+.window-space-title-visual {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  margin-right: 6px;
+}
+
+/* The accent belongs to the whole Space panel, not to the icon/name row. */
+.window-layouts-modal .suggestion-item.window-layout-item.has-window-space-accent-fold::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 18px;
+  height: 18px;
+  z-index: 0;
+  background: linear-gradient(
+    to bottom right,
+    var(--window-space-color) 50%,
+    transparent 50.5%
+  );
+  pointer-events: none;
+}
+
+.window-layouts-modal .suggestion-item.window-layout-item > * {
+  position: relative;
+  z-index: 1;
 }
 
 .window-layouts-modal .suggestion-note.qsp-note {
@@ -1035,7 +1068,7 @@
   position: fixed;
   top: 0;
   bottom: 0;
-  width: 44px;
+  width: var(--window-spaces-activity-bar-width, 44px);
   z-index: var(--layer-side-dock, 10);
   display: flex;
   flex-direction: column;
@@ -1060,10 +1093,10 @@
 
 /* 讓 popout 內容避開左右固定列 */
 body.is-popout-window.window-spaces-has-left-activity .workspace-split.mod-root {
-  margin-left: 44px;
+  margin-left: var(--window-spaces-activity-bar-width, 44px);
 }
 body.is-popout-window.window-spaces-has-right-activity .workspace-split.mod-root {
-  margin-right: 44px;
+  margin-right: var(--window-spaces-activity-bar-width, 44px);
 }
 
 /* 每個 Activity Bar 頂端（標題列高度）的拖曳區：拖曳移動整個視窗 */
@@ -1089,36 +1122,121 @@ body.is-popout-window.window-spaces-has-right-activity .workspace-split.mod-root
   font-size: 16px;
 }
 
-/* 在視窗左上角（space icon 區域範圍）以 space 識別色呈現「折頁」效果：
-   左上角的對角三角形實色，模擬 sticky note 的折角。
-   放在 body::before（獨立於上層 drag 元件），不受 drag 元件邊框與尺寸限制。
-   z-index 需高於 activity bar（--layer-side-dock, 10）才能浮在 icon 之上、
-   呈現透明的疊層；同時低於邊框 ::after（999999）以免遮住邊框。 */
-body.is-popout-window.has-window-space-color::before {
-  content: "";
+/* Keep the Space icon visible even when the left Activity Bar is hidden. */
+.window-spaces-space-identity {
   position: fixed;
   top: 0;
   left: 0;
-  width: 24px;
+  width: var(--window-spaces-activity-bar-width, 44px);
+  height: var(--titlebar-height, 40px);
+  z-index: 102;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--window-space-color, var(--text-muted));
+  pointer-events: auto;
+  cursor: default;
+  user-select: none;
+  /* The identity is also the fallback drag region when the left Activity Bar
+     is hidden. Keep it draggable in both states so the icon never becomes an
+     unreliable dead spot at the top-left corner. */
+  -webkit-app-region: drag;
+}
+.window-spaces-space-identity .window-spaces-space-icon {
+  position: absolute;
+  top: 15px;
+  left: 13px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 14px;
+  line-height: 14px;
+  font-size: 14px;
+  pointer-events: auto;
+  -webkit-app-region: drag;
+}
+.window-spaces-space-identity .window-spaces-space-icon svg {
+  width: 14px;
+  height: 14px;
+  color: var(--window-space-color, var(--text-muted));
+}
+
+/* When the left Activity Bar is present it owns its own drag strip. Let the
+   identity remain visible above the fold, but do not let it intercept the
+   Activity Bar toggle or view buttons. */
+body.is-popout-window.window-spaces-has-left-activity:not(.window-spaces-left-activity-hidden)
+  .window-spaces-space-identity {
+  left: 14px;
+  width: 16px;
+  height: 14px;
+  top: 0;
+  pointer-events: none;
+  -webkit-app-region: no-drag;
+}
+
+body.is-popout-window.window-spaces-has-left-activity:not(.window-spaces-left-activity-hidden)
+  .window-spaces-space-identity .window-spaces-space-icon {
+  left: 0;
+  pointer-events: none;
+  -webkit-app-region: no-drag;
+}
+
+/* Explicit state class for the fallback drag region. The important flags keep
+   this usable even when Obsidian's titlebar rules or a stale Activity Bar
+   state briefly win the cascade during a sidebar toggle. */
+.window-spaces-space-identity.window-spaces-space-identity-drag-region {
+  left: 0 !important;
+  width: var(--window-spaces-activity-bar-width, 44px) !important;
+  height: var(--titlebar-height, 40px) !important;
+  top: 0 !important;
+  pointer-events: auto !important;
+  -webkit-app-region: drag !important;
+}
+
+.window-spaces-space-identity.window-spaces-space-identity-drag-region
+  .window-spaces-space-icon {
+  pointer-events: auto !important;
+  -webkit-app-region: drag !important;
+}
+
+/* The Popout accent belongs to the whole window outer edge. Keep it as the
+   bottom layer so the independent Space icon/emoji remains unobstructed. */
+body.is-popout-window.has-window-space-folded-corner::before {
+  content: "";
+  position: fixed;
+  inset: 0 auto auto 0;
+  width: 18px;
   height: 18px;
+  /* Above the colored Activity Bar background, below the Space identity. */
+  z-index: 100;
   background: linear-gradient(
     to bottom right,
     var(--window-space-color) 50%,
     transparent 50.5%
   );
   pointer-events: none;
-  z-index: 100;
+}
+
+.workspace-tab-header-container.window-spaces-space-identity-tab-header {
+  padding-left: var(--window-spaces-activity-bar-width, 44px) !important;
+}
+
+.workspace-tab-header-container.window-spaces-space-identity-tab-header
+  .workspace-tab-header-container-inner {
+  padding-left: 0 !important;
 }
 
 /* Popout 視窗 4 邊全方向自訂主題顏色邊框 (使用 fixed ::after 頂層 inset box-shadow 覆蓋，動態適應各 OS/主題之視窗圓角) */
-body.is-popout-window.has-window-space-color::after {
+body.is-popout-window.has-window-space-border::after {
   content: "";
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  box-shadow: inset 0 0 0 3px var(--window-space-color) !important;
+  box-shadow: inset 0 0 0 var(--window-space-border-inset) var(--window-space-color) !important;
   pointer-events: none !important;
   z-index: 999999 !important;
   /* 視窗本身由 OS（Windows 11 DWM）套用圓角，若 ::after 維持直角會讓四個角落
@@ -1127,8 +1245,25 @@ body.is-popout-window.has-window-space-color::after {
   border-radius: var(--window-space-corner-radius, 8px) !important;
 }
 
-body.is-popout-window.has-window-space-color .window-spaces-activity-left {
+body.is-popout-window.has-window-space-border .window-spaces-activity-left {
   border-left: 2px solid var(--window-space-color);
+}
+
+.window-spaces-activity-hidden {
+  display: none !important;
+}
+
+/* A hidden Popout sidebar must release its split allocation as well as hide
+   its contents. Split proportions now use Obsidian's native flex-grow weight
+   semantics, so `display: none` alone removes the column from flex layout and
+   the remaining columns automatically redistribute by weight. The explicit
+   `flex-grow: 0` is kept as a belt-and-suspenders guard in case Obsidian
+   reapplies an inline flex-grow during a layout update. */
+.window-spaces-column-hidden {
+  display: none !important;
+  flex-grow: 0 !important;
+  width: 0 !important;
+  min-width: 0 !important;
 }
 
 /* 統一 Activity Bar、左上角拖曳區、以及所有 Tab Header Container 區域之背景色 */
@@ -1469,26 +1604,23 @@ body.is-popout-window .workspace-tab-header-spacer {
   height: 18px;
 }
 .window-space-color-badge {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  margin-right: 6px;
-  flex-shrink: 0;
+  display: none;
 }
 .window-space-item-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-right: 6px;
-  width: 16px;
-  height: 16px;
+  position: relative;
+  z-index: 1;
+  margin-right: 0;
+  width: 18px;
+  height: 18px;
   font-size: 14px;
   flex-shrink: 0;
 }
 .window-space-item-icon svg {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
 }
 
 .window-space-icon-setting-control {

@@ -1,4 +1,4 @@
-import { App, WorkspaceLeaf, Notice, TFile, setIcon } from "obsidian";
+import { App, WorkspaceLeaf, Notice, TFile, setIcon, WorkspaceWindowInitData } from "obsidian";
 import {
   WindowLayout,
   WindowState,
@@ -625,7 +625,7 @@ export class WindowLayoutManager {
 
 
   /** 開啟全新的 Popout 視窗（等待 leaf 與 DOM 都完成掛載後再回傳視窗物件） */
-  async openNewPopoutWindow(): Promise<Window | null> {
+  async openNewPopoutWindow(options: { initializeDefaults?: boolean } = {}): Promise<Window | null> {
     try {
       const workspace = this.app.workspace as unknown as ExtendedWorkspace & { openPopoutLeaf?: () => WorkspaceLeaf };
       const leaf = workspace.openPopoutLeaf?.();
@@ -660,6 +660,9 @@ export class WindowLayoutManager {
           console.warn("Failed to focus new popout window:", e);
         }
       }
+      if (options.initializeDefaults) {
+        await this.plugin.activityBars?.initializeNewWindow(targetWin);
+      }
       return targetWin;
     } catch (e) {
       console.warn("Failed to open new popout window:", e);
@@ -681,6 +684,9 @@ export class WindowLayoutManager {
         layout.autoSave = existing.autoSave;
         layout.icon = existing.icon;
         layout.color = existing.color;
+        layout.borderInset = existing.borderInset;
+        layout.showFoldedCorner = existing.showFoldedCorner;
+        layout.activityBars = existing.activityBars;
       }
 
       this.plugin.openSaveLayoutModal(layout, targetWin);
@@ -751,6 +757,9 @@ export class WindowLayoutManager {
           captured.includeGeometry = existing.includeGeometry;
           captured.icon = existing.icon;
           captured.color = existing.color;
+          captured.borderInset = existing.borderInset;
+          captured.showFoldedCorner = existing.showFoldedCorner;
+          captured.activityBars = existing.activityBars;
           this.lastValidSnapshots.set(targetWin, captured);
         }
       } catch {
@@ -1148,6 +1157,15 @@ export class WindowLayoutManager {
         if (existingLayout.color !== undefined) {
           capturedLayout.color = existingLayout.color;
         }
+        if (existingLayout.borderInset !== undefined) {
+          capturedLayout.borderInset = existingLayout.borderInset;
+        }
+        if (existingLayout.showFoldedCorner !== undefined) {
+          capturedLayout.showFoldedCorner = existingLayout.showFoldedCorner;
+        }
+        if (existingLayout.activityBars !== undefined) {
+          capturedLayout.activityBars = existingLayout.activityBars;
+        }
       }
 
       // 紀錄該視窗目前隱藏的側欄/分頁群組（Activity Bar 與 Pane 隱藏功能持久化）
@@ -1239,6 +1257,8 @@ export class WindowLayoutManager {
       // 1. 嘗試尋找目標現有視窗
       let targetIndex = -1;
       let targetWin: Window | null = null;
+      // 標記目標是否為本次 restore 才建立的全新 Popout（可走 leaf 層級重建）
+      let isNewlyCreatedWindow = false;
 
       if (options.forceNewWindow) {
         // 強制在新 Popout 視窗開啟
@@ -1277,8 +1297,29 @@ export class WindowLayoutManager {
           const popoutWinsBefore = new Set(this.getLivePopoutWindows());
 
           // 呼叫 openPopoutLeaf 建立新 Popout 分頁
-          const extWs = this.app.workspace as unknown as ExtendedWorkspace & { openPopoutLeaf?: () => WorkspaceLeaf };
-          const popoutLeaf = extWs.openPopoutLeaf?.();
+          isNewlyCreatedWindow = true;
+          const extWs = this.app.workspace as unknown as ExtendedWorkspace & {
+            openPopoutLeaf?: (data?: WorkspaceWindowInitData) => WorkspaceLeaf;
+          };
+          // 【幾何前置】openPopoutLeaf 接受 WorkspaceWindowInitData（x/y/size），
+          // 直接帶入 saved 幾何，讓新視窗在誕生瞬間就是正確位置與尺寸。
+          // 若不帶，Obsidian 會以預設幾何（Electron 預設 1025x801@螢幕中央）
+          // 建立，之後 restoreWindowGeometry 再校正會產生「先錯誤位置、
+          // 約 1 秒後才跳正」的兩階段跳動。
+          const popoutInitData: WorkspaceWindowInitData | undefined =
+            layout.includeGeometry !== false && layout.windowState
+              ? {
+                  x: layout.windowState.position?.x,
+                  y: layout.windowState.position?.y,
+                  size: layout.windowState.size
+                    ? {
+                        width: layout.windowState.size.width,
+                        height: layout.windowState.size.height,
+                      }
+                    : undefined,
+                }
+              : undefined;
+          const popoutLeaf = extWs.openPopoutLeaf?.(popoutInitData);
 
           // 輪詢等待全新的 Live Popout Window 在 Electron 中被正式掛載建立（最多等待 2 秒）
           let newlyCreatedWin: Window | null = null;
@@ -1311,41 +1352,67 @@ export class WindowLayoutManager {
         }
       }
 
-      // 3. 只替換目標 window 的 children，保留 floating container 與
-      // window id。Obsidian 1.12 的 floating schema 是：
-      // floating object -> window children -> split/tabs/leaf；不能把
-      // floating 當成陣列，也不能直接用 leaf/split 覆蓋 window。
+      // 3. 結構建立。新建的目標視窗若為簡單結構（單層 split / 單 tabs 群組），
+      // 直接以 leaf 層級 API 重建，完全不觸發全域 changeLayout——主視窗與其他
+      // popout 的 DOM/view 一律不受影響（changeLayout 內部會 clearLayout：
+      // 關閉所有 floating window、detach 主視窗與全部 popout 的 DOM 後重建，
+      // 代價極高）。巢狀 split 或取代既有視窗等複雜情境才 fallback 到 changeLayout。
+      let builtLeaves: WorkspaceLeaf[] | null = null;
       if (targetIndex >= 0 && layout.workspace?.layout) {
-        const currentFloatingWindow = floatingWindows[targetIndex];
-        const restoredWindow = this.prepareFloatingWindowForRestore(
-          layout.workspace.layout,
-          currentFloatingWindow,
-          layout.includeGeometry
-        );
-        const livePopoutsBeforeLayout = this.getLivePopoutWindows();
-        const floatingObj = currentLayout.floating as { type?: string; children?: unknown[] } | unknown[];
-        if (typeof floatingObj === "object" && floatingObj !== null && "type" in floatingObj && (floatingObj as { type?: string }).type === "floating" && Array.isArray((floatingObj as { children?: unknown[] }).children)) {
-          (floatingObj as { children: unknown[] }).children = (floatingObj as { children: unknown[] }).children.map(
-            (child: unknown, idx: number) => {
-              if (idx === targetIndex) return restoredWindow;
-              const liveWin = livePopoutsBeforeLayout.find(
-                (w) => this.findFloatingWindowIndexForWindow(w, floatingWindows) === idx
-              ) || livePopoutsBeforeLayout[idx];
-              if (liveWin && !liveWin.closed && this.isPopoutDocument(liveWin.document)) {
-                return this.syncLiveWindowBoundsToFloatingChild(child, liveWin);
+        const rootNode = this.extractLayoutRootNode(layout.workspace.layout);
+        if (isNewlyCreatedWindow && targetWin && this.isSimpleLayoutStructure(rootNode)) {
+          builtLeaves = await this.buildSimpleWindowStructure(targetWin, rootNode);
+          // 【方案 C】leaf 層級建立完成後、開啟檔案前，立即隱藏側欄。
+          // 側欄收合不依賴 leaf id（由 root split 的頂層欄位定位），
+          // 提前到這裡可避免「先顯示展開側欄、開檔後才收合」的二次跳動。
+          // 巢狀 split fallback（changeLayout）路徑仍在下方套用。
+          if (layout.hidden && targetWin) {
+            try {
+              if (layout.hidden.leftSidebar) {
+                this.plugin.popoutLayout.hideColumn(targetWin, "left");
               }
-              return child;
+              if (layout.hidden.rightSidebar) {
+                this.plugin.popoutLayout.hideColumn(targetWin, "right");
+              }
+            } catch {
+              // Ignore DOM not ready error during early apply
             }
+          }
+        } else {
+          const currentFloatingWindow = floatingWindows[targetIndex];
+          const restoredWindow = this.prepareFloatingWindowForRestore(
+            layout.workspace.layout,
+            currentFloatingWindow,
+            layout.includeGeometry,
+            layout.windowState
           );
-        } else if (Array.isArray(floatingObj)) {
-          floatingObj[targetIndex] = restoredWindow;
+          const livePopoutsBeforeLayout = this.getLivePopoutWindows();
+          const floatingObj = currentLayout.floating as { type?: string; children?: unknown[] } | unknown[];
+          if (typeof floatingObj === "object" && floatingObj !== null && "type" in floatingObj && (floatingObj as { type?: string }).type === "floating" && Array.isArray((floatingObj as { children?: unknown[] }).children)) {
+            (floatingObj as { children: unknown[] }).children = (floatingObj as { children: unknown[] }).children.map(
+              (child: unknown, idx: number) => {
+                if (idx === targetIndex) return restoredWindow;
+                const liveWin = livePopoutsBeforeLayout.find(
+                  (w) => this.findFloatingWindowIndexForWindow(w, floatingWindows) === idx
+                ) || livePopoutsBeforeLayout[idx];
+                if (liveWin && !liveWin.closed && this.isPopoutDocument(liveWin.document)) {
+                  return this.syncLiveWindowBoundsToFloatingChild(child, liveWin);
+                }
+                return child;
+              }
+            );
+          } else if (Array.isArray(floatingObj)) {
+            floatingObj[targetIndex] = restoredWindow;
+          }
+          await workspace.changeLayout(currentLayout);
         }
-        await workspace.changeLayout(currentLayout);
       }
 
-      await new Promise((resolve) => window.setTimeout(resolve, 150));
-
-      // 4. 取得目標 Popout 視窗最新活體 DOM Window 並安全開啟所有檔案
+      // 4. 取得目標 Popout 視窗最新活體 DOM Window。changeLayout 會關閉並
+      // 重建所有 floating window（含 openPopoutLeaf 剛建立的目標窗），因此
+      // 必須在 changeLayout 完成後立即重新解析目標視窗，並立刻套用保存的
+      // 幾何，避免新視窗停留在預設位置直到檔案開啟完成後才被移動
+      // （兩階段位置跳動）。
       const livePopouts = this.getLivePopoutWindows();
       let liveTargetWin: Window | null = null;
 
@@ -1368,6 +1435,15 @@ export class WindowLayoutManager {
         targetWin
       ) || targetWin;
 
+      // 【幾何立即套用】changeLayout 以 window.open features 重建視窗，其
+      // x/y 不一定被 Electron 採用；立即用 windowState 強制校正，再開始
+      // 開啟檔案，消除「先偏位、開檔後才回正」的位移感。
+      if (targetWin) {
+        this.restoreWindowGeometry(targetWin, layout.windowState, layout.includeGeometry, true);
+      }
+
+      await new Promise((resolve) => window.setTimeout(resolve, 150));
+
       let missingFiles: string[] = [];
       if (options.validateFiles !== false && savedLeaves.length > 0) {
         missingFiles = await this.restoreFileStatesForWindow(
@@ -1375,6 +1451,18 @@ export class WindowLayoutManager {
           savedLeaves,
           layout.workspace?.activeFile
         );
+      }
+
+      // leaf 層級建立情境：saved leaf 與 live leaf 的 id 不同，需以「先序
+      // 順序」對應套用 pinned，並把 hidden leaf id 轉換成 live id。
+      if (builtLeaves && builtLeaves.length > 0) {
+        this.applyPinnedStateToBuiltLeaves(builtLeaves, savedLeaves);
+        if (layout.hidden?.hiddenLeafIds?.length && targetWin) {
+          const hiddenIds = new Set(layout.hidden.hiddenLeafIds);
+          layout.hidden.hiddenLeafIds = builtLeaves
+            .filter((_, i) => hiddenIds.has(savedLeaves[i]?.id))
+            .map((leaf) => (leaf as unknown as ExtendedWorkspaceLeaf).id || "");
+        }
       }
 
       this.setLayoutLabelForWindow(targetWin, layout.name);
@@ -1389,7 +1477,10 @@ export class WindowLayoutManager {
       // 5. 調整視窗尺寸與座標，並聚焦視窗
       if (targetWin) {
         this.layoutWindows.set(layout, targetWin);
-        this.restoreWindowGeometry(targetWin, layout.windowState, layout.includeGeometry, true);
+        this.plugin.activityBars?.renderWindow(targetWin);
+        // 幾何已在 changeLayout 後立即套用；此處僅以差異驗證（force=false）
+        // 校正檔案開啟期間可能出現的微幅偏移，避免無謂地移動已就位的視窗。
+        this.restoreWindowGeometry(targetWin, layout.windowState, layout.includeGeometry, false);
 
         // 若使用者在 restore 的非同步等待期間已切回主視窗，就不能再把全域
         // activeLeaf 指到 popout leaf，否則下一次主視窗 File Explorer 點擊
@@ -1413,6 +1504,13 @@ export class WindowLayoutManager {
             console.warn("Failed to focus target window:", e);
           }
         }
+      }
+
+      // 視窗已顯示：補載仍為空的 deferred view（file-explorer / search 等）。
+      // leaf 層級路徑的 view 在視窗未顯示時建立會變成 DeferredView，需在
+      // 視窗顯示後（containerEl 可見）重新 loadIfDeferred 才會載入真實內容。
+      if (targetWin) {
+        this.ensureDeferredViewsLoaded(targetWin);
       }
 
       WindowLayoutsModal.renderAllInstances();
@@ -1490,6 +1588,15 @@ export class WindowLayoutManager {
         if (layout.includeGeometry === undefined && existing.includeGeometry !== undefined) {
           layout.includeGeometry = existing.includeGeometry;
         }
+        if (layout.borderInset === undefined && existing.borderInset !== undefined) {
+          layout.borderInset = existing.borderInset;
+        }
+        if (layout.showFoldedCorner === undefined && existing.showFoldedCorner !== undefined) {
+          layout.showFoldedCorner = existing.showFoldedCorner;
+        }
+        if (layout.activityBars === undefined && existing.activityBars !== undefined) {
+          layout.activityBars = existing.activityBars;
+        }
         settings.spaces[existingIndex] = layout;
       } else {
         // 全新建立 (由 A 複製/改名另存為 B 時，重設 B 的 createdAt 為當時時間)
@@ -1497,14 +1604,6 @@ export class WindowLayoutManager {
         layout.updatedAt = now;
         layout.timestamp = now;
         settings.spaces.push(layout);
-      }
-
-      // 限制佈局數量
-      if (
-        settings.maxLayouts &&
-        settings.spaces.length > settings.maxLayouts
-      ) {
-        settings.spaces = settings.spaces.slice(-settings.maxLayouts);
       }
 
       await this.plugin.saveSettings();
@@ -1903,10 +2002,340 @@ export class WindowLayoutManager {
    * 以目前 WorkspaceWindow 的 id/容器為基礎，只替換其 children。
    * Obsidian 1.12 的 layout schema 是 floating -> window -> split/tabs/leaf。
    */
+  /**
+   * 以 windowState（screenX/screenY、outerWidth/outerHeight）覆寫 floating
+   * window 節點的序列化幾何，統一 changeLayout 建立視窗時使用的座標來源，
+   * 避免 Obsidian 序列化幾何與 screen 座標不一致造成 restore 後的位移。
+   */
+  private applyWindowStateGeometry(
+    node: Record<string, unknown> | null | undefined,
+    windowState: WindowState | null | undefined
+  ): void {
+    if (!node || !windowState) return;
+    const size = windowState.size;
+    if (size && size.width > 0 && size.height > 0) {
+      node.width = size.width;
+      node.height = size.height;
+    }
+    if (windowState.position) {
+      node.x = windowState.position.x;
+      node.y = windowState.position.y;
+    }
+  }
+
+  /**
+   * 取得實際的根結構節點。保留 window/floating 包裝：多 child 的 window
+   * （如 Professional：tabs + tabs + split）也可由 leaf 層級重建，是否可行
+   * 交由 isSimpleLayoutStructure 遞迴判定。
+   */
+  private extractLayoutRootNode(layout: any): any {
+    return layout ?? null;
+  }
+
+  /**
+   * 判斷 layout 結構是否可用 leaf 層級 API 重建：
+   * - leaf / tabs：可。
+   * - split：children 皆為 tabs/leaf（無巢狀 split）。
+   * - window / floating：children 皆為 tabs/leaf/split，且其中的 split
+   *   本身無巢狀。
+   * 其餘（巢狀 split、未知節點）一律回傳 false，交由全域 changeLayout fallback。
+   */
+  private isSimpleLayoutStructure(node: any, parentDirection?: string): boolean {
+    if (!node) return false;
+    if (node.type === "leaf" || node.type === "tabs") return true;
+    if (node.type === "split") {
+      if (!Array.isArray(node.children) || node.children.length === 0) return false;
+      // 方向與父 split 相同時，createLeafBySplit 會扁平插入（無法包出巢狀
+      // split），先序/佔位演算法都無法精確重建 → fallback。
+      if (parentDirection && node.direction === parentDirection) return false;
+      // 不支援 split 內再套 split（更深巢狀）
+      for (const child of node.children) {
+        if (!child) return false;
+        if (child.type !== "tabs" && child.type !== "leaf") return false;
+      }
+      return true;
+    }
+    if (node.type === "window" || node.type === "floating") {
+      if (!Array.isArray(node.children) || node.children.length === 0) return false;
+      const dir = node.direction || "vertical";
+      for (const child of node.children) {
+        if (!child) return false;
+        if (child.type === "split") {
+          if (!this.isSimpleLayoutStructure(child, dir)) return false;
+        } else if (child.type !== "tabs" && child.type !== "leaf") {
+          return false;
+        }
+      }
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * 在目標視窗內以 leaf 層級 API 重建結構（不觸發全域 changeLayout）。
+   *
+   * 使用「兩階段」演算法以正確支援單層巢狀 split（如 FET-Migration 的
+   * window > [hSplit, tabs, tabs]）：
+   * 1. 階段一：先為頂層每個單位建立「佔位 leaf」（同一層級，依序
+   *    createLeafBySplit），確保外層分割結構完整。
+   * 2. 階段二：逐個單位填充——tabs/leaf 直接填 leaf；split 則以其佔位
+   *    leaf 為錨點遞迴展開（此時錨點位於外層正確層級，createLeafBySplit
+   *    建立的新 split 會正確替換佔位位置）。
+   *
+   * 回傳依建立順序（= saved 樹先序）的 leaf 清單，供後續 openFile 配對。
+   */
+  private async buildSimpleWindowStructure(
+    targetWin: Window,
+    rootNode: any
+  ): Promise<WorkspaceLeaf[]> {
+    const workspace = this.app.workspace as unknown as ExtendedWorkspace;
+    const initialLeaves = this.getLeavesForWindow(targetWin);
+    const built: WorkspaceLeaf[] = [];
+
+    const fillTabs = async (leaf: WorkspaceLeaf, node: any): Promise<WorkspaceLeaf> => {
+      // 把 tabs/leaf 節點的 leaf 依序填入 leaf 所在的 tabs 群組，回傳最後 leaf
+      const leafNodes =
+        node.type === "leaf"
+          ? [node]
+          : Array.isArray(node.children)
+            ? node.children.filter((c: any) => c?.type === "leaf")
+            : [];
+      let last: WorkspaceLeaf = leaf;
+      for (let i = 0; i < leafNodes.length; i++) {
+        if (i > 0) {
+          const parent = (last as unknown as ExtendedWorkspaceLeaf).parent;
+          if (!parent) break;
+          last = workspace.createLeafInParent(
+            parent as unknown as Parameters<typeof workspace.createLeafInParent>[0],
+            -1
+          );
+        }
+        await this.applyBuiltLeafState(last, leafNodes[i]);
+        built.push(last);
+      }
+      return last;
+    };
+
+    const expandSplit = async (
+      node: any,
+      direction: string,
+      placeholderLeaf: WorkspaceLeaf
+    ): Promise<WorkspaceLeaf> => {
+      // 在佔位 leaf 位置展開 split：children 依序建立；方向不同時
+      // createLeafBySplit 會建立新 split 替換佔位位置（isSimpleLayoutStructure
+      // 已保證每個 split 方向與其父不同，因此必然成立）。
+      let anchor: WorkspaceLeaf = placeholderLeaf;
+      for (let i = 0; i < node.children.length; i++) {
+        const child = node.children[i];
+        if (i > 0) {
+          anchor = workspace.createLeafBySplit(
+            anchor,
+            direction === "horizontal" ? "horizontal" : "vertical"
+          );
+        }
+        anchor = await fillTabs(anchor, child);
+      }
+      return anchor;
+    };
+
+    const isContainer = rootNode?.type === "window" || rootNode?.type === "floating";
+    const topDirection = isContainer ? rootNode.direction || "vertical" : "vertical";
+    const topUnits: any[] = isContainer ? rootNode.children || [] : [rootNode];
+
+    // 階段一：建立頂層佔位 leaf（同層級依序分割）
+    const placeholders: WorkspaceLeaf[] = [];
+    let anchor: WorkspaceLeaf | null = initialLeaves[0] || null;
+    for (let i = 0; i < topUnits.length; i++) {
+      if (i > 0) {
+        if (!anchor) break;
+        try {
+          anchor = workspace.createLeafBySplit(anchor, topDirection);
+        } catch (e) {
+          console.warn("Failed to split leaf during restore:", e);
+          break;
+        }
+      }
+      if (!anchor) break;
+      placeholders.push(anchor);
+    }
+
+    // 階段二：填充 / 展開每個頂層單位
+    for (let i = 0; i < topUnits.length && i < placeholders.length; i++) {
+      const unit = topUnits[i];
+      const placeholder = placeholders[i];
+      if (unit?.type === "split") {
+        await expandSplit(unit, unit.direction, placeholder);
+      } else {
+        await fillTabs(placeholder, unit);
+      }
+    }
+
+    // 結構建立完成後，立即依 saved dimension 套用 flex-grow 權重
+    // （與 Obsidian 原生 setDimension 語意一致）。createLeafBySplit 建立
+    // 時每個分割都是 50/50 均分；此處用 saved 的 0~100 權重覆寫，讓視窗
+    // 第一幀即為正確比例，restore 完成後不再需要 activityBar 以 flex-basis
+    // 覆寫（避免兩階段跳動）。
+    this.applySavedSplitDimensions(targetWin, rootNode);
+
+    return built;
+  }
+
+  /**
+   * 依 saved layout 的 dimension（Obsidian flex-grow 權重，0~100）遞迴
+   * 套用 split 比例。與 Obsidian 原生 `setDimension` 語意一致：
+   * - flex-grow 權重在容器縮放時自動重新分配；
+   * - display:none 隱藏側欄時，剩餘欄位自動填滿（不需 rebalance）。
+   */
+  private applySavedSplitDimensions(win: Window, rootNode: any): void {
+    if (!win || win.closed || !rootNode) return;
+    const rootEl = win.document?.querySelector<HTMLElement>(".workspace-split.mod-root");
+    if (!rootEl) return;
+
+    // 建立 containerEl → Obsidian WorkspaceItem 對應，以便用 setDimension()
+    // 同時寫入 dimension 屬性（Obsidian serialize 會保存）與 flex-grow
+    // （視覺比例）。只設 CSS flex-grow 會讓「restore 後重新儲存」時
+    // dimension 丟失（Obsidian serialize 讀的是物件的 dimension 屬性）。
+    const elToItem = new Map<HTMLElement, { setDimension?: (v: number) => void }>();
+    try {
+      (this.app.workspace as unknown as {
+        iterateAllLeaves: (cb: (leaf: any) => void) => void;
+      }).iterateAllLeaves((leaf: any) => {
+        if (!leaf || this.getWindowForLeaf(leaf) !== win) return;
+        let item: any = leaf.parent;
+        let guard = 0;
+        while (item && guard++ < 20) {
+          const itemEl = (item as { containerEl?: HTMLElement }).containerEl;
+          if (itemEl instanceof HTMLElement && !elToItem.has(itemEl)) {
+            elToItem.set(itemEl, item);
+          }
+          item = item.parent;
+        }
+      });
+    } catch {
+      // iterateAllLeaves 失敗時退回首選（僅 CSS）
+    }
+
+    const getSplitChildren = (el: HTMLElement): HTMLElement[] =>
+      Array.from(el.children).filter(
+        (child): child is HTMLElement =>
+          child instanceof HTMLElement &&
+          (child.classList.contains("workspace-tabs") ||
+            child.classList.contains("workspace-split"))
+      );
+
+    const setFlexGrow = (domEl: HTMLElement, dimension: number): void => {
+      // 優先走 Obsidian setDimension：寫入 dimension 屬性 + flex-grow，
+      // restore 後重新儲存時比例才不會丟失。
+      const item = elToItem.get(domEl);
+      if (item && typeof item.setDimension === "function") {
+        // Obsidian setDimension 對 <=0 或 >=100 的值會設成 null（清除），
+        // 因此僅在 (0,100) 區間使用；100 走純 CSS 避免被清除。
+        if (dimension > 0 && dimension < 100) {
+          item.setDimension(dimension);
+          return;
+        }
+      }
+      // fallback：僅設 CSS flex-grow（setCssProps 需 kebab-case key）
+      const customEl = domEl as unknown as {
+        setCssProps?: (props: Record<string, string>) => void;
+      };
+      const flexGrow = String(dimension);
+      if (typeof customEl.setCssProps === "function") {
+        customEl.setCssProps({ "flex-grow": flexGrow });
+      } else {
+        domEl.style.setProperty("flex-grow", flexGrow);
+      }
+    };
+
+    const applyNode = (node: any, domEl: HTMLElement | null | undefined): void => {
+      if (!node || !domEl) return;
+      const dimension = Number(node.dimension);
+      if (Number.isFinite(dimension) && dimension > 0 && dimension <= 100) {
+        setFlexGrow(domEl, dimension);
+      }
+      if (node.type === "split" && Array.isArray(node.children)) {
+        const domChildren = getSplitChildren(domEl);
+        node.children.forEach((child: any, index: number) => {
+          applyNode(child, domChildren[index]);
+        });
+      }
+    };
+
+    // window/floating 包裝：其 children 對應 rootEl 的頂層欄位
+    if (rootNode.type === "window" || rootNode.type === "floating") {
+      const domChildren = getSplitChildren(rootEl);
+      (Array.isArray(rootNode.children) ? rootNode.children : []).forEach(
+        (child: any, index: number) => {
+          applyNode(child, domChildren[index]);
+        }
+      );
+    } else {
+      applyNode(rootNode, rootEl);
+    }
+  }
+
+  /**
+   * 為 leaf 層級建立的 leaf 設定 view state。
+   * 檔案 leaf 交由 restoreFileStatesForWindow 的 openFile 處理（此處跳過）；
+   * 非檔案 leaf 在此先建立 view，讓後續的 ensureViewRenderedWithRetries 能渲染。
+   */
+  private async applyBuiltLeafState(leaf: WorkspaceLeaf, node: any): Promise<void> {
+    if (!leaf || !node) return;
+    const filePath = this.getFilePathFromLeafState({
+      type: node.type,
+      state: (node.state as { state?: Record<string, unknown> } | undefined)?.state || {},
+    });
+    if (filePath) return;
+
+    const nodeState = (node.state as { type?: string; state?: Record<string, unknown> } | undefined) || {};
+    await leaf.setViewState({
+      type: nodeState.type || node.type || "empty",
+      active: false,
+      state: nodeState.state || {},
+    });
+
+    // 核心 view（file-explorer / search / outline 等）是 deferred view：
+    // setViewState 只建立 tab 標題，內容需 loadIfDeferred() 才會載入。
+    // 未載入時 content area 會是空的（先前 changeLayout 路徑由 Obsidian
+    // 的 setLayout 自動 load；leaf 層級路徑需自行處理）。
+    const extLeaf = leaf as unknown as { isDeferred?: boolean; loadIfDeferred?: () => Promise<void> };
+    if (extLeaf.isDeferred && typeof extLeaf.loadIfDeferred === "function") {
+      try {
+        await extLeaf.loadIfDeferred();
+      } catch (e) {
+        console.warn("Failed to load deferred view during restore:", e);
+      }
+    }
+  }
+
+  /**
+   * leaf 層級建立後，依 saved 順序套用 pinned 狀態
+   * （檔案 leaf 需於 openFile 之後才 toggle，避免 openFile 重置）。
+   */
+  private applyPinnedStateToBuiltLeaves(built: WorkspaceLeaf[], saved: ViewState[]): void {
+    built.forEach((leaf, i) => {
+      const savedLeaf = saved[i];
+      if (!savedLeaf || savedLeaf.pinned !== true) return;
+      const extLeaf = leaf as unknown as {
+        togglePinned?: () => void;
+        getViewState?: () => { pinned?: boolean };
+      };
+      const isPinned = extLeaf.getViewState?.()?.pinned === true;
+      if (!isPinned && typeof extLeaf.togglePinned === "function") {
+        try {
+          extLeaf.togglePinned();
+        } catch {
+          // Ignore pinned toggle error
+        }
+      }
+    });
+  }
+
   private prepareFloatingWindowForRestore(
     savedLayout: any,
     currentWindow: any,
-    includeGeometry = true
+    includeGeometry = true,
+    windowState?: WindowState | null
   ): any {
     const saved = JSON.parse(JSON.stringify(savedLayout));
 
@@ -1930,6 +2359,8 @@ export class WindowLayoutManager {
           delete merged.zoom;
           delete merged.isMaximized;
           delete merged.isFullScreen;
+        } else {
+          this.applyWindowStateGeometry(merged, windowState);
         }
 
         return merged;
@@ -1949,6 +2380,8 @@ export class WindowLayoutManager {
         delete res.zoom;
         delete res.isMaximized;
         delete res.isFullScreen;
+      } else {
+        this.applyWindowStateGeometry(res, windowState);
       }
 
       return res;
@@ -1963,6 +2396,8 @@ export class WindowLayoutManager {
       delete saved.zoom;
       delete saved.isMaximized;
       delete saved.isFullScreen;
+    } else if (saved?.type === "window") {
+      this.applyWindowStateGeometry(saved, windowState);
     }
 
     return saved.type === "window" ? saved : this.normalizeFloatingLayout(saved);
@@ -2530,15 +2965,21 @@ export class WindowLayoutManager {
     return !!leaf && !!(leaf.view as { file?: unknown } | null)?.file;
   }
 
-  /** 檢查 leaf 的 `.view-content` 是否已渲染出實際內容。 */
+  /** 檢查 leaf 是否已渲染出實際內容。 */
   private hasRenderedContent(leaf: WorkspaceLeaf | null): boolean {
     if (!leaf) return false;
     const leafEl = (leaf as unknown as ExtendedWorkspaceLeaf).containerEl ||
       (leaf.view as { containerEl?: HTMLElement } | null)?.containerEl;
     if (!(leafEl instanceof HTMLElement)) return false;
+    // 標準 view：.view-content 有子元素即已渲染。
     const content = leafEl.querySelector<HTMLElement>(".view-content");
-    if (!content) return false;
-    return content.children.length > 0;
+    if (content) return content.children.length > 0;
+    // File Explorer 家族（原生 file-explorer 與 Folder Space 重用同一 DOM 結構，
+    // 無 .view-content）：nav-files-container 有子元素即已渲染。
+    // 避免 restore 後的 lifecycle retry 把已渲染的 folder tree 反覆 rebuild（抖動）。
+    const navFiles = leafEl.querySelector<HTMLElement>(".nav-files-container");
+    if (navFiles) return navFiles.children.length > 0;
+    return false;
   }
 
   /** 強制重新渲染 leaf 的 view（重建視圖，重新執行 onOpen）。 */
@@ -2628,6 +3069,68 @@ export class WindowLayoutManager {
         if (targetWin.closed) return;
         this.ensureViewRendered(leaf);
       }, 200);
+    }
+  }
+
+  /**
+   * 視窗已顯示後，對仍無內容的 deferred view（file-explorer / search 等）
+   * 強制 loadIfDeferred——此時 containerEl 可見，setViewState 會建立真實
+   * view（而非 DeferredView），內容即可渲染。300ms 後再確認一次，涵蓋
+   * 視窗建立初期 onOpen 的非同步渲染延遲。
+   */
+  private ensureDeferredViewsLoaded(targetWin: Window): void {
+    if (!targetWin || targetWin.closed) return;
+    const attempt = async (): Promise<void> => {
+      if (targetWin.closed) return;
+      const leaves = this.getLeavesForWindow(targetWin);
+      // 依序 await 處理，避免多個 rebuildView 並發互相衝突（working 標記會
+      // 讓彼此的 setViewState 被跳過，導致停在半初始化空白）。
+      for (const leaf of leaves) {
+        if (this.isFileView(leaf) || this.hasRenderedContent(leaf)) continue;
+        const extLeaf = leaf as unknown as {
+          isDeferred?: boolean;
+          loadIfDeferred?: () => Promise<void>;
+          rebuildView?: () => Promise<void>;
+        };
+        if (extLeaf.isDeferred && typeof extLeaf.loadIfDeferred === "function") {
+          try {
+            await extLeaf.loadIfDeferred();
+          } catch {
+            // Ignore deferred load error
+          }
+          continue;
+        }
+        // 非 deferred 但內容仍空：視窗未顯示時建立的 view 停在半初始化
+        // （open() 未完成，containerEl 空白）。視窗顯示後 rebuildView 可
+        // 正確渲染；多階段 attempt 涵蓋視窗顯示時序的不確定性。
+        this.renderAttemptedLeaves.delete(leaf);
+        if (typeof extLeaf.rebuildView === "function") {
+          try {
+            await extLeaf.rebuildView();
+          } catch {
+            // Ignore rebuild error; 後續 attempt 會再試
+          }
+        } else {
+          this.rebuildViewIfNeeded(leaf);
+        }
+      }
+    };
+    void attempt();
+    if (typeof targetWin.setTimeout === "function") {
+      [300, 1200, 2500].forEach((ms) => targetWin.setTimeout(() => void attempt(), ms));
+    }
+    // 視窗尚未顯示（Electron 顯示延遲）時，前面的 attempt 可能全部太早。
+    // 視窗首次變為 visible 時再補載一次——此時 rebuildView 能正確渲染。
+    const doc = targetWin.document;
+    if (doc && typeof doc.addEventListener === "function") {
+      doc.addEventListener(
+        "visibilitychange",
+        () => {
+          if (targetWin.closed) return;
+          if (doc.visibilityState === "visible") void attempt();
+        },
+        { once: true }
+      );
     }
   }
 

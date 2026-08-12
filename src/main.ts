@@ -31,12 +31,12 @@ import {
 import { PopoutActivityBarManager } from "./popout/activityBar";
 import { WorkspaceInterceptor } from "./popout/workspaceInterceptor";
 import { BUILTIN_SIDEBAR_VIEWS } from "./popout/viewRegistry";
+import { DEFAULT_SPACE_ICON } from "./spaceVisuals";
 
 const DEFAULT_SETTINGS: WindowSettings = {
   spaces: [],
   autoSave: false,
   showNotifications: true,
-  maxLayouts: 20,
   version: "1.0.0",
   showLayoutStatusBar: true,
   layoutStatusBarDefaultApplied: false,
@@ -45,12 +45,18 @@ const DEFAULT_SETTINGS: WindowSettings = {
   sectionsOrder: [],
   groupBySection: true,
   showArchived: false,
-  defaultIcon: "layout",
+  defaultIcon: DEFAULT_SPACE_ICON,
   colorPresets: DEFAULT_COLOR_PRESETS,
-  showActivityBars: true,
+  defaultBorderInset: 1,
+  visualDefaultsVersion: 1,
+  defaultShowFoldedCorner: true,
   activityBars: {
     left: BUILTIN_SIDEBAR_VIEWS.filter((item) => item.side === "left"),
     right: BUILTIN_SIDEBAR_VIEWS.filter((item) => item.side === "right"),
+  },
+  activityBarDefaults: {
+    left: true,
+    right: true,
   },
   workspaceInterceptorEnabled: true,
 };
@@ -162,6 +168,24 @@ export default class WindowSpacesPlugin extends Plugin {
       delete savedSettings.layouts;
     }
     this.settings = Object.assign({}, DEFAULT_SETTINGS, savedSettings);
+
+    // Version 1 used 3px as the default frame inset. Migrate that legacy
+    // default to Obsidian's native 1px accent-border thickness once, while
+    // preserving other values that may have been explicitly chosen.
+    if (savedSettings?.visualDefaultsVersion !== 1) {
+      if (savedSettings?.defaultBorderInset === 3) {
+        this.settings.defaultBorderInset = 1;
+      }
+      this.settings.visualDefaultsVersion = 1;
+      await this.saveSettings();
+    }
+
+    // "layout" was the old built-in fallback. Migrate that legacy default so
+    // icon-less Spaces now use the neutral square icon.
+    if (savedSettings?.defaultIcon === "layout") {
+      this.settings.defaultIcon = DEFAULT_SPACE_ICON;
+      await this.saveSettings();
+    }
 
     // 將舊版「預設關閉」的狀態列設定遷移為新版預設開啟；之後尊重使用者的手動選擇。
     if (this.settings.layoutStatusBarDefaultApplied !== true) {

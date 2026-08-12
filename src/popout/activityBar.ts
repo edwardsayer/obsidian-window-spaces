@@ -1,16 +1,25 @@
 import { App, Notice, WorkspaceLeaf, setIcon } from "obsidian";
-import { ActivityBarItem, WindowLayout, WindowSettings } from "../types";
+import {
+  ActivityBarItem,
+  WindowLayout,
+  WindowSettings,
+  WindowSpaceActivityBarSettings,
+} from "../types";
 import { t } from "../i18n";
 import {
   isPopoutWindow,
+  isElementHidden,
+  ExtendedWorkspaceLeaf,
   PopoutLayoutEngine,
   PopoutSide,
 } from "../shared/popoutLayout";
 import { applyItemIcon, applyViewIcon, resolveViewLabel, setIconWithCheck } from "./viewRegistry";
+import { isSpaceEmoji, resolveSpaceIcon } from "../spaceVisuals";
 
 interface WindowBars {
   left: HTMLElement;
   right: HTMLElement;
+  spaceIdentity: HTMLElement;
   viewButtons: Map<string, HTMLButtonElement>;
   columnButtons: { left: HTMLButtonElement; right: HTMLButtonElement };
 }
@@ -30,6 +39,8 @@ export class PopoutActivityBarManager {
   private engine: PopoutLayoutEngine;
   private barsByWindow = new WeakMap<Window, WindowBars>();
   private injectedWindows = new Set<Window>();
+  private sidebarHintsByWindow = new WeakMap<Window, { left: boolean; right: boolean }>();
+  private columnEnsurePromises = new WeakMap<Window, Promise<void>>();
 
   constructor(plugin: { app: App; settings: WindowSettings }, engine: PopoutLayoutEngine) {
     this.app = plugin.app;
@@ -42,11 +53,282 @@ export class PopoutActivityBarManager {
   }
 
   isEnabled(): boolean {
-    return this.settings.showActivityBars !== false;
+    // Visibility is controlled independently by the left/right defaults and
+    // per-Space settings. Keep injecting the lightweight controller so a
+    // later setting change can update the existing Popout without reopening it.
+    return true;
   }
 
   getItemsForSide(side: PopoutSide): ActivityBarItem[] {
     return this.settings.activityBars?.[side] ?? [];
+  }
+
+  /** Snapshot the global Activity Bar defaults for a newly-created Space. */
+  getDefaultSettingsForNewSpace(): {
+    left: WindowSpaceActivityBarSettings;
+    right: WindowSpaceActivityBarSettings;
+  } {
+    const copy = (side: PopoutSide): WindowSpaceActivityBarSettings => ({
+      show: this.settings.activityBarDefaults?.[side] !== false,
+      items: this.getItemsForSide(side).map((item) => ({ ...item })),
+    });
+    return { left: copy("left"), right: copy("right") };
+  }
+
+  /**
+   * Build the initial columns for a brand-new empty Popout. The first
+   * configured button on each enabled side becomes that sidebar's first view.
+   * When no view is available, ensureSideColumn intentionally leaves a New Tab
+   * panel in that sidebar instead.
+   */
+  async initializeNewWindow(win: Window): Promise<void> {
+    if (!win || win.closed) return;
+
+    this.injectForWindow(win);
+    const leftVisible = this.settings.activityBarDefaults?.left !== false;
+    const rightVisible = this.settings.activityBarDefaults?.right !== false;
+    const engineWithSidebarHints = this.engine as PopoutLayoutEngine & {
+      setSidebarSides?: (targetWin: Window, sides: { left: boolean; right: boolean }) => void;
+    };
+    engineWithSidebarHints.setSidebarSides?.(win, { left: leftVisible, right: rightVisible });
+
+    if (leftVisible) {
+      await this.engine.ensureSideColumn(win, "left", this.getItemsForSide("left")[0]?.viewType);
+    }
+    // ensureSideColumn focuses the newly-created sidebar leaf. Before creating
+    // the opposite sidebar, explicitly reactivate the center pane so the right
+    // split is made around content rather than around the left sidebar.
+    if (leftVisible && rightVisible) {
+      const centerLeaf = this.engine.getCenterLeafSync(win);
+      this.app.workspace.setActiveLeaf(centerLeaf, { focus: false });
+    }
+    if (rightVisible) {
+      await this.engine.ensureSideColumn(win, "right", this.getItemsForSide("right")[0]?.viewType);
+    }
+
+    await this.waitForLayoutFrame(win);
+    this.applyDefaultColumnSizing(win, leftVisible, rightVisible);
+    this.renderWindow(win);
+  }
+
+  /**
+   * Keep a real content column while Activity Bar visibility changes on an
+   * existing Space. A newly enabled side is added next to the current center;
+   * enabling the second side then produces [left sidebar, content, right
+   * sidebar].
+   */
+  private ensureLayoutColumns(win: Window): Promise<void> {
+    const existing = this.columnEnsurePromises.get(win);
+    if (existing) return existing;
+
+    const promise = (async () => {
+      const layout = this.getLayoutForWindow(win);
+      if (!layout) return;
+
+      const leftVisible = this.isSideVisibleForWindow(win, "left");
+      const rightVisible = this.isSideVisibleForWindow(win, "right");
+      const initialColumns = this.engine.getTopLevelColumnElements(win).length;
+      let hints = this.sidebarHintsByWindow.get(win) || this.getEngineSidebarHints(win);
+
+      if (!hints) {
+        // Infer the physical endpoints once for legacy Spaces. Three columns
+        // already imply both sidebars; two columns use the requested side (or
+        // native Obsidian split classes when available). Keep this physical
+        // mapping even if an Activity Bar is later hidden, so re-enabling the
+        // other side does not create duplicate columns.
+        const columns = this.engine.getTopLevelColumnElements(win);
+        const hasLeftClass = columns[0]?.classList.contains("mod-left-split") === true;
+        const hasRightClass = columns[columns.length - 1]?.classList.contains("mod-right-split") === true;
+        hints = initialColumns >= 3
+          ? { left: true, right: true }
+          : initialColumns <= 1
+            ? { left: false, right: false }
+            : hasLeftClass || hasRightClass
+              ? { left: hasLeftClass, right: hasRightClass }
+              : { left: leftVisible && !rightVisible, right: rightVisible && !leftVisible };
+      }
+      this.setEngineSidebarHints(win, hints);
+
+      const ensureSide = async (side: PopoutSide) => {
+        if (!((side === "left" ? leftVisible : rightVisible) && !hints?.[side])) return;
+        await this.engine.ensureSideColumn(win, side, this.getItemsForWindowSide(win, side)[0]?.viewType);
+        hints = { ...(hints || { left: false, right: false }), [side]: true };
+        this.setEngineSidebarHints(win, hints);
+      };
+
+      await ensureSide("left");
+      await ensureSide("right");
+
+      // `hints` describes physical sidebar columns, not current Activity Bar
+      // visibility. Preserve it while a bar is hidden so a later toggle can
+      // reuse the existing column instead of splitting it again.
+      const finalHints = hints || { left: false, right: false };
+      this.sidebarHintsByWindow.set(win, finalHints);
+      this.setEngineSidebarHints(win, finalHints);
+
+      const finalColumns = this.engine.getTopLevelColumnElements(win).length;
+      if (finalColumns !== initialColumns) {
+        await this.waitForLayoutFrame(win);
+        if (!this.hasSavedLayoutDimensions(layout.workspace?.layout)) {
+          this.applyDefaultColumnSizing(win, leftVisible, rightVisible);
+        }
+      }
+    })().finally(() => {
+      this.columnEnsurePromises.delete(win);
+    });
+
+    this.columnEnsurePromises.set(win, promise);
+    return promise;
+  }
+
+  private getEngineSidebarHints(win: Window): { left: boolean; right: boolean } | undefined {
+    const engineWithSidebarHints = this.engine as PopoutLayoutEngine & {
+      getSidebarSides?: (targetWin: Window) => { left: boolean; right: boolean } | undefined;
+    };
+    return engineWithSidebarHints.getSidebarSides?.(win);
+  }
+
+  private setEngineSidebarHints(win: Window, hints: { left: boolean; right: boolean }): void {
+    this.sidebarHintsByWindow.set(win, { ...hints });
+    const engineWithSidebarHints = this.engine as PopoutLayoutEngine & {
+      setSidebarSides?: (targetWin: Window, sides: { left: boolean; right: boolean }) => void;
+    };
+    engineWithSidebarHints.setSidebarSides?.(win, hints);
+  }
+
+  private async waitForLayoutFrame(win: Window): Promise<void> {
+    const raf = win.requestAnimationFrame?.bind(win);
+    if (raf) {
+      await new Promise<void>((resolve) => raf(() => resolve()));
+      await new Promise<void>((resolve) => raf(() => resolve()));
+      return;
+    }
+    await new Promise<void>((resolve) => win.setTimeout(resolve, 0));
+  }
+
+  private applyDefaultColumnSizing(win: Window, leftVisible: boolean, rightVisible: boolean): void {
+    const columns = this.engine.getTopLevelColumnElements(win);
+    // flex-grow 權重語意（與 Obsidian 原生 setDimension 一致）：容器縮放或
+    // 側欄收合（display:none）時剩餘欄位自動重新分配，不需 rebalance。
+    const weights = leftVisible && rightVisible
+      ? [20, 60, 20]
+      : leftVisible
+        ? [24, 76]
+        : rightVisible
+          ? [76, 24]
+          : [100];
+
+    columns.forEach((column, index) => {
+      const weight = weights[index];
+      if (weight === undefined) return;
+      const customEl = column as unknown as {
+        setCssProps?: (props: Record<string, string>) => void;
+      };
+      const flexGrow = String(weight);
+      if (typeof customEl.setCssProps === "function") {
+        // setCssProps 以 setProperty(key, value) 套用，key 需為 kebab-case
+        customEl.setCssProps({ "flex-grow": flexGrow });
+      } else {
+        column.style.setProperty("flex-grow", flexGrow);
+      }
+    });
+  }
+
+  private hasSavedLayoutDimensions(node: any): boolean {
+    if (!node || !Array.isArray(node.children)) return false;
+    return node.children.some((child: any) =>
+      (typeof child?.dimension === "number" && Number.isFinite(child.dimension)) ||
+      this.hasSavedLayoutDimensions(child)
+    );
+  }
+
+  /**
+   * Reapply Obsidian's serialized split dimensions after a leaf-level restore.
+   * The leaf APIs recreate the tree but initially distribute every split
+   * equally; saved `dimension` values are the source of truth for final sizes.
+   *
+   * 以 flex-grow 權重語意（0~100，與 Obsidian 原生 setDimension 一致）遞迴
+   * 套用：容器縮放或側欄收合時剩餘欄位自動重新分配，不會像 flex-basis 百分比
+   * 那樣需要手動 rebalance。
+   */
+  private applySavedLayoutDimensions(win: Window): void {
+    const layout = this.getLayoutForWindow(win);
+    let rootNode = layout?.workspace?.layout as any;
+    if (!rootNode) return;
+
+    // Some workspace snapshots wrap the actual window tree in a `floating`
+    // node. The popout root element corresponds to that node's window child.
+    if (rootNode.type === "floating" && rootNode.children?.length === 1) {
+      rootNode = rootNode.children[0];
+    }
+
+    const rootEl = win.document.querySelector<HTMLElement>(
+      ".workspace-split.mod-root"
+    );
+    if (!rootEl) return;
+
+    const getSplitChildren = (splitEl: HTMLElement): HTMLElement[] =>
+      Array.from(splitEl.children).filter(
+        (child): child is HTMLElement =>
+          child instanceof HTMLElement &&
+          (child.classList.contains("workspace-tabs") || child.classList.contains("workspace-split"))
+      );
+
+    const setFlex = (el: HTMLElement, dimension: number): void => {
+      const customEl = el as unknown as {
+        setCssProps?: (props: Record<string, string>) => void;
+      };
+      // flex-grow 權重（與 Obsidian setDimension 一致），而非 flex-basis 百分比
+      const flexGrow = String(dimension);
+      if (typeof customEl.setCssProps === "function") {
+        // setCssProps 以 setProperty(key, value) 套用，key 需為 kebab-case
+        customEl.setCssProps({ "flex-grow": flexGrow });
+      } else {
+        el.style.setProperty("flex-grow", flexGrow);
+      }
+    };
+
+    const applyNode = (node: any, splitEl: HTMLElement): void => {
+      if (!node || !Array.isArray(node.children)) return;
+      const domChildren = getSplitChildren(splitEl);
+      node.children.forEach((child: any, index: number) => {
+        const domChild = domChildren[index];
+        if (!domChild) return;
+
+        const dimension = Number(child?.dimension);
+        if (Number.isFinite(dimension) && dimension > 0) {
+          setFlex(domChild, dimension);
+        }
+
+        if (child?.type === "split") {
+          applyNode(child, domChild);
+        }
+      });
+    };
+
+    applyNode(rootNode, rootEl);
+  }
+
+  private getItemsForWindowSide(win: Window, side: PopoutSide): ActivityBarItem[] {
+    const layout = this.getLayoutForWindow(win);
+    const savedSettings = layout?.activityBars?.[side];
+    if (savedSettings?.items) return savedSettings.items;
+
+    const items = this.getItemsForSide(side);
+    const selectedViewTypes = savedSettings?.viewTypes;
+    if (!selectedViewTypes) return items;
+    const selected = new Set(selectedViewTypes);
+    return items.filter((item) => selected.has(item.viewType));
+  }
+
+  private isSideVisibleForWindow(win: Window, side: PopoutSide): boolean {
+    const layout = this.getLayoutForWindow(win);
+    if (layout?.activityBars?.[side]) {
+      return layout.activityBars[side]?.show === true;
+    }
+    // A legacy saved Space without per-side settings is intentionally hidden.
+    if (layout) return false;
+    return this.settings.activityBarDefaults?.[side] !== false;
   }
 
   /**
@@ -110,6 +392,7 @@ export class PopoutActivityBarManager {
       return;
     }
 
+    const spaceIdentity = body.createDiv({ cls: "window-spaces-space-identity" });
     const left = body.createDiv({ cls: "window-spaces-activity-bar window-spaces-activity-left" });
     // 只有左側 bar 有拖曳 handle（右上方是原生視窗控制鈕，不能遮蓋）
     left.createDiv({ cls: "window-spaces-activity-drag" });
@@ -118,6 +401,7 @@ export class PopoutActivityBarManager {
     this.barsByWindow.set(win, {
       left,
       right,
+      spaceIdentity,
       viewButtons: new Map(),
       columnButtons: {
         left: left.createEl("button", { cls: "window-spaces-activity-btn clickable-icon", attr: { type: "button", "aria-label": t("activityBar.toggleColumn"), title: t("activityBar.toggleColumn") } }),
@@ -128,6 +412,8 @@ export class PopoutActivityBarManager {
     body.classList.add("window-spaces-has-left-activity");
     body.classList.add("window-spaces-has-right-activity");
 
+    this.injectedWindows.add(win);
+
     this.renderWindow(win);
   }
 
@@ -137,12 +423,23 @@ export class PopoutActivityBarManager {
     if (bars) {
       bars.left.remove();
       bars.right.remove();
+      bars.spaceIdentity.remove();
     }
     this.barsByWindow.delete(win);
     this.injectedWindows.delete(win);
     const body = win.document?.body;
     body?.classList.remove("window-spaces-has-left-activity");
     body?.classList.remove("window-spaces-has-right-activity");
+    body?.classList.remove("window-spaces-has-left-activity-hidden");
+    body?.classList.remove("window-spaces-has-right-activity-hidden");
+    body?.classList.remove("window-spaces-left-activity-hidden");
+    body?.classList.remove("window-spaces-right-activity-hidden");
+    this.clearTabHeaderAvoidance(win);
+    body?.style.removeProperty("--window-space-color");
+    body?.style.removeProperty("--window-space-border-inset");
+    body?.classList.remove("has-window-space-color");
+    body?.classList.remove("has-window-space-border");
+    body?.classList.remove("has-window-space-folded-corner");
   }
 
   /** 清理所有已注入的 Popout。 */
@@ -179,7 +476,7 @@ export class PopoutActivityBarManager {
     }
 
     // 3. 依 manager 的 layoutWindows 記憶體 map 反向比對
-    for (const space of this.settings.spaces) {
+    for (const space of this.settings.spaces ?? []) {
       if (manager?.layoutWindows?.get(space) === win) {
         return space;
       }
@@ -193,50 +490,117 @@ export class PopoutActivityBarManager {
     if (!drag) return;
 
     drag.empty();
+    bars.spaceIdentity.empty();
 
     const layout = this.getLayoutForWindow(win);
-    const icon = layout?.icon || this.settings.defaultIcon || "layout";
-    const color = layout?.color;
+    const icon = resolveSpaceIcon(layout?.icon, this.settings.defaultIcon);
+    const color = layout?.color?.trim();
+    const hasCustomColor = Boolean(color);
+    const hasCustomBorderInset = typeof layout?.borderInset === "number" && Number.isFinite(layout.borderInset);
+    const borderInset = hasCustomBorderInset
+      ? Math.max(0, Math.min(20, layout?.borderInset as number))
+      : 0;
+    const showFoldedCorner = hasCustomColor && (layout?.showFoldedCorner ?? this.settings.defaultShowFoldedCorner !== false);
 
     const body = win.document?.body;
     if (body) {
-      if (color) {
-        body.style.setProperty("--window-space-color", color);
+      if (hasCustomColor) {
+        body.style.setProperty("--window-space-color", color as string);
         body.classList.add("has-window-space-color");
       } else {
         body.style.removeProperty("--window-space-color");
         body.classList.remove("has-window-space-color");
       }
+      if (hasCustomColor && hasCustomBorderInset) {
+        body.style.setProperty("--window-space-border-inset", `${borderInset}px`);
+      } else {
+        body.style.removeProperty("--window-space-border-inset");
+      }
+      body.classList.toggle("has-window-space-border", hasCustomColor && hasCustomBorderInset && borderInset > 0);
+      body.classList.toggle("has-window-space-folded-corner", showFoldedCorner);
     }
 
-    const isEmoji = /\p{Extended_Pictographic}/u.test(icon) || !/^[a-zA-Z0-9-]+$/.test(icon);
+    const isEmoji = isSpaceEmoji(icon);
     if (isEmoji) {
-      drag.createSpan({ cls: "window-spaces-drag-emoji", text: icon });
+      bars.spaceIdentity.createSpan({ cls: "window-spaces-space-icon window-spaces-drag-emoji", text: icon });
     } else {
-      const iconEl = drag.createDiv({ cls: "window-spaces-drag-icon" });
+      const iconEl = bars.spaceIdentity.createDiv({ cls: "window-spaces-space-icon window-spaces-drag-icon" });
       if (!setIconWithCheck(iconEl, icon)) {
-        setIcon(iconEl, "layout");
+        setIcon(iconEl, "square");
       }
     }
+    bars.spaceIdentity.setAttribute("aria-label", layout?.name || "Window Space");
   }
 
   /** 重建指定視窗的按鈕內容。 */
   renderWindow(win: Window): void {
+    void this.ensureLayoutColumns(win).then(() => this.renderWindowNow(win));
+    this.renderWindowNow(win);
+  }
+
+  private renderWindowNow(win: Window): void {
     const bars = this.barsByWindow.get(win);
     if (!bars) return;
 
     this.updateDragHandleIcon(bars, win);
+    const body = win.document?.body;
+    if (body) {
+      const leftVisible = this.isSideVisibleForWindow(win, "left");
+      const rightVisible = this.isSideVisibleForWindow(win, "right");
+      bars.spaceIdentity.classList.toggle(
+        "window-spaces-space-identity-drag-region",
+        !leftVisible,
+      );
+      body.classList.toggle("window-spaces-has-left-activity", leftVisible);
+      body.classList.toggle("window-spaces-has-right-activity", rightVisible);
+      body.classList.toggle("window-spaces-left-activity-hidden", !leftVisible);
+      body.classList.toggle("window-spaces-right-activity-hidden", !rightVisible);
+      this.updateTabHeaderAvoidance(win, leftVisible);
+    }
     this.renderBar(bars, win, "left");
     this.renderBar(bars, win, "right");
+    this.applySavedLayoutDimensions(win);
     this.updateActiveStates(win);
+  }
+
+  /**
+   * When the left Activity Bar is hidden, reserve its exact width only in
+   * the first tab header of the first visible root column. A root column may
+   * contain multiple stacked split headers, so the class belongs on the
+   * header itself rather than on the whole column.
+   */
+  private updateTabHeaderAvoidance(win: Window, leftActivityVisible: boolean): void {
+    this.clearTabHeaderAvoidance(win);
+    if (leftActivityVisible) return;
+
+    const firstVisibleColumn = this.engine
+      .getTopLevelColumnElements(win)
+      .find((column) => !isElementHidden(column));
+    const firstTabHeader = firstVisibleColumn?.querySelector<HTMLElement>(
+      ".workspace-tab-header-container"
+    );
+    firstTabHeader?.classList.add("window-spaces-space-identity-tab-header");
+  }
+
+  private clearTabHeaderAvoidance(win: Window): void {
+    win.document
+      .querySelectorAll<HTMLElement>(".window-spaces-space-identity-tab-header")
+      .forEach((header) => header.classList.remove("window-spaces-space-identity-tab-header"));
   }
 
   private renderBar(bars: WindowBars, win: Window, side: PopoutSide): void {
     const bar = side === "left" ? bars.left : bars.right;
+    const isVisible = this.isSideVisibleForWindow(win, side);
+    bar.classList.toggle("window-spaces-activity-hidden", !isVisible);
 
-    // 移除舊的 view 按鈕與分隔線（保留 bar 容器與固定按鈕）
-    bar.querySelectorAll(".window-spaces-activity-view, .window-spaces-activity-divider").forEach((el) => el.remove());
-    bars.viewButtons.clear();
+    // 移除舊的 view 按鈕與分隔線（保留 bar 容器與固定按鈕）。
+    // viewButtons 同時保存左右兩側的按鈕，因此只清理目前這一側。
+    bar.querySelectorAll(".window-spaces-activity-view, .window-spaces-activity-divider").forEach((el) => {
+      bars.viewButtons.forEach((button, key) => {
+        if (button === el) bars.viewButtons.delete(key);
+      });
+      el.remove();
+    });
 
     // 固定控制按鈕：插入於 drag handle 之後、視圖按鈕之前
     const colBtn = side === "left" ? bars.columnButtons.left : bars.columnButtons.right;
@@ -245,7 +609,7 @@ export class PopoutActivityBarManager {
     colBtn.onclick = (evt: MouseEvent) => {
       evt.preventDefault();
       evt.stopPropagation();
-      this.toggleColumn(win, side);
+      void this.toggleColumn(win, side);
     };
     const drag = bar.querySelector<HTMLElement>(".window-spaces-activity-drag");
     if (drag) {
@@ -257,7 +621,7 @@ export class PopoutActivityBarManager {
     // 固定控制與 view 按鈕之間的分隔線
     bar.createDiv({ cls: "window-spaces-activity-divider" });
 
-    const items = this.getItemsForSide(side);
+    const items = this.getItemsForWindowSide(win, side);
     const configuredTypes = new Set<string>();
 
     for (const item of items) {
@@ -273,7 +637,7 @@ export class PopoutActivityBarManager {
         evt.stopPropagation();
         void this.toggleView(win, item);
       };
-      bars.viewButtons.set(item.viewType, btn);
+      bars.viewButtons.set(`${side}:${item.viewType}`, btn);
       configuredTypes.add(item.viewType);
     }
   }
@@ -289,9 +653,10 @@ export class PopoutActivityBarManager {
     // 下一幀再重新同步一次，確保新產生的容器 / tab group 也套用到 sidebar class。
     this.scheduleDeferredSync(win);
 
-    bars.viewButtons.forEach((btn, viewType) => {
+    bars.viewButtons.forEach((btn, key) => {
       // 以按鈕所屬的 bar 判定側（同側的 view 按鈕只反映自己側欄的狀態）
       const side: PopoutSide = bars.left.contains(btn) ? "left" : "right";
+      const viewType = key.slice(key.indexOf(":") + 1);
       const columnEl = this.engine.getColumnElement(win, side);
       let active = false;
       if (columnEl) {
@@ -343,17 +708,34 @@ export class PopoutActivityBarManager {
   private syncSidebarColumnClasses(win: Window): void {
     const columns = this.engine.getTopLevelColumnElements(win);
     const last = columns.length - 1;
+    const engineWithSidebarHints = this.engine as PopoutLayoutEngine & {
+      getSidebarSides?: (targetWin: Window) => { left: boolean; right: boolean } | undefined;
+    };
+    const configuredSides = engineWithSidebarHints.getSidebarSides?.(win);
+    const leftActivityVisible = this.isSideVisibleForWindow(win, "left");
+    const rightActivityVisible = this.isSideVisibleForWindow(win, "right");
     columns.forEach((el, index) => {
-      const isSidebar = columns.length >= 2 && (index === 0 || index === last);
+      // Only a column adjacent to a visible Activity Bar is a visual sidebar.
+      // If the bar is hidden, its neighboring column is content and must keep
+      // the normal editor background/tab presentation.
+      const isLeftSidebar = columns.length >= 2
+        && leftActivityVisible
+        && (configuredSides ? configuredSides.left : true)
+        && index === 0;
+      const isRightSidebar = columns.length >= 2
+        && rightActivityVisible
+        && (configuredSides ? configuredSides.right : true)
+        && index === last;
+      const isSidebar = isLeftSidebar || isRightSidebar;
       el.classList.toggle("window-spaces-sidebar-column", isSidebar);
       el.classList.toggle("mod-sidedock", isSidebar);
-      el.classList.toggle("mod-left-split", isSidebar && index === 0);
-      el.classList.toggle("mod-right-split", isSidebar && index === last);
+      el.classList.toggle("mod-left-split", isLeftSidebar);
+      el.classList.toggle("mod-right-split", isRightSidebar);
       const tabGroups = this.getSidebarTabGroups(el);
       tabGroups.forEach((tabsEl) => {
         tabsEl.classList.toggle("mod-sidedock", isSidebar);
-        tabsEl.classList.toggle("mod-left-split", isSidebar && index === 0);
-        tabsEl.classList.toggle("mod-right-split", isSidebar && index === last);
+        tabsEl.classList.toggle("mod-left-split", isLeftSidebar);
+        tabsEl.classList.toggle("mod-right-split", isRightSidebar);
       });
       if (isSidebar) {
         this.ensureSidebarFileTabIcons(win, el);
@@ -469,12 +851,13 @@ export class PopoutActivityBarManager {
     }
   }
 
-  private toggleColumn(win: Window, side: PopoutSide): void {
+  private async toggleColumn(win: Window, side: PopoutSide): Promise<void> {
     const columnEl = this.engine.getColumnElement(win, side);
     if (!columnEl) return;
 
     if (this.engine.isColumnHidden(win, side)) {
       this.engine.showColumn(win, side);
+      await this.ensureColumnViewsRendered(win, columnEl);
     } else {
       // 防呆：若隱藏後沒有任何可見欄位，則拒絕
       if (this.engine.getVisibleColumnCount(win) < 2) {
@@ -483,6 +866,50 @@ export class PopoutActivityBarManager {
       }
       this.engine.hideColumn(win, side);
     }
+    // 側欄收合：flex-grow 權重語意下，display:none 的欄位不參與 flex 佈局，
+    // 剩餘欄位依權重自動重新分配填滿，不需手動 rebalance。
+    // The column toggle changes pane visibility, not Activity Bar settings.
+    // Recompute only the tab-header marker here so lightweight test/mocked
+    // windows do not need the full Activity Bar DOM renderer.
+    this.updateTabHeaderAvoidance(win, this.isSideVisibleForWindow(win, "left"));
+    // Refresh the toggle button's open/collapsed SVG state and each view
+    // button's active state after the column visibility changed.
     this.updateActiveStates(win);
+  }
+
+  /**
+   * Views restored into a hidden sidebar can remain DeferredViews with an
+   * empty container. Once the sidebar becomes visible, load and render every
+   * leaf in that column so split panels such as Tags and Search are populated.
+   */
+  private async ensureColumnViewsRendered(win: Window, columnEl: HTMLElement): Promise<void> {
+    const leaves = this.engine.getLeavesForWindow(win).filter((leaf) => {
+      const extLeaf = leaf as unknown as ExtendedWorkspaceLeaf;
+      const container = extLeaf.containerEl || (leaf.view as { containerEl?: HTMLElement } | null)?.containerEl;
+      return container instanceof HTMLElement && columnEl.contains(container);
+    });
+
+    const manager = (this.plugin as unknown as {
+      manager?: {
+        ensureViewRendered?: (leaf: WorkspaceLeaf) => void;
+        scheduleViewRenderAfterActivation?: (leaf: WorkspaceLeaf, targetWin: Window) => void;
+      };
+    }).manager;
+
+    for (const leaf of leaves) {
+      const extLeaf = leaf as unknown as ExtendedWorkspaceLeaf & {
+        isDeferred?: boolean;
+        loadIfDeferred?: () => Promise<void>;
+      };
+      if (extLeaf.isDeferred && typeof extLeaf.loadIfDeferred === "function") {
+        try {
+          await extLeaf.loadIfDeferred();
+        } catch {
+          // A later render attempt may still recover the view.
+        }
+      }
+      manager?.ensureViewRendered?.(leaf);
+      manager?.scheduleViewRenderAfterActivation?.(leaf, win);
+    }
   }
 }

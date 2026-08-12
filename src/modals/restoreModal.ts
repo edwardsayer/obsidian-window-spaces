@@ -3,6 +3,7 @@ import { WindowLayout, ViewState, WindowSettings } from "../types";
 import { t, getI18n } from "../i18n";
 import WindowSpacesPlugin from "../main";
 import { setIconWithCheck } from "../popout/viewRegistry";
+import { isSpaceEmoji, resolveSpaceIcon } from "../spaceVisuals";
 
 /**
  * 統一的 Window Layouts 視窗：搜尋、恢復與管理都在同一個入口完成。
@@ -189,7 +190,6 @@ export class WindowLayoutsModal extends Modal {
     }
 
     this.clearSearchBtn = searchContainer.createDiv("window-layouts-search-clear");
-    setIcon(this.clearSearchBtn, "x");
     setTooltip(this.clearSearchBtn, t("manageModal.clearSearch") || "Clear search");
 
     this.clearSearchBtn.onclick = (e: MouseEvent) => {
@@ -546,7 +546,7 @@ export class WindowLayoutsModal extends Modal {
         }
       } else {
         // 情境 2：在主視窗中執行 -> 建立全新的 0 檔案 Popout 佈局，並開啟新 Popout 視窗
-        const newWin = await this.plugin.manager.openNewPopoutWindow();
+        const newWin = await this.plugin.manager.openNewPopoutWindow({ initializeDefaults: true });
         if (!newWin) {
           throw new Error(t("errors.cannotRestore"));
         }
@@ -570,6 +570,7 @@ export class WindowLayoutsModal extends Modal {
             activeFile: undefined,
             leaves: [],
           },
+          activityBars: this.plugin.activityBars?.getDefaultSettingsForNewSpace(),
           metadata: {
             fileCount: 0,
             tabCount: 0,
@@ -905,6 +906,11 @@ export class WindowLayoutsModal extends Modal {
       layoutEl.addClass("is-archived");
     }
 
+    if (layout.color?.trim()) {
+      layoutEl.addClass("has-window-space-accent-fold");
+      layoutEl.style.setProperty("--window-space-color", layout.color.trim());
+    }
+
     this.setFilesTooltipForLayout(layoutEl, layout);
 
     let holdTimer: number | null = null;
@@ -931,22 +937,15 @@ export class WindowLayoutsModal extends Modal {
       cls: "suggestion-title qsp-title",
     });
 
-    if (layout.color) {
-      const colorBadge = titleEl.createSpan({ cls: "window-space-color-badge" });
-      colorBadge.style.backgroundColor = layout.color;
-    }
-
-    if (layout.icon) {
-      const iconSpan = titleEl.createSpan({ cls: "window-space-item-icon" });
-      const val = layout.icon;
-      const isEmoji = /\p{Extended_Pictographic}/u.test(val) || !/^[a-zA-Z0-9-]+$/.test(val);
-      if (isEmoji) {
-        iconSpan.setText(val);
-      } else {
-        const iconDiv = iconSpan.createDiv();
-        if (!setIconWithCheck(iconDiv, val)) {
-          setIcon(iconDiv, "layout");
-        }
+    const visualEl = titleEl.createSpan({ cls: "window-space-title-visual" });
+    const iconSpan = visualEl.createSpan({ cls: "window-space-item-icon" });
+    const val = resolveSpaceIcon(layout.icon, this.plugin.settings?.defaultIcon);
+    if (isSpaceEmoji(val)) {
+      iconSpan.setText(val);
+    } else {
+      const iconDiv = iconSpan.createDiv();
+      if (!setIconWithCheck(iconDiv, val)) {
+        setIcon(iconDiv, "square");
       }
     }
 

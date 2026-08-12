@@ -178,9 +178,12 @@ export function getPaneContainerElement(leaf: WorkspaceLeaf): HTMLElement | null
   return null;
 }
 
-/** 是否為隱藏狀態（inline display:none）。 */
+/** 是否為隱藏狀態（inline display:none 或明確的 collapse class）。 */
 export function isElementHidden(el: HTMLElement | null | undefined): boolean {
-  return !!el && el.style.display === "none";
+  return !!el && (
+    el.style.display === "none" ||
+    el.classList.contains("window-spaces-column-hidden")
+  );
 }
 
 /** 透過 Obsidian 樣式 Helper 設定 display（禁止直接指派 el.style.display）。 */
@@ -262,6 +265,7 @@ function findLeafInTabs(tabs: WorkspaceParent | null | undefined, viewType: stri
 
 export class PopoutLayoutEngine {
   private app: App;
+  private sidebarSidesByWindow = new WeakMap<Window, { left: boolean; right: boolean }>();
 
   constructor(app: App) {
     this.app = app;
@@ -300,6 +304,16 @@ export class PopoutLayoutEngine {
       }
     });
     return leaves;
+  }
+
+  /** Record which endpoint columns are real sidebars for a newly-created Popout. */
+  setSidebarSides(win: Window, sides: { left: boolean; right: boolean }): void {
+    this.sidebarSidesByWindow.set(win, { ...sides });
+  }
+
+  getSidebarSides(win: Window): { left: boolean; right: boolean } | undefined {
+    const sides = this.sidebarSidesByWindow.get(win);
+    return sides ? { ...sides } : undefined;
   }
 
   /** 取得所有目前存活的 Popout DOM Window（去重）。 */
@@ -411,7 +425,14 @@ export class PopoutLayoutEngine {
     }
 
     // 尚無側欄欄位：建立貫穿全高的垂直 Split 欄位
-    let editorLeaf = this.getActiveLeafInWindow(win) || this.getLastLeafInWindow(win);
+    // Prefer an existing center pane when adding a second sidebar. The active
+    // leaf is often still in the first sidebar after the user clicks an
+    // Activity Bar button; splitting that leaf would turn a sidebar into the
+    // content area and leave the layout with no real center column.
+    const centerPane = this.getCenterPanes(win)[0];
+    let editorLeaf = (centerPane?.tabs.children?.[0] as WorkspaceLeaf | undefined)
+      || this.getActiveLeafInWindow(win)
+      || this.getLastLeafInWindow(win);
     if (editorLeaf && viewType && editorLeaf.getViewState()?.type === viewType) {
       let otherLeaf: WorkspaceLeaf | null = null;
       workspace.iterateAllLeaves((l: WorkspaceLeaf) => {
@@ -739,6 +760,16 @@ export class PopoutLayoutEngine {
     // 誤判為最右/最左的可見欄位；因此一律先以 root split 的 direct children
     // （DOM 順序）定位左右側欄，隱藏中的側欄仍在 DOM 中，不受影響。
     const topEls = this.getTopLevelColumnElements(win);
+    const configuredSides = this.sidebarSidesByWindow.get(win);
+    if (configuredSides) {
+      if (!configuredSides[side]) return null;
+      const requiredColumns = Number(configuredSides.left) + Number(configuredSides.right) + 1;
+      if (topEls.length < requiredColumns) return null;
+      if (configuredSides.left && configuredSides.right) {
+        return side === "left" ? topEls[0] ?? null : topEls[topEls.length - 1] ?? null;
+      }
+      return configuredSides.left ? topEls[0] ?? null : topEls[topEls.length - 1] ?? null;
+    }
     if (topEls.length >= 2) {
       return side === "left" ? topEls[0] ?? null : topEls[topEls.length - 1] ?? null;
     }
@@ -751,17 +782,25 @@ export class PopoutLayoutEngine {
   }
 
   isColumnHidden(win: Window, side: PopoutSide): boolean {
-    return isElementHidden(this.getColumnElement(win, side));
+    const column = this.getColumnElement(win, side);
+    return isElementHidden(column) || !!column?.classList.contains("window-spaces-column-hidden");
   }
 
   hideColumn(win: Window, side: PopoutSide): void {
     const column = this.getColumnElement(win, side);
-    if (column) setElementDisplay(column, "none");
+    if (!column) return;
+    // Keep an explicit state class alongside inline display. Obsidian can
+    // reapply flex sizing to a popout split after a layout update; the class
+    // lets our stylesheet collapse that split's flex basis as well.
+    column.classList.add("window-spaces-column-hidden");
+    setElementDisplay(column, "none");
   }
 
   showColumn(win: Window, side: PopoutSide): void {
     const column = this.getColumnElement(win, side);
-    if (column) setElementDisplay(column, "");
+    if (!column) return;
+    column.classList.remove("window-spaces-column-hidden");
+    setElementDisplay(column, "");
   }
 
   hidePaneGroup(leaf: WorkspaceLeaf): void {

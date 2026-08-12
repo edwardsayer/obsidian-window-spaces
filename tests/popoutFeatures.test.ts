@@ -19,7 +19,9 @@ import {
   enumerateAvailableViews,
   resolveViewIcon,
   resolveViewLabel,
+  sortViewTypesByLabel,
 } from "../src/popout/viewRegistry";
+import { resolveSpaceIcon } from "../src/spaceVisuals";
 
 describe("popoutLayout helpers", () => {
   test("isPopoutWindow detects popout via body class", () => {
@@ -244,9 +246,11 @@ describe("PopoutLayoutEngine hide/show + persistence", () => {
     engine.hideColumn(win, "left");
     expect(engine.isColumnHidden(win, "left")).toBe(true);
     expect(leftTabsEl.style.display).toBe("none");
+    expect(leftTabsEl.classList.contains("window-spaces-column-hidden")).toBe(true);
 
     engine.showColumn(win, "left");
     expect(engine.isColumnHidden(win, "left")).toBe(false);
+    expect(leftTabsEl.classList.contains("window-spaces-column-hidden")).toBe(false);
   });
 
   test("getColumnElement is structural and still finds hidden columns", () => {
@@ -914,6 +918,72 @@ describe("PopoutActivityBarManager toggle behavior", () => {
     expect(rightColEl.style.display).toBe("");
   });
 
+  test("flex-grow columns fill released space automatically when a sidebar is hidden", async () => {
+    const { manager, win, leftColEl, centerColEl, rightColEl } = buildManager();
+    leftColEl.style.flexGrow = "20";
+    centerColEl.style.flexGrow = "60";
+    rightColEl.style.flexGrow = "20";
+
+    // flex-grow 語意下，display:none 的欄位不參與 flex 佈局，剩餘欄位依
+    // 權重自動重新分配填滿（不需手動 rebalance），因此權重保持不變。
+    await (manager as any).toggleColumn(win, "right");
+    expect(rightColEl.style.display).toBe("none");
+    expect(leftColEl.style.flexGrow).toBe("20");
+    expect(centerColEl.style.flexGrow).toBe("60");
+
+    await (manager as any).toggleColumn(win, "right");
+    expect(rightColEl.style.display).toBe("");
+    expect(rightColEl.style.flexGrow).toBe("20");
+  });
+
+  test("restore reapplies saved dimensions as flex-grow weights to top-level and nested splits", () => {
+    document.body.replaceChildren();
+    const { manager, win, leftColEl, centerColEl, rightColEl } = buildManager();
+    const nestedSplitEl = document.createElement("div");
+    nestedSplitEl.classList.add("workspace-split");
+    const nestedTopEl = document.createElement("div");
+    nestedTopEl.classList.add("workspace-tabs");
+    const nestedBottomEl = document.createElement("div");
+    nestedBottomEl.classList.add("workspace-tabs");
+    nestedSplitEl.append(nestedTopEl, nestedBottomEl);
+    rightColEl.replaceWith(nestedSplitEl);
+
+    const plugin = (manager as any).plugin;
+    plugin.settings.spaces = [{
+      id: "saved-dimensions",
+      name: "Saved dimensions",
+      timestamp: 1,
+      workspace: {
+        layout: {
+          type: "window",
+          children: [
+            { type: "tabs", dimension: 25 },
+            { type: "tabs", dimension: 40 },
+            {
+              type: "split",
+              dimension: 35,
+              children: [
+                { type: "tabs", dimension: 70 },
+                { type: "tabs", dimension: 30 },
+              ],
+            },
+          ],
+        },
+      },
+    }];
+    (win as any)._windowSpacesLayoutId = "saved-dimensions";
+
+    (manager as any).applySavedLayoutDimensions(win);
+
+    expect(leftColEl.style.flexGrow).toBe("25");
+    expect(centerColEl.style.flexGrow).toBe("40");
+    expect(nestedSplitEl.style.flexGrow).toBe("35");
+    expect(nestedTopEl.style.flexGrow).toBe("70");
+    expect(nestedBottomEl.style.flexGrow).toBe("30");
+
+    delete (win as any)._windowSpacesLayoutId;
+  });
+
   test("syncSidebarColumnClasses applies sidebar classes to nested-split container AND its tabs groups", () => {
     const rootEl = document.createElement("div");
     rootEl.classList.add("workspace-split", "mod-root");
@@ -1137,6 +1207,11 @@ describe("PopoutActivityBarManager toggle behavior", () => {
 });
 
 describe("view icon resolution", () => {
+  test("Spaces without an icon use the configured default icon", () => {
+    expect(resolveSpaceIcon()).toBe("square");
+    expect(resolveSpaceIcon("🚀")).toBe("🚀");
+  });
+
   test("view icon resolution no longer consults viewRegistry.getIcon (step A removed)", () => {
     const app = {
       viewRegistry: {
@@ -1293,5 +1368,23 @@ describe("viewRegistry enumeration", () => {
 
     expect(resolveViewLabel(app, "folder-spaces-explorer")).toBe("Folder Spaces Explorer");
     expect(resolveViewLabel(app, "grid-view")).toBe("Grid View");
+  });
+
+  test("sortViewTypesByLabel sorts by display name with a stable type tie-breaker", () => {
+    const app = {
+      viewRegistry: {
+        getDisplayText: (type: string) => ({
+          "z-view": "Beta",
+          "a-view": "Alpha",
+          "b-view": "Beta",
+        }[type] || type),
+      },
+    } as any;
+
+    expect(sortViewTypesByLabel(app, ["z-view", "b-view", "a-view"])).toEqual([
+      "a-view",
+      "b-view",
+      "z-view",
+    ]);
   });
 });

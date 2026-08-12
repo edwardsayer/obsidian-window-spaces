@@ -24,6 +24,15 @@ export interface WindowLayout {
   archived?: boolean;
   icon?: string;
   color?: string;
+  /** Popout frame inset thickness in pixels; undefined follows the global default. */
+  borderInset?: number;
+  /** Whether to show the folded-corner decoration; undefined follows the global default. */
+  showFoldedCorner?: boolean;
+  /** Per-space Activity Bar visibility and view-button selection. */
+  activityBars?: {
+    left?: WindowSpaceActivityBarSettings;
+    right?: WindowSpaceActivityBarSettings;
+  };
   // 用於識別視窗的資訊
   windowInfo?: {
     windowId?: string;
@@ -129,7 +138,6 @@ export interface WindowSettings {
   spaces: WindowLayout[];
   autoSave: boolean;
   showNotifications: boolean;
-  maxLayouts: number;
   version: string;
   showStatusBarIndicator?: boolean;
   showLayoutStatusBar: boolean;
@@ -141,12 +149,22 @@ export interface WindowSettings {
   showArchived?: boolean;
   defaultIcon?: string;
   colorPresets?: string[];
+  /** Default Popout frame inset thickness in pixels. */
+  defaultBorderInset?: number;
+  /** Internal migration marker for the native-width default frame setting. */
+  visualDefaultsVersion?: number;
+  /** Default visibility of the Popout folded-corner decoration. */
+  defaultShowFoldedCorner?: boolean;
   // Activity Bar 設定
   activityBars?: {
     left: ActivityBarItem[];
     right: ActivityBarItem[];
   };
-  showActivityBars?: boolean;
+  /** Default visibility for each Popout Activity Bar side. */
+  activityBarDefaults?: {
+    left: boolean;
+    right: boolean;
+  };
   // Workspace API 攔截器（Monkey Patch）開關，預設開啟
   workspaceInterceptorEnabled?: boolean;
 }
@@ -159,6 +177,14 @@ export interface ActivityBarItem {
   label?: string;
   icon?: string;
   side: "left" | "right";
+}
+
+export interface WindowSpaceActivityBarSettings {
+  show: boolean;
+  /** Snapshot of the Activity Bar view buttons for this Space. */
+  items?: ActivityBarItem[];
+  /** Legacy selection format kept for backwards compatibility. */
+  viewTypes?: string[];
 }
 
 /**

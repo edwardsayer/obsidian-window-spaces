@@ -106,10 +106,12 @@ function getActivePopoutWindow(state: InterceptorState): Window | null {
   }
 
   let focusedPopout: Window | null = null;
-  const iterateAllLeaves = (
-    state.workspace as unknown as { iterateAllLeaves?: (callback: (leaf: WorkspaceLeaf) => void) => void }
-  ).iterateAllLeaves;
-  iterateAllLeaves?.((leaf) => {
+  const workspace = state.workspace as unknown as {
+    iterateAllLeaves?: (callback: (leaf: WorkspaceLeaf) => void) => void;
+  };
+  // 解構後必須以 call(workspace) 綁定 this，否則原生 iterateAllLeaves 內部
+  // 的 this.iterateLeaves 會因 this 為 undefined 而拋錯，中斷 restore 流程。
+  workspace.iterateAllLeaves?.call(workspace, (leaf) => {
     const win = getWindowOfLeaf(leaf);
     if (!focusedPopout && win && isPopoutWindow(win) && hasWindowFocus(win)) {
       focusedPopout = win;

@@ -1,7 +1,7 @@
 import { App, PluginSettingTab, Setting, Notice, Modal, setIcon } from "obsidian";
 import * as obsidian from "obsidian";
 import { t } from "./i18n";
-import { ActivityBarItem, SettingGroupLike } from "./types";
+import { SettingGroupLike } from "./types";
 import {
   ICON_CHOICES,
   enumerateAvailableViews,
@@ -9,10 +9,22 @@ import {
   resolveViewIcon,
   resolveViewLabel,
   setIconWithCheck,
+  sortViewTypesByLabel,
 } from "./popout/viewRegistry";
+import {
+  ACTIVITY_BAR_DRAG_DATA_TYPE,
+  canRemoveActivityBarItem,
+  reorderActivityBarItems,
+} from "./settingsActivityBar";
 import WindowSpacesPlugin from "./main";
+import { DEFAULT_SPACE_ICON, isSpaceEmoji } from "./spaceVisuals";
 
 type SettingContainer = HTMLElement | SettingGroupLike;
+import type { ActivityBarItem } from "./types";
+
+function isActivityBarItem(value: ActivityBarItem | null | undefined): value is ActivityBarItem {
+  return !!value && typeof value.viewType === "string" && value.viewType.trim().length > 0;
+}
 
 /** Obsidian `SettingGroup` 建構式（1.12.7+；舊版為 undefined）。 */
 const SettingGroupCtor = (obsidian as unknown as {
@@ -99,11 +111,9 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
-    new Setting(containerEl).setName(t("settings.title")).setHeading();
-
     // ===== 一般設定（單一 panel） =====
+    new Setting(containerEl).setName(t("settings.autoSaveSection")).setHeading();
     const generalGroup = this.createGroup(containerEl) ?? containerEl;
-    this.createSettingIn(generalGroup, (s) => s.setName(t("settings.autoSaveSection")).setHeading());
 
     this.createSettingIn(generalGroup, (s) => {
       s.setName(t("settings.showNotifications")).setDesc(t("settings.showNotificationsDesc"));
@@ -134,8 +144,8 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
     });
 
     // ===== Popout 空間顯示（單一 panel） =====
+    new Setting(containerEl).setName(t("settings.layoutDisplaySection")).setHeading();
     const displayGroup = this.createGroup(containerEl) ?? containerEl;
-    this.createSettingIn(displayGroup, (s) => s.setName(t("settings.layoutDisplaySection")).setHeading());
 
     this.createSettingIn(displayGroup, (s) => {
       s.setName(t("settings.showLayoutStatusBar")).setDesc(t("settings.showLayoutStatusBarDesc"));
@@ -161,32 +171,18 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
       });
     });
 
-    this.createSettingIn(displayGroup, (s) => {
-      s.setName(t("settings.maxLayouts")).setDesc(t("settings.maxLayoutsDesc"));
-      s.addSlider((slider) => {
-        slider
-          .setLimits(0, 50, 1)
-          .setValue(this.plugin.settings.maxLayouts || 20)
-          .setDynamicTooltip()
-          .onChange(async (value) => {
-            this.plugin.settings.maxLayouts = value;
-            await this.plugin.saveSettings();
-          });
-      });
-    });
-
     // ===== Popout 側欄（Activity Bars） =====
     this.renderActivityBarSection(containerEl);
 
     // ===== 視窗外觀與圖示 (Accent & Icons) =====
+    new Setting(containerEl).setName(t("settings.accentSection")).setHeading();
     const accentGroup = this.createGroup(containerEl) ?? containerEl;
-    this.createSettingIn(accentGroup, (s) => s.setName(t("settings.accentSection")).setHeading());
 
     this.createSettingIn(accentGroup, (s) => {
       s.setName(t("settings.defaultIcon")).setDesc(t("settings.defaultIconDesc"));
       s.controlEl.addClass("window-space-icon-setting-control");
 
-      let currentIcon = this.plugin.settings.defaultIcon || "layout";
+      let currentIcon = this.plugin.settings.defaultIcon || DEFAULT_SPACE_ICON;
       let iconInputEl!: HTMLInputElement;
 
       s.addText((text) => {
@@ -194,7 +190,7 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
         text.setPlaceholder(t("saveModal.iconPlaceholder"));
         text.setValue(currentIcon);
         text.onChange(async (val) => {
-          currentIcon = val.trim() || "layout";
+          currentIcon = val.trim() || DEFAULT_SPACE_ICON;
           this.plugin.settings.defaultIcon = currentIcon;
           await this.plugin.saveSettings();
           updatePreview();
@@ -221,8 +217,8 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
       const previewEl = s.controlEl.createDiv({ cls: "window-space-icon-preview" });
       const updatePreview = () => {
         previewEl.empty();
-        const val = currentIcon || "layout";
-        const isEmoji = /\p{Extended_Pictographic}/u.test(val) || !/^[a-zA-Z0-9-]+$/.test(val);
+        const val = currentIcon || DEFAULT_SPACE_ICON;
+        const isEmoji = isSpaceEmoji(val);
         if (isEmoji) {
           previewEl.createSpan({ text: val });
         } else {
@@ -235,9 +231,36 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
       updatePreview();
     });
 
+    this.createSettingIn(accentGroup, (s) => {
+      s.setName(t("settings.defaultBorderInset")).setDesc(t("settings.defaultBorderInsetDesc"));
+      s.addSlider((slider) => {
+        slider
+          .setLimits(0, 20, 1)
+          .setValue(this.getDefaultBorderInset())
+          .setDynamicTooltip()
+          .onChange(async (value) => {
+            this.plugin.settings.defaultBorderInset = value;
+            await this.plugin.saveSettings();
+            this.plugin.activityBars.refreshAll();
+          });
+      });
+    });
+
+    this.createSettingIn(accentGroup, (s) => {
+      s.setName(t("settings.defaultFoldedCorner")).setDesc(t("settings.defaultFoldedCornerDesc"));
+      s.addToggle((toggle) => {
+        toggle.setValue(this.plugin.settings.defaultShowFoldedCorner !== false);
+        toggle.onChange(async (value) => {
+          this.plugin.settings.defaultShowFoldedCorner = value;
+          await this.plugin.saveSettings();
+          this.plugin.activityBars.refreshAll();
+        });
+      });
+    });
+
     // ===== 危險操作（單一 panel） =====
+    new Setting(containerEl).setName(t("settings.resetSettings")).setHeading();
     const dangerGroup = this.createGroup(containerEl) ?? containerEl;
-    this.createSettingIn(dangerGroup, (s) => s.setName(t("settings.resetSettings")).setHeading());
 
     this.createSettingIn(dangerGroup, (s) => {
       s.setName(t("settings.resetSettings")).setDesc(t("settings.resetSettingsDescription"));
@@ -261,10 +284,15 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
     });
   }
 
+  private getDefaultBorderInset(): number {
+    const value = this.plugin.settings.defaultBorderInset;
+    return typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.min(20, value)) : 1;
+  }
+
   /** 渲染 Popout 側欄（Activity Bars）設定區塊（每個子區塊各自一個 SettingGroup panel）。 */
   private renderActivityBarSection(section: HTMLElement): void {
+    new Setting(section).setName(t("settings.popoutSidebarSection")).setHeading();
     const mainGroup = this.createGroup(section) ?? section;
-    this.createSettingIn(mainGroup, (s) => s.setName(t("settings.popoutSidebarSection")).setHeading());
 
     this.createSettingIn(mainGroup, (s) => {
       s.setName(t("settings.enableInterceptor")).setDesc(t("settings.enableInterceptorDesc"));
@@ -274,19 +302,6 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
           this.plugin.settings.workspaceInterceptorEnabled = value;
           this.plugin.workspaceInterceptor.enabled = value;
           await this.plugin.saveSettings();
-        });
-      });
-    });
-
-    this.createSettingIn(mainGroup, (s) => {
-      s.setName(t("settings.enableActivityBars")).setDesc(t("settings.enableActivityBarsDesc"));
-      s.addToggle((toggle) => {
-        toggle.setValue(this.plugin.settings.showActivityBars !== false);
-        toggle.onChange(async (value) => {
-          this.plugin.settings.showActivityBars = value;
-          await this.plugin.saveSettings();
-          this.plugin.activityBars.refreshAll();
-          this.display();
         });
       });
     });
@@ -346,6 +361,10 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
       s.addButton((button) => {
         button.setButtonText(t("settings.removeView")).setWarning().onClick(() => {
           const current = this.plugin.settings.activityBars?.[side] ?? [];
+          if (!canRemoveActivityBarItem(current, enumerateAvailableViews(this.app)[side])) {
+            new Notice(t("settings.keepOneActivityBarView"));
+            return;
+          }
           const idx = current.indexOf(item);
           if (idx >= 0) {
             current.splice(idx, 1);
@@ -363,12 +382,14 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
 
     row.settingEl.setAttr("data-window-spaces-activity-item", side);
     row.settingEl.setAttr("data-drag-index", String(index));
+    row.settingEl.setAttr("data-drag-view-type", item.viewType);
     row.settingEl.setAttr("draggable", "true");
 
     row.settingEl.addEventListener("dragstart", (e: DragEvent) => {
       row.settingEl.classList.add("drag-source");
-      e.dataTransfer!.effectAllowed = "move";
-      e.dataTransfer!.setData("application/x-window-spaces-index", String(index));
+      if (!e.dataTransfer) return;
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData(ACTIVITY_BAR_DRAG_DATA_TYPE, item.viewType);
     });
 
     row.settingEl.addEventListener("dragend", () => {
@@ -391,9 +412,9 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
   private rebuildViewSelect(selectEl: HTMLSelectElement, side: "left" | "right"): void {
     selectEl.empty();
     const available = enumerateAvailableViews(this.app);
-    const allTypes = Array.from(
+    const allTypes = sortViewTypesByLabel(this.app, Array.from(
       new Set([...available.left, ...available.right].map((item) => item.viewType))
-    );
+    ));
     const current = this.plugin.settings.activityBars?.[side] ?? [];
     allTypes.forEach((viewType) => {
       if (current.some((item) => item.viewType === viewType)) return;
@@ -407,9 +428,21 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
   }
 
   private renderActivityBarSide(section: HTMLElement, side: "left" | "right", heading: string): void {
-    // 每個側欄是一個 SettingGroup（單一 panel）
+    new Setting(section).setName(heading).setHeading();
     const group = this.createGroup(section) ?? section;
-    this.createSettingIn(group, (s) => s.setName(heading).setHeading());
+    this.createSettingIn(group, (s) => {
+      s.setName(t("settings.defaultActivityBarVisibility"));
+      s.setDesc(t("settings.defaultActivityBarVisibilityDesc"));
+      s.addToggle((toggle) => {
+        toggle.setValue(this.plugin.settings.activityBarDefaults?.[side] !== false);
+        toggle.onChange(async (value) => {
+          this.plugin.settings.activityBarDefaults = this.plugin.settings.activityBarDefaults ?? { left: true, right: true };
+          this.plugin.settings.activityBarDefaults[side] = value;
+          await this.plugin.saveSettings();
+          this.plugin.activityBars.refreshAll();
+        });
+      });
+    });
 
     const items = this.plugin.settings.activityBars?.[side] ?? [];
 
@@ -470,10 +503,40 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
     const refreshSelect = () => this.rebuildViewSelect(selectEl, side);
 
     const renderItemRows = () => {
-      section.querySelectorAll(`[data-window-spaces-activity-item="${side}"]`).forEach((el) => el.remove());
+      const current = this.plugin.settings.activityBars?.[side];
+      const items = Array.isArray(current) ? current : [];
+      const validItems = items.filter(isActivityBarItem);
 
-      const current = this.plugin.settings.activityBars?.[side] ?? [];
-      current.forEach((item, index) => {
+      // Repair malformed entries left by an interrupted/old reorder instead of
+      // allowing one bad item to throw after the existing DOM is removed.
+      if (validItems.length !== items.length) {
+        this.plugin.settings.activityBars = this.plugin.settings.activityBars ?? { left: [], right: [] };
+        this.plugin.settings.activityBars[side] = validItems;
+        void this.plugin.saveSettings().catch((error: unknown) => {
+          console.warn("Failed to repair activity bar settings:", error);
+        });
+      }
+
+      const existingRows = new Map<string, HTMLElement>();
+      section.querySelectorAll<HTMLElement>(`[data-window-spaces-activity-item="${side}"]`).forEach((el) => {
+        const viewType = el.getAttribute("data-drag-view-type");
+        if (viewType) existingRows.set(viewType, el);
+      });
+
+      const activeTypes = new Set(validItems.map((item) => item.viewType));
+      existingRows.forEach((row, viewType) => {
+        if (!activeTypes.has(viewType)) row.remove();
+      });
+
+      // Reuse existing rows when reordering. This avoids a transient empty
+      // SettingGroup DOM and prevents the whole list disappearing after drop.
+      validItems.forEach((item, index) => {
+        const existingRow = existingRows.get(item.viewType);
+        if (existingRow) {
+          existingRow.setAttr("data-drag-index", String(index));
+          addRow.settingEl.before(existingRow);
+          return;
+        }
         const handle = this.renderSideItemRow(group, side, item, index, () => {
           renderItemRows();
           refreshSelect();
@@ -511,29 +574,32 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
         `[data-window-spaces-activity-item="${side}"].drag-over-top, [data-window-spaces-activity-item="${side}"].drag-over-bottom`
       );
 
+      const isBottom = indicatorEl?.classList.contains("drag-over-bottom") ?? false;
+
       section.querySelectorAll(
         `[data-window-spaces-activity-item="${side}"].drag-over-top, [data-window-spaces-activity-item="${side}"].drag-over-bottom`
       ).forEach((el) => { el.classList.remove("drag-over-top", "drag-over-bottom"); });
 
       if (!indicatorEl) return;
 
-      const fromIndex = parseInt(e.dataTransfer?.getData("application/x-window-spaces-index") ?? "", 10);
-      if (isNaN(fromIndex)) return;
+      const draggedViewType = e.dataTransfer?.getData(ACTIVITY_BAR_DRAG_DATA_TYPE) ?? "";
+      const targetViewType = indicatorEl.getAttribute("data-drag-view-type") ?? "";
+      if (!draggedViewType || !targetViewType) return;
 
-      const toIndex = parseInt(indicatorEl.getAttribute("data-drag-index") ?? "", 10);
-      if (isNaN(toIndex)) return;
+      const current = this.plugin.settings.activityBars?.[side];
+      if (!Array.isArray(current)) return;
 
-      const isBottom = indicatorEl.classList.contains("drag-over-bottom");
-      const insertIndex = isBottom ? toIndex + 1 : toIndex;
-      if (fromIndex === insertIndex) return;
+      const reordered = reorderActivityBarItems(current, draggedViewType, targetViewType, isBottom);
+      if (!reordered) return;
 
-      const current = this.plugin.settings.activityBars?.[side] ?? [];
-      const [moved] = current.splice(fromIndex, 1);
-      current.splice(insertIndex > fromIndex ? insertIndex - 1 : insertIndex, 0, moved);
+      this.plugin.settings.activityBars = this.plugin.settings.activityBars ?? { left: [], right: [] };
+      this.plugin.settings.activityBars[side] = reordered;
 
       void this.plugin.saveSettings().then(() => {
         this.plugin.activityBars.refreshAll();
         renderItemRows();
+      }).catch((error: unknown) => {
+        console.warn("Failed to save activity bar order:", error);
       });
     });
   }

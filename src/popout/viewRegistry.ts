@@ -364,6 +364,18 @@ export function resolveViewLabel(app: App, viewType: string): string {
   return formatViewTypeId(viewType);
 }
 
+/** 依 view 的顯示名稱排序，名稱相同時以 view type 作穩定排序。 */
+export function sortViewTypesByLabel(app: App, viewTypes: string[]): string[] {
+  return [...viewTypes].sort((a, b) => {
+    const labelOrder = resolveViewLabel(app, a).localeCompare(
+      resolveViewLabel(app, b),
+      undefined,
+      { sensitivity: "base" },
+    );
+    return labelOrder || a.localeCompare(b);
+  });
+}
+
 /**
  * 將內建精選 + 動態 registry view 合併為「可用 view type」清單（去重）。
  * 回傳 items 已依照 `side` 分派至 left / right。

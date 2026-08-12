@@ -65,6 +65,17 @@ export interface TranslationStrings {
     clearColor: string;
     saveSuccess: string;
     autoSaveToggle: string;
+    borderInset: string;
+    borderInsetDesc: string;
+    foldedCorner: string;
+    foldedCornerDesc: string;
+    activityBarsSection: string;
+    showActivityBar: string;
+    activityBarViewButtons: string;
+    spaceSection: string;
+    windowAppearanceSection: string;
+    behaviorSection: string;
+    sectionsSection: string;
   };
 
   // 恢復對話框
@@ -142,8 +153,6 @@ export interface TranslationStrings {
     showLayoutStatusBarDesc: string;
     showWindowLayoutsRibbonIcon: string;
     showWindowLayoutsRibbonIconDesc: string;
-    maxLayouts: string;
-    maxLayoutsDesc: string;
     autoSaveInterval: string;
     minutes: string;
     resetSettings: string;
@@ -153,9 +162,6 @@ export interface TranslationStrings {
     resetConfirmMessage: string;
     resetSuccess: string;
     popoutSidebarSection: string;
-    activityBarSection: string;
-    enableActivityBars: string;
-    enableActivityBarsDesc: string;
     leftBar: string;
     rightBar: string;
     addView: string;
@@ -169,7 +175,14 @@ export interface TranslationStrings {
     accentSection: string;
     defaultIcon: string;
     defaultIconDesc: string;
+    defaultBorderInset: string;
+    defaultBorderInsetDesc: string;
+    defaultFoldedCorner: string;
+    defaultFoldedCornerDesc: string;
+    defaultActivityBarVisibility: string;
+    defaultActivityBarVisibilityDesc: string;
     dragToReorder: string;
+    keepOneActivityBarView: string;
   };
 
   // 通知
