@@ -882,4 +882,56 @@ describe("WindowLayoutsModal restore target", () => {
     document.body.removeChild(panelContainer);
     document.body.removeChild(promptContainer);
   });
-});
+});  test("分組檢視下 Enter 開啟高亮項（renderedLayoutEntries 渲染順序）而非 filteredLayouts 排序順序", () => {
+    WindowLayoutsModal.activeInstances.clear();
+    const restoreLayout = vi.fn().mockResolvedValue(undefined);
+    const plugin = {
+      manager: { restoreLayout, getSavedLayouts: () => [], getSavedViewStates: () => [] },
+    };
+
+    const createMockEl = (tag = "div") => {
+      const el = document.createElement(tag) as any;
+      el.empty = () => { el.innerHTML = ""; };
+      el.addClass = () => {};
+      el.createDiv = () => createMockEl("div");
+      el.createEl = (t: string) => createMockEl(t);
+      el.createSpan = () => createMockEl("span");
+      el.setAttribute = () => {};
+      if (tag === "input") el.value = "";
+      return el;
+    };
+
+    const modal = new WindowLayoutsModal({} as any, plugin);
+    const root = createMockEl();
+    modal.mountInContainer(root);
+    (modal as any).panelMode = true;
+    (modal as any).isPanelActive = () => true;
+
+    // 模擬分組檢視渲染後的狀態：renderedLayoutEntries（分組渲染順序）
+    // 與 filteredLayouts（排序順序）不同。
+    const layoutA = { id: "a", name: "A" };
+    const layoutB = { id: "b", name: "B" };
+    const layoutC = { id: "c", name: "C" };
+    (modal as any).filteredLayouts = [layoutA, layoutB, layoutC];
+    (modal as any).renderedLayoutEntries = [
+      { layout: layoutB, element: createMockEl() },
+      { layout: layoutC, element: createMockEl() },
+      { layout: layoutA, element: createMockEl() },
+    ];
+    // 方向鍵把高亮移到 renderedLayoutEntries[1] = layoutC
+    (modal as any).selectedIndex = 1;
+
+    const enterEvent = new KeyboardEvent("keydown", {
+      key: "Enter",
+      bubbles: true,
+      cancelable: true,
+    });
+    window.dispatchEvent(enterEvent);
+
+    expect(enterEvent.defaultPrevented).toBe(true);
+    // 必須開啟高亮項 C，而非 filteredLayouts[1]（B）
+    expect(restoreLayout).toHaveBeenCalledTimes(1);
+    expect(restoreLayout).toHaveBeenCalledWith(layoutC, expect.anything());
+
+    modal.unmountFromContainer();
+  });

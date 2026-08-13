@@ -317,6 +317,32 @@ export class WindowLayoutManager {
    * 自動比對該視窗現有的 Leaves / 檔案與已儲存的 Layout (spaces)，
    * 為無標籤 Popout 視窗一對一辨識還原其 space name 及狀態列 / 側欄樣式。
    */
+  /**
+   * 把視窗目前的 live leaf id 集合回寫為該 layout 的識別記號（leafIdMarker）。
+   * Obsidian 重啟後 floating 視窗的 leaf id 穩定保留，因此下次重啟可直接
+   * 核對此記號識別 space，不需內容比對。靜默保存（不發通知、不拋錯）。
+   */
+  private syncWindowLeafMarker(targetWin: Window, layout: WindowLayout | null): void {
+    if (!layout || !targetWin || targetWin.closed) return;
+    try {
+      const ids = this.getLeavesForWindow(targetWin)
+        .map((leaf) => (leaf as unknown as ExtendedWorkspaceLeaf).id)
+        .filter((id): id is string => !!id);
+      if (ids.length === 0) return;
+      const current = layout.leafIdMarker;
+      const same = Array.isArray(current) &&
+        current.length === ids.length &&
+        current.every((id, i) => id === ids[i]);
+      if (same) return;
+      layout.leafIdMarker = ids;
+      void this.plugin.saveSettings().catch(() => {
+        // 靜默：識別記號同步失敗不影響主流程
+      });
+    } catch {
+      // Ignore marker sync errors
+    }
+  }
+
   matchUnlabeledPopoutWindows(): void {
     if (this.isMatchingUnlabeled) return;
     this.isMatchingUnlabeled = true;
@@ -384,6 +410,20 @@ export class WindowLayoutManager {
             })
             .filter((f): f is string => !!f)
         );
+        // folder-spaces-explorer 等 view 的 panelId 跨 session 穩定，
+        // 作為「無檔案 space」的比對特徵（leaf id 重啟後可能重建）。
+        const winPanelIds = new Set(
+          winLeaves
+            .map((leaf) => {
+              const state =
+                typeof (leaf as unknown as ExtendedWorkspaceLeaf).getViewState === "function"
+                  ? (leaf as unknown as ExtendedWorkspaceLeaf).getViewState()?.state
+                  : null;
+              const panelId = (state as { panelId?: unknown } | null | undefined)?.panelId;
+              return typeof panelId === "string" && panelId ? panelId : null;
+            })
+            .filter((pid): pid is string => !!pid)
+        );
 
         let bestSpace: WindowLayout | null = null;
         let bestScore = 0;
@@ -400,8 +440,26 @@ export class WindowLayoutManager {
               .map((l) => this.getFilePathFromLeafState(l))
               .filter((f): f is string => !!f)
           );
+          const savedPanelIds = new Set(
+            savedLeaves
+              .map((l) => {
+                const panelId = (l.state as { panelId?: unknown } | undefined)?.panelId;
+                return typeof panelId === "string" && panelId ? panelId : null;
+              })
+              .filter((pid): pid is string => !!pid)
+          );
 
           let score = 0;
+
+          // (0) 視窗識別記號（leafIdMarker）比對：上次識別/restore 時回寫的
+          // live leaf id 集合，重啟後視窗 leaf id 穩定 → 直接命中，最高權重。
+          if (Array.isArray(space.leafIdMarker) && space.leafIdMarker.length > 0) {
+            let markerHit = 0;
+            for (const id of winLeafIds) {
+              if (space.leafIdMarker.includes(id)) markerHit++;
+            }
+            score += markerHit * 200;
+          }
 
           // (a) Leaf ID 匹配 (+100/leaf)
           for (const id of winLeafIds) {
@@ -414,6 +472,12 @@ export class WindowLayoutManager {
             if (savedFiles.has(file)) matchingFilesCount++;
           }
           score += matchingFilesCount * 10;
+
+          // (e) view state 特徵比對：folder-spaces-explorer 等 view 的 panelId
+          // 跨 session 穩定，補足無檔案 space 的辨識（leaf id 重啟後可能重建）。
+          for (const pid of winPanelIds) {
+            if (savedPanelIds.has(pid)) score += 100;
+          }
 
           // (c) 檔案完全吻合（Popout 中所有檔案與 space 中所有檔案一致）時大幅加分 (+50)
           if (winFiles.size > 0 && winFiles.size === savedFiles.size && matchingFilesCount === winFiles.size) {
@@ -441,6 +505,8 @@ export class WindowLayoutManager {
           claimedLayoutNames.add(bestSpace.name);
           this.setLayoutLabelForWindow(win, bestSpace.name);
           this.layoutWindows.set(bestSpace, win);
+          // 回寫識別記號：使下次重啟直接命中 leafIdMarker，不再依賴內容比對
+          this.syncWindowLeafMarker(win, bestSpace);
         }
       }
     } finally {
@@ -990,6 +1056,27 @@ export class WindowLayoutManager {
   }
 
   /**
+   * 取得指定視窗內「目前 active 的 tab」leaf（依 tab header 的 is-active class）。
+   * 全域 activeLeaf 可能指向其他視窗（例如使用者已切回主視窗），此時不該
+   * fallback 到視窗內第一個 leaf，以免把第一個 tab 搶成 active。
+   */
+  private getActiveLeafInWindow(targetWin: Window): WorkspaceLeaf | null {
+    const workspace = this.app.workspace as unknown as ExtendedWorkspace;
+    if (typeof workspace.iterateAllLeaves !== "function") return null;
+    let found: WorkspaceLeaf | null = null;
+    workspace.iterateAllLeaves((leaf: WorkspaceLeaf) => {
+      if (found) return;
+      const extLeaf = leaf as unknown as ExtendedWorkspaceLeaf;
+      if (extLeaf.containerEl?.ownerDocument?.defaultView !== targetWin) return;
+      const tabEl = (extLeaf as { tabHeaderEl?: HTMLElement }).tabHeaderEl;
+      if (tabEl && tabEl.classList.contains("is-active")) {
+        found = leaf;
+      }
+    });
+    return found;
+  }
+
+  /**
    * 獲取目前活動視窗 (activeWindow) 中真正的 activeLeaf
    */
   private getActiveLeafForCurrentWindow(targetWindow?: Window): WorkspaceLeaf | null {
@@ -1275,7 +1362,9 @@ export class WindowLayoutManager {
       ) {
         const existingWin = this.getOpenWindowForLayout(layout);
         if (existingWin && !existingWin.closed && this.isPopoutDocument(existingWin.document)) {
-          this.focusTargetWindow(existingWin);
+          // 聚焦已開啟的視窗時，保留視窗內目前的 active tab，
+          // 避免 active 被搶回第一個 tab。
+          this.focusTargetWindow(existingWin, this.getActiveLeafInWindow(existingWin));
           this.setLayoutLabelForWindow(existingWin, layout.name);
           this.refreshLayoutLabels();
 
@@ -1511,6 +1600,8 @@ export class WindowLayoutManager {
       }
 
       this.setLayoutLabelForWindow(targetWin, layout.name);
+      // 回寫視窗識別記號：下次重啟可直接核對 leafIdMarker 識別此 space
+      this.syncWindowLeafMarker(targetWin, layout);
       this.restorePreservedWindowLabels(preservedWindowLayouts, targetWin);
       this.refreshLayoutLabels();
 
@@ -1535,10 +1626,19 @@ export class WindowLayoutManager {
 
         const winLeaves = this.getLeavesForWindow(targetWin);
         if (winLeaves.length > 0 && canActivatePopout) {
-          try {
-            this.app.workspace.setActiveLeaf(winLeaves[0], { focus: true });
-          } catch {
-            // Ignore focus error
+          // restoreFileStatesForWindow 已把 active 設到 layout 保存時選中的
+          // tab（activeFile 對應的 leaf，fallback 第一個 leaf）。此處只在全域
+          // activeLeaf 尚未指向此 popout 時才設定，避免把 active 搶到第一個
+          // column 的第一個 tab，導致原本選中的 tab 失去 active。
+          const activeLeaf = typeof this.app.workspace.getMostRecentLeaf === "function"
+            ? this.app.workspace.getMostRecentLeaf()
+            : (this.app.workspace as ExtendedWorkspace).activeLeaf;
+          if (!activeLeaf || !winLeaves.includes(activeLeaf)) {
+            try {
+              this.app.workspace.setActiveLeaf(winLeaves[0], { focus: true });
+            } catch {
+              // Ignore focus error
+            }
           }
         }
 
@@ -2145,6 +2245,7 @@ export class WindowLayoutManager {
           : Array.isArray(node.children)
             ? node.children.filter((c: any) => c?.type === "leaf")
             : [];
+      const groupLeaves: WorkspaceLeaf[] = [];
       let last: WorkspaceLeaf = leaf;
       for (let i = 0; i < leafNodes.length; i++) {
         if (i > 0) {
@@ -2156,7 +2257,24 @@ export class WindowLayoutManager {
           );
         }
         await this.applyBuiltLeafState(last, leafNodes[i]);
+        groupLeaves.push(last);
         built.push(last);
+      }
+      // 恢復 saved layout 的 currentTab（該 tab group 保存時選中的 tab）。
+      // leaf 層級重建預設會把 group 的 active tab 落在建立順序的預設值，
+      // 造成「第一個 column 的第一個 tab 被特別 active、原本選中的 tab
+      // lost active」；其他 split 的 tab group 同理一併恢復。
+      if (node.type === "tabs" && typeof node.currentTab === "number" && groupLeaves.length > 0) {
+        const activeIndex = Math.max(0, Math.min(node.currentTab, groupLeaves.length - 1));
+        const groupActive = groupLeaves[activeIndex];
+        if (groupActive) {
+          try {
+            await workspace.revealLeaf(groupActive);
+            workspace.setActiveLeaf(groupActive, { focus: false });
+          } catch {
+            // Ignore focus/activation error during structure build
+          }
+        }
       }
       return last;
     };
@@ -2812,7 +2930,7 @@ export class WindowLayoutManager {
       progressNotice.hide();
     }
 
-    const leafToFocus = targetActiveLeaf || windowLeaves[0] || null;
+    const leafToFocus = targetActiveLeaf || null;
     if (leafToFocus) {
       try {
         await this.app.workspace.revealLeaf(leafToFocus);
@@ -2822,6 +2940,25 @@ export class WindowLayoutManager {
         }
       } catch (e) {
         console.warn("Failed to set active leaf:", e);
+      }
+    } else {
+      // 無 activeFile 時不要 fallback 到 windowLeaves[0]：leaf 層級重建
+      // （fillTabs 已恢復各 tab group 的 currentTab）或 changeLayout 已把
+      // active 指到視窗內的 leaf。此處只在 active 完全未指向此視窗時才補指，
+      // 避免把第一個 column 的第一個 tab 搶成 active（原本選中的 tab lost active）。
+      const currentActive = typeof this.app.workspace.getMostRecentLeaf === "function"
+        ? this.app.workspace.getMostRecentLeaf()
+        : (this.app.workspace as ExtendedWorkspace).activeLeaf;
+      if (!currentActive || !windowLeaves.includes(currentActive)) {
+        const fallbackLeaf = windowLeaves[0] || null;
+        if (fallbackLeaf) {
+          try {
+            await this.app.workspace.revealLeaf(fallbackLeaf);
+            this.app.workspace.setActiveLeaf(fallbackLeaf, { focus: true });
+          } catch (e) {
+            console.warn("Failed to set active leaf:", e);
+          }
+        }
       }
     }
 
@@ -2860,6 +2997,10 @@ export class WindowLayoutManager {
         .filter((filePath): filePath is string => !!filePath)
     );
     const windows = new Map<Window, number>();
+    // 追蹤各視窗的 leaf-id 命中數與被命中的 saved 檔案集合（供覆蓋率門檻使用），
+    // 避免只靠通用檔名（如多個 space 共用的 Untitled.md）造成誤匹配。
+    const idMatches = new Map<Window, number>();
+    const matchedSavedFiles = new Map<Window, Set<string>>();
     let bestWindow: Window | null = null;
     let bestScore = 0;
 
@@ -2878,10 +3019,18 @@ export class WindowLayoutManager {
       const filePath = this.getFilePathFromLeafState({
         state: viewState?.state || {},
       });
+      const idHit = savedIds.has((leaf as any).id) ? 1 : 0;
+      const fileHit = filePath && savedFiles.has(filePath) ? 1 : 0;
       const score = (windows.get(targetWindow) || 0) +
-        (savedIds.has((leaf as any).id) ? 100 : 0) +
-        (filePath && savedFiles.has(filePath) ? 10 : 0);
+        (idHit ? 100 : 0) +
+        (fileHit ? 10 : 0);
       windows.set(targetWindow, score);
+      idMatches.set(targetWindow, (idMatches.get(targetWindow) || 0) + idHit);
+      if (fileHit) {
+        const set = matchedSavedFiles.get(targetWindow) || new Set<string>();
+        set.add(filePath);
+        matchedSavedFiles.set(targetWindow, set);
+      }
       if (score > bestScore) {
         bestScore = score;
         bestWindow = targetWindow;
@@ -2894,7 +3043,17 @@ export class WindowLayoutManager {
       return preferredWindow;
     }
 
-    if (bestWindow) return bestWindow;
+    if (bestWindow) {
+      // 當要求正分數 (requirePositiveScore) 時，leaf-id 命中視為高置信直接接受；
+      // 純檔案匹配則需 saved 檔案覆蓋率 ≥ 50%，避免通用檔名（Untitled.md）誤判。
+      if (requirePositiveScore && (idMatches.get(bestWindow) || 0) === 0) {
+        const coverage = savedFiles.size > 0
+          ? (matchedSavedFiles.get(bestWindow)?.size || 0) / savedFiles.size
+          : 0;
+        if (coverage < 0.5) return null;
+      }
+      return bestWindow;
+    }
 
     // 當要求正分數 (positive score) 時，若未匹配到任何 leaf/file (score 0)，禁止盲目 fallback 回傳唯一視窗
     if (requirePositiveScore) return null;

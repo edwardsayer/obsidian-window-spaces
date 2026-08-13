@@ -1,6 +1,6 @@
 import { App, Modal, Notice, Setting, setIcon, setTooltip, Menu } from "obsidian";
 import { WindowLayout, ViewState, WindowSettings } from "../types";
-import { t, getI18n } from "../i18n";
+import { t } from "../i18n";
 import WindowSpacesPlugin from "../main";
 import { setIconWithCheck } from "../popout/viewRegistry";
 import { isSpaceEmoji, resolveSpaceIcon } from "../spaceVisuals";
@@ -328,7 +328,10 @@ export class WindowLayoutsModal extends Modal {
       event.preventDefault();
       event.stopImmediatePropagation();
       const rawQuery = this.searchInput?.value.trim() || "";
-      const selectedLayout = this.filteredLayouts[this.selectedIndex >= 0 ? this.selectedIndex : 0];
+      // 高亮（方向鍵）是以 renderedLayoutEntries 的渲染順序移動；分組檢視下
+      // 該順序與 filteredLayouts（排序順序）不同，必須以渲染順序取選中的 layout。
+      const entry = this.renderedLayoutEntries[this.selectedIndex >= 0 ? this.selectedIndex : 0];
+      const selectedLayout = entry ? entry.layout : this.filteredLayouts[0];
       if (selectedLayout) {
         void this.restoreLayout(selectedLayout, !event.shiftKey);
       } else if (rawQuery) {
@@ -778,11 +781,12 @@ export class WindowLayoutsModal extends Modal {
     allSectionsOrder: string[] | null,
     isReorderable = true
   ): void {
-    const headerEl = parentEl.createDiv("space-section-header");
+    const headerEl = parentEl.createDiv(
+      isReorderable ? "space-section-header" : "space-section-header is-static"
+    );
 
     if (isReorderable && allSectionsOrder) {
       headerEl.setAttribute("draggable", "true");
-
       headerEl.ondragstart = (e: DragEvent) => {
         e.dataTransfer?.setData("text/plain", secName);
         headerEl.addClass("is-dragging");
@@ -814,10 +818,30 @@ export class WindowLayoutsModal extends Modal {
 
     const isCollapsed = WindowLayoutsModal.collapsedSections.has(secName);
 
+    // Hint 放在整個 section bar 上（與 toolbar 的 View Options 一致，用
+    // Obsidian 原生 setTooltip）；不可排序的 section（如 Uncategorized）
+    // 提示不包含 drag to reorder。
+    const headerHint = isReorderable
+      ? t("manageModal.sectionHeaderHint")
+      : t("manageModal.sectionHeaderHintStatic");
+    setTooltip(headerEl, headerHint);
+
     // 左側：Section 名稱、計數與更名按鈕
     const leftEl = headerEl.createDiv("space-section-header-left");
 
-    const titleSpan = leftEl.createSpan({ text: secName, cls: "space-section-title" });
+    // 前方拖曳指示圖示：可排序的 section 顯示 grip（表示可拖曳移動）；
+    // 不可排序的（Uncategorized）顯示低調 lock 占位（表示不可移動）。
+    const dragIndicator = leftEl.createSpan({
+      cls: isReorderable
+        ? "space-section-drag-indicator"
+        : "space-section-drag-indicator is-static",
+    });
+    setIcon(dragIndicator, isReorderable ? "grip-vertical" : "lock");
+
+    const titleSpan = leftEl.createSpan({
+      text: secName,
+      cls: "space-section-title",
+    });
 
     leftEl.createSpan({ text: `(${count})`, cls: "space-section-count" });
 
@@ -906,9 +930,16 @@ export class WindowLayoutsModal extends Modal {
       layoutEl.addClass("is-archived");
     }
 
+    // 顯示設定 follow Space Settings：
+    // - has-window-space-accent：只要有 accent color，icon 就用該色上色
+    // - has-window-space-accent-fold：左上角折疊標示需 color + Show fold corner 設定
     if (layout.color?.trim()) {
-      layoutEl.addClass("has-window-space-accent-fold");
       layoutEl.style.setProperty("--window-space-color", layout.color.trim());
+      layoutEl.addClass("has-window-space-accent");
+      const showFold = layout.showFoldedCorner ?? this.plugin.settings.defaultShowFoldedCorner !== false;
+      if (showFold) {
+        layoutEl.addClass("has-window-space-accent-fold");
+      }
     }
 
     this.setFilesTooltipForLayout(layoutEl, layout);
@@ -968,13 +999,8 @@ export class WindowLayoutsModal extends Modal {
     }
 
     const noteEl = itemContentEl.createDiv("suggestion-note qsp-note");
-    const i18n = getI18n();
     const pathEl = noteEl.createDiv("qsp-path");
 
-    pathEl.createSpan({
-      text: `${t("manageModal.updatedDate")}: ${i18n.formatDate(new Date(layout.updatedAt || layout.timestamp || layout.createdAt || Date.now()))}`,
-      cls: "layout-date",
-    });
     const totalTabs = layout.metadata?.tabCount || layout.workspace?.leaves?.length || 0;
     pathEl.createSpan({
       text: `${t("manageModal.tabCount")}: ${totalTabs}`,

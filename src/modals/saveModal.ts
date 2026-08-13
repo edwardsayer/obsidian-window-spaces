@@ -122,6 +122,10 @@ export class SaveLayoutModal extends Modal {
     });
     statsContainer.createDiv({
       cls: "window-spaces-stat-item",
+      text: `${t("manageModal.updatedDate")}: ${i18n.formatDate(new Date(this.layout.updatedAt || this.layout.timestamp || this.layout.createdAt || Date.now()))}`,
+    });
+    statsContainer.createDiv({
+      cls: "window-spaces-stat-item",
       text: `${t("saveModal.windowSize")}: ${this.layout.windowState.size.width} x ${this.layout.windowState.size.height}`,
     });
 
@@ -649,7 +653,6 @@ export class SaveLayoutModal extends Modal {
         let iconButton: { setIcon: (icon: string) => unknown } | null = null;
         const row = this.createSettingIn(activityGroup, (setting) => {
           setting.setName(item.label || resolveViewLabel(this.app, item.viewType));
-          setting.setDesc(item.viewType);
         });
 
         row.settingEl.setAttr("data-window-spaces-activity-item", side);

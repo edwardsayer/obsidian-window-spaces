@@ -313,7 +313,6 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
     const row = this.createSettingIn(container, (s) => {
       const resolvedLabel = resolveViewLabel(this.app, item.viewType);
       s.setName(item.label || resolvedLabel);
-      s.setDesc(item.viewType);
 
       s.addButton((button) => {
         iconBtn = button;

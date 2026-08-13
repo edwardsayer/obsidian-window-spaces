@@ -142,6 +142,8 @@ export interface TranslationStrings {
     renameSection?: string;
     sectionsLabel?: string;
     sectionsPlaceholder?: string;
+    sectionHeaderHint?: string;
+    sectionHeaderHintStatic?: string;
   };
 
   // 設定頁面

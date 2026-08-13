@@ -551,7 +551,8 @@ button.mod-destructive:hover,
   gap: 3px;
 }
 
-/* CRITICAL: user 驗證過，不要動到!! (Verified by user, DO NOT MODIFY) */
+/* CRITICAL: user 驗證過，不要動到!! (Verified by user, DO NOT MODIFY)
+   EXCEPTION: cursor 依 2026-08-13 使用者要求改為預設指標（不再手型）。 */
 .window-layouts-modal .suggestion-item.window-layout-item {
   margin: 0;
   padding: 8px 10px;
@@ -566,7 +567,7 @@ button.mod-destructive:hover,
   width: 100%;
   box-sizing: border-box;
   overflow: hidden !important;
-  cursor: pointer;
+  cursor: default;
   background-color: transparent;
   transition: background-color 0.15s ease;
   flex-shrink: 0 !important;
@@ -593,7 +594,7 @@ button.mod-destructive:hover,
 .window-layouts-modal .suggestion-title.qsp-title {
   display: flex;
   align-items: center;
-  font-weight: var(--font-semibold, 500);
+  font-weight: normal;
   font-size: var(--font-ui-medium, 14px);
   color: var(--text-normal);
   line-height: 1.3;
@@ -629,6 +630,14 @@ button.mod-destructive:hover,
   pointer-events: none;
 }
 
+/* Space with an accent color: tint the panel icon with that color
+   (svg icons follow currentColor; emoji keep their own colors).
+   has-window-space-accent = 有 accent color（icon 上色）；
+   has-window-space-accent-fold = color + Show fold corner（左上角折疊標示）。 */
+.window-layouts-modal .suggestion-item.window-layout-item.has-window-space-accent .window-space-item-icon {
+  color: var(--window-space-color);
+}
+
 .window-layouts-modal .suggestion-item.window-layout-item > * {
   position: relative;
   z-index: 1;
@@ -655,7 +664,9 @@ button.mod-destructive:hover,
   min-width: 0;
   max-width: 100%;
   overflow: hidden !important;
-  padding: 0;
+  /* 避讓 icon 寬度，使剩餘文字開頭與 Space name 文字對齊
+     (10px item padding + 18px icon + 6px gap) */
+  padding: 0 0 0 24px;
   margin: 0;
 }
 
@@ -973,17 +984,25 @@ button.mod-destructive:hover,
 }
 
 /* ===== Section list headers ===== */
+/* Cursor matches the Option page's Activity Bar view items (grab/grabbing)
+   so section bars read as draggable. The Space items inside a section keep
+   their own (default) cursor. Left padding is 0 so the drag indicator can
+   sit at the very edge; the indicator's negative right margin keeps the
+   section title text aligned with the Space items' icon column (10px). */
 .space-section-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 4px 6px 4px;
+  padding: 8px 4px 6px 0;
   margin-top: 4px;
   margin-bottom: 4px;
   background: transparent;
   border-bottom: 1px solid var(--background-modifier-border);
   user-select: none;
-  cursor: pointer;
+  cursor: grab;
+}
+.space-section-header:active {
+  cursor: grabbing;
 }
 .space-section-header.is-dragging {
   opacity: 0.5;
@@ -991,10 +1010,38 @@ button.mod-destructive:hover,
 .space-section-header-left {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 0;
+}
+/* 前方拖曳指示圖示：grip 表示可拖曳排序；is-static（Uncategorized）為低調
+   占位，表示不可移動（不支援拖曳排序）。margin-right 4px 讓 title 文字從
+   icon 右緣之後開始（CDP 實測：icon 16px，負 margin 曾造成 6px 重疊），
+   同時仍不超過 space name 文字位置。 */
+.space-section-drag-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-right: 4px;
+  color: var(--text-muted);
+  opacity: 0.55;
+  flex-shrink: 0;
+  pointer-events: none;
+}
+.space-section-drag-indicator svg {
+  width: 13px;
+  height: 13px;
+}
+.space-section-drag-indicator.is-static {
+  opacity: 0.3;
+}
+/* Uncategorized 等不可排序的 section bar：滑鼠指標用預設指標（不可拖曳） */
+.space-section-header.is-static,
+.space-section-header.is-static:active {
+  cursor: default;
 }
 .space-section-title {
-  font-weight: 600;
+  font-weight: 700;
   font-size: 13px;
   color: var(--text-normal);
 }
@@ -1002,6 +1049,7 @@ button.mod-destructive:hover,
   font-size: 11px;
   color: var(--text-muted);
   opacity: 0.8;
+  margin-left: 6px;
 }
 .space-section-rename-input {
   font-size: 13px;
@@ -1527,12 +1575,33 @@ body.is-popout-window .workspace-tab-header-spacer {
 }
 
 /* 設定頁：Activity Bar view 項目拖曳排序 */
+/* View item rows in the Option page and the Space Settings dialog.
+   2026-08-13 反饋：上下 padding 改為 10px（Obsidian 標準 20px 太高）；
+   按鈕採用標準高度（不壓縮）。group 內需同級 selector 覆蓋 Obsidian 的
+   .setting-group .setting-item:not(.setting-item-heading)（specificity 0,3,0）。 */
 .setting-item[data-window-spaces-activity-item] {
   cursor: grab;
   position: relative;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+.setting-group .setting-item:not(.setting-item-heading)[data-window-spaces-activity-item] {
+  padding-top: 10px;
+  padding-bottom: 10px;
 }
 .setting-item[data-window-spaces-activity-item]:active {
   cursor: grabbing;
+}
+.setting-item[data-window-spaces-activity-item] .setting-item-info {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.setting-item[data-window-spaces-activity-item] .setting-item-name {
+  line-height: 1.25;
+}
+.setting-item[data-window-spaces-activity-item] .setting-item-description {
+  line-height: 1.25;
+  margin-top: 0;
 }
 .window-spaces-activity-drag-handle {
   display: flex;

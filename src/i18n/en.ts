@@ -139,6 +139,8 @@ export const en: TranslationStrings = {
     renameSection: "Rename Section",
     sectionsLabel: "Sections",
     sectionsPlaceholder: "Type section name and press Enter...",
+    sectionHeaderHint: "Click to collapse/expand · Double-click to rename · Drag to reorder",
+    sectionHeaderHintStatic: "Click to collapse/expand",
   },
 
   settings: {

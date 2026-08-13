@@ -404,8 +404,8 @@ export class PopoutActivityBarManager {
       spaceIdentity,
       viewButtons: new Map(),
       columnButtons: {
-        left: left.createEl("button", { cls: "window-spaces-activity-btn clickable-icon", attr: { type: "button", "aria-label": t("activityBar.toggleColumn"), title: t("activityBar.toggleColumn") } }),
-        right: right.createEl("button", { cls: "window-spaces-activity-btn clickable-icon", attr: { type: "button", "aria-label": t("activityBar.toggleColumn"), title: t("activityBar.toggleColumn") } }),
+        left: left.createEl("button", { cls: "window-spaces-activity-btn clickable-icon", attr: { type: "button", "aria-label": t("activityBar.toggleColumn") } }),
+        right: right.createEl("button", { cls: "window-spaces-activity-btn clickable-icon", attr: { type: "button", "aria-label": t("activityBar.toggleColumn") } }),
       },
     });
 
@@ -628,7 +628,7 @@ export class PopoutActivityBarManager {
       const label = item.label || resolveViewLabel(this.app, item.viewType);
       const btn = bar.createEl("button", {
         cls: "window-spaces-activity-btn window-spaces-activity-view clickable-icon",
-        attr: { type: "button", "aria-label": label, title: label },
+        attr: { type: "button", "aria-label": label },
       });
       // 自訂 icon 優先，否則走 A+B 機制
       applyItemIcon(btn, this.app, item);

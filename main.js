@@ -196,6 +196,8 @@ const en = {
         renameSection: "Rename Section",
         sectionsLabel: "Sections",
         sectionsPlaceholder: "Type section name and press Enter...",
+        sectionHeaderHint: "Click to collapse/expand · Double-click to rename · Drag to reorder",
+        sectionHeaderHintStatic: "Click to collapse/expand",
     },
     settings: {
         title: "Window Spaces Settings",
@@ -415,6 +417,8 @@ const zhTW = {
         renameSection: "重命名 Section",
         sectionsLabel: "Section 分組標籤",
         sectionsPlaceholder: "輸入 Section 名稱後按 Enter...",
+        sectionHeaderHint: "點擊摺疊/展開 · 雙擊重新命名 · 拖曳排序",
+        sectionHeaderHintStatic: "點擊摺疊/展開",
     },
     settings: {
         title: "Window Spaces 設定",
@@ -634,6 +638,8 @@ const zhCN = {
         renameSection: "重命名 Section",
         sectionsLabel: "Section 分组标签",
         sectionsPlaceholder: "输入 Section 名称后按 Enter...",
+        sectionHeaderHint: "点击折叠/展开 · 双击重命名 · 拖拽排序",
+        sectionHeaderHintStatic: "点击折叠/展开",
     },
     settings: {
         title: "Window Spaces 设置",
@@ -1559,7 +1565,10 @@ class WindowLayoutsModal extends obsidian.Modal {
             event.preventDefault();
             event.stopImmediatePropagation();
             const rawQuery = ((_f = this.searchInput) === null || _f === void 0 ? void 0 : _f.value.trim()) || "";
-            const selectedLayout = this.filteredLayouts[this.selectedIndex >= 0 ? this.selectedIndex : 0];
+            // 高亮（方向鍵）是以 renderedLayoutEntries 的渲染順序移動；分組檢視下
+            // 該順序與 filteredLayouts（排序順序）不同，必須以渲染順序取選中的 layout。
+            const entry = this.renderedLayoutEntries[this.selectedIndex >= 0 ? this.selectedIndex : 0];
+            const selectedLayout = entry ? entry.layout : this.filteredLayouts[0];
             if (selectedLayout) {
                 void this.restoreLayout(selectedLayout, !event.shiftKey);
             }
@@ -1982,7 +1991,7 @@ class WindowLayoutsModal extends obsidian.Modal {
         this.updateSelectedItemHighlight();
     }
     renderSectionHeader(parentEl, secName, count, allSectionsOrder, isReorderable = true) {
-        const headerEl = parentEl.createDiv("space-section-header");
+        const headerEl = parentEl.createDiv(isReorderable ? "space-section-header" : "space-section-header is-static");
         if (isReorderable && allSectionsOrder) {
             headerEl.setAttribute("draggable", "true");
             headerEl.ondragstart = (e) => {
@@ -2013,9 +2022,27 @@ class WindowLayoutsModal extends obsidian.Modal {
             });
         }
         const isCollapsed = WindowLayoutsModal.collapsedSections.has(secName);
+        // Hint 放在整個 section bar 上（與 toolbar 的 View Options 一致，用
+        // Obsidian 原生 setTooltip）；不可排序的 section（如 Uncategorized）
+        // 提示不包含 drag to reorder。
+        const headerHint = isReorderable
+            ? t("manageModal.sectionHeaderHint")
+            : t("manageModal.sectionHeaderHintStatic");
+        obsidian.setTooltip(headerEl, headerHint);
         // 左側：Section 名稱、計數與更名按鈕
         const leftEl = headerEl.createDiv("space-section-header-left");
-        const titleSpan = leftEl.createSpan({ text: secName, cls: "space-section-title" });
+        // 前方拖曳指示圖示：可排序的 section 顯示 grip（表示可拖曳移動）；
+        // 不可排序的（Uncategorized）顯示低調 lock 占位（表示不可移動）。
+        const dragIndicator = leftEl.createSpan({
+            cls: isReorderable
+                ? "space-section-drag-indicator"
+                : "space-section-drag-indicator is-static",
+        });
+        obsidian.setIcon(dragIndicator, isReorderable ? "grip-vertical" : "lock");
+        const titleSpan = leftEl.createSpan({
+            text: secName,
+            cls: "space-section-title",
+        });
         leftEl.createSpan({ text: `(${count})`, cls: "space-section-count" });
         const triggerInlineRename = () => {
             const input = headerEl.createEl("input", {
@@ -2085,7 +2112,7 @@ class WindowLayoutsModal extends obsidian.Modal {
         };
     }
     renderLayoutItem(containerEl, layout) {
-        var _a, _b, _c, _d, _e, _f;
+        var _a, _b, _c, _d, _e, _f, _g;
         const layoutEl = containerEl.createDiv("suggestion-item window-layout-item");
         const itemIndex = this.renderedLayoutEntries.length;
         this.renderedLayoutEntries.push({ layout, element: layoutEl });
@@ -2097,9 +2124,16 @@ class WindowLayoutsModal extends obsidian.Modal {
         if (layout.archived === true) {
             layoutEl.addClass("is-archived");
         }
+        // 顯示設定 follow Space Settings：
+        // - has-window-space-accent：只要有 accent color，icon 就用該色上色
+        // - has-window-space-accent-fold：左上角折疊標示需 color + Show fold corner 設定
         if ((_a = layout.color) === null || _a === void 0 ? void 0 : _a.trim()) {
-            layoutEl.addClass("has-window-space-accent-fold");
             layoutEl.style.setProperty("--window-space-color", layout.color.trim());
+            layoutEl.addClass("has-window-space-accent");
+            const showFold = (_b = layout.showFoldedCorner) !== null && _b !== void 0 ? _b : this.plugin.settings.defaultShowFoldedCorner !== false;
+            if (showFold) {
+                layoutEl.addClass("has-window-space-accent-fold");
+            }
         }
         this.setFilesTooltipForLayout(layoutEl, layout);
         let holdTimer = null;
@@ -2123,7 +2157,7 @@ class WindowLayoutsModal extends obsidian.Modal {
         });
         const visualEl = titleEl.createSpan({ cls: "window-space-title-visual" });
         const iconSpan = visualEl.createSpan({ cls: "window-space-item-icon" });
-        const val = resolveSpaceIcon(layout.icon, (_b = this.plugin.settings) === null || _b === void 0 ? void 0 : _b.defaultIcon);
+        const val = resolveSpaceIcon(layout.icon, (_c = this.plugin.settings) === null || _c === void 0 ? void 0 : _c.defaultIcon);
         if (isSpaceEmoji(val)) {
             iconSpan.setText(val);
         }
@@ -2149,18 +2183,13 @@ class WindowLayoutsModal extends obsidian.Modal {
             obsidian.setTooltip(autoSaveBadge, t("manageModal.autoSaveEnabled"));
         }
         const noteEl = itemContentEl.createDiv("suggestion-note qsp-note");
-        const i18n = getI18n();
         const pathEl = noteEl.createDiv("qsp-path");
-        pathEl.createSpan({
-            text: `${t("manageModal.updatedDate")}: ${i18n.formatDate(new Date(layout.updatedAt || layout.timestamp || layout.createdAt || Date.now()))}`,
-            cls: "layout-date",
-        });
-        const totalTabs = ((_c = layout.metadata) === null || _c === void 0 ? void 0 : _c.tabCount) || ((_e = (_d = layout.workspace) === null || _d === void 0 ? void 0 : _d.leaves) === null || _e === void 0 ? void 0 : _e.length) || 0;
+        const totalTabs = ((_d = layout.metadata) === null || _d === void 0 ? void 0 : _d.tabCount) || ((_f = (_e = layout.workspace) === null || _e === void 0 ? void 0 : _e.leaves) === null || _f === void 0 ? void 0 : _f.length) || 0;
         pathEl.createSpan({
             text: `${t("manageModal.tabCount")}: ${totalTabs}`,
             cls: "layout-files",
         });
-        const openWin = typeof ((_f = this.plugin.manager) === null || _f === void 0 ? void 0 : _f.getOpenWindowForLayout) === "function"
+        const openWin = typeof ((_g = this.plugin.manager) === null || _g === void 0 ? void 0 : _g.getOpenWindowForLayout) === "function"
             ? this.plugin.manager.getOpenWindowForLayout(layout)
             : null;
         if (openWin) {
@@ -2774,6 +2803,35 @@ class WindowLayoutManager {
      * 自動比對該視窗現有的 Leaves / 檔案與已儲存的 Layout (spaces)，
      * 為無標籤 Popout 視窗一對一辨識還原其 space name 及狀態列 / 側欄樣式。
      */
+    /**
+     * 把視窗目前的 live leaf id 集合回寫為該 layout 的識別記號（leafIdMarker）。
+     * Obsidian 重啟後 floating 視窗的 leaf id 穩定保留，因此下次重啟可直接
+     * 核對此記號識別 space，不需內容比對。靜默保存（不發通知、不拋錯）。
+     */
+    syncWindowLeafMarker(targetWin, layout) {
+        if (!layout || !targetWin || targetWin.closed)
+            return;
+        try {
+            const ids = this.getLeavesForWindow(targetWin)
+                .map((leaf) => leaf.id)
+                .filter((id) => !!id);
+            if (ids.length === 0)
+                return;
+            const current = layout.leafIdMarker;
+            const same = Array.isArray(current) &&
+                current.length === ids.length &&
+                current.every((id, i) => id === ids[i]);
+            if (same)
+                return;
+            layout.leafIdMarker = ids;
+            void this.plugin.saveSettings().catch(() => {
+                // 靜默：識別記號同步失敗不影響主流程
+            });
+        }
+        catch (_a) {
+            // Ignore marker sync errors
+        }
+    }
     matchUnlabeledPopoutWindows() {
         var _a, _b;
         if (this.isMatchingUnlabeled)
@@ -2832,6 +2890,18 @@ class WindowLayoutManager {
                     return this.getFilePathFromLeafState({ state: state || {} });
                 })
                     .filter((f) => !!f));
+                // folder-spaces-explorer 等 view 的 panelId 跨 session 穩定，
+                // 作為「無檔案 space」的比對特徵（leaf id 重啟後可能重建）。
+                const winPanelIds = new Set(winLeaves
+                    .map((leaf) => {
+                    var _a;
+                    const state = typeof leaf.getViewState === "function"
+                        ? (_a = leaf.getViewState()) === null || _a === void 0 ? void 0 : _a.state
+                        : null;
+                    const panelId = state === null || state === void 0 ? void 0 : state.panelId;
+                    return typeof panelId === "string" && panelId ? panelId : null;
+                })
+                    .filter((pid) => !!pid));
                 let bestSpace = null;
                 let bestScore = 0;
                 for (const space of availableSpaces) {
@@ -2844,7 +2914,24 @@ class WindowLayoutManager {
                     const savedFiles = new Set(savedLeaves
                         .map((l) => this.getFilePathFromLeafState(l))
                         .filter((f) => !!f));
+                    const savedPanelIds = new Set(savedLeaves
+                        .map((l) => {
+                        var _a;
+                        const panelId = (_a = l.state) === null || _a === void 0 ? void 0 : _a.panelId;
+                        return typeof panelId === "string" && panelId ? panelId : null;
+                    })
+                        .filter((pid) => !!pid));
                     let score = 0;
+                    // (0) 視窗識別記號（leafIdMarker）比對：上次識別/restore 時回寫的
+                    // live leaf id 集合，重啟後視窗 leaf id 穩定 → 直接命中，最高權重。
+                    if (Array.isArray(space.leafIdMarker) && space.leafIdMarker.length > 0) {
+                        let markerHit = 0;
+                        for (const id of winLeafIds) {
+                            if (space.leafIdMarker.includes(id))
+                                markerHit++;
+                        }
+                        score += markerHit * 200;
+                    }
                     // (a) Leaf ID 匹配 (+100/leaf)
                     for (const id of winLeafIds) {
                         if (savedLeafIds.has(id))
@@ -2857,6 +2944,12 @@ class WindowLayoutManager {
                             matchingFilesCount++;
                     }
                     score += matchingFilesCount * 10;
+                    // (e) view state 特徵比對：folder-spaces-explorer 等 view 的 panelId
+                    // 跨 session 穩定，補足無檔案 space 的辨識（leaf id 重啟後可能重建）。
+                    for (const pid of winPanelIds) {
+                        if (savedPanelIds.has(pid))
+                            score += 100;
+                    }
                     // (c) 檔案完全吻合（Popout 中所有檔案與 space 中所有檔案一致）時大幅加分 (+50)
                     if (winFiles.size > 0 && winFiles.size === savedFiles.size && matchingFilesCount === winFiles.size) {
                         score += 50;
@@ -2880,6 +2973,8 @@ class WindowLayoutManager {
                     claimedLayoutNames.add(bestSpace.name);
                     this.setLayoutLabelForWindow(win, bestSpace.name);
                     this.layoutWindows.set(bestSpace, win);
+                    // 回寫識別記號：使下次重啟直接命中 leafIdMarker，不再依賴內容比對
+                    this.syncWindowLeafMarker(win, bestSpace);
                 }
             }
         }
@@ -3342,6 +3437,30 @@ class WindowLayoutManager {
         targetWin.setTimeout(() => { void doFocusAndReveal(false); }, 200);
     }
     /**
+     * 取得指定視窗內「目前 active 的 tab」leaf（依 tab header 的 is-active class）。
+     * 全域 activeLeaf 可能指向其他視窗（例如使用者已切回主視窗），此時不該
+     * fallback 到視窗內第一個 leaf，以免把第一個 tab 搶成 active。
+     */
+    getActiveLeafInWindow(targetWin) {
+        const workspace = this.app.workspace;
+        if (typeof workspace.iterateAllLeaves !== "function")
+            return null;
+        let found = null;
+        workspace.iterateAllLeaves((leaf) => {
+            var _a, _b;
+            if (found)
+                return;
+            const extLeaf = leaf;
+            if (((_b = (_a = extLeaf.containerEl) === null || _a === void 0 ? void 0 : _a.ownerDocument) === null || _b === void 0 ? void 0 : _b.defaultView) !== targetWin)
+                return;
+            const tabEl = extLeaf.tabHeaderEl;
+            if (tabEl && tabEl.classList.contains("is-active")) {
+                found = leaf;
+            }
+        });
+        return found;
+    }
+    /**
      * 獲取目前活動視窗 (activeWindow) 中真正的 activeLeaf
      */
     getActiveLeafForCurrentWindow(targetWindow) {
@@ -3607,7 +3726,9 @@ class WindowLayoutManager {
                     (!options.forceNewWindow || options.focusExistingWindow === true)) {
                     const existingWin = this.getOpenWindowForLayout(layout);
                     if (existingWin && !existingWin.closed && this.isPopoutDocument(existingWin.document)) {
-                        this.focusTargetWindow(existingWin);
+                        // 聚焦已開啟的視窗時，保留視窗內目前的 active tab，
+                        // 避免 active 被搶回第一個 tab。
+                        this.focusTargetWindow(existingWin, this.getActiveLeafInWindow(existingWin));
                         this.setLayoutLabelForWindow(existingWin, layout.name);
                         this.refreshLayoutLabels();
                         if (options.showNotifications !== false && this.plugin.settings.showNotifications !== false) {
@@ -3806,6 +3927,8 @@ class WindowLayoutManager {
                     }
                 }
                 this.setLayoutLabelForWindow(targetWin, layout.name);
+                // 回寫視窗識別記號：下次重啟可直接核對 leafIdMarker 識別此 space
+                this.syncWindowLeafMarker(targetWin, layout);
                 this.restorePreservedWindowLabels(preservedWindowLayouts, targetWin);
                 this.refreshLayoutLabels();
                 // 先套用隱藏的側欄/分頁群組，避免幾何對齊後再縮放側欄觸發橫向位移
@@ -3826,11 +3949,20 @@ class WindowLayoutManager {
                     const canActivatePopout = this.isWindowFocused(targetWin) || !this.isMainWindowFocused();
                     const winLeaves = this.getLeavesForWindow(targetWin);
                     if (winLeaves.length > 0 && canActivatePopout) {
-                        try {
-                            this.app.workspace.setActiveLeaf(winLeaves[0], { focus: true });
-                        }
-                        catch (_p) {
-                            // Ignore focus error
+                        // restoreFileStatesForWindow 已把 active 設到 layout 保存時選中的
+                        // tab（activeFile 對應的 leaf，fallback 第一個 leaf）。此處只在全域
+                        // activeLeaf 尚未指向此 popout 時才設定，避免把 active 搶到第一個
+                        // column 的第一個 tab，導致原本選中的 tab 失去 active。
+                        const activeLeaf = typeof this.app.workspace.getMostRecentLeaf === "function"
+                            ? this.app.workspace.getMostRecentLeaf()
+                            : this.app.workspace.activeLeaf;
+                        if (!activeLeaf || !winLeaves.includes(activeLeaf)) {
+                            try {
+                                this.app.workspace.setActiveLeaf(winLeaves[0], { focus: true });
+                            }
+                            catch (_p) {
+                                // Ignore focus error
+                            }
                         }
                     }
                     if (typeof targetWin.focus === "function" && canActivatePopout) {
@@ -4398,6 +4530,7 @@ class WindowLayoutManager {
                     : Array.isArray(node.children)
                         ? node.children.filter((c) => (c === null || c === void 0 ? void 0 : c.type) === "leaf")
                         : [];
+                const groupLeaves = [];
                 let last = leaf;
                 for (let i = 0; i < leafNodes.length; i++) {
                     if (i > 0) {
@@ -4407,7 +4540,25 @@ class WindowLayoutManager {
                         last = workspace.createLeafInParent(parent, -1);
                     }
                     yield this.applyBuiltLeafState(last, leafNodes[i]);
+                    groupLeaves.push(last);
                     built.push(last);
+                }
+                // 恢復 saved layout 的 currentTab（該 tab group 保存時選中的 tab）。
+                // leaf 層級重建預設會把 group 的 active tab 落在建立順序的預設值，
+                // 造成「第一個 column 的第一個 tab 被特別 active、原本選中的 tab
+                // lost active」；其他 split 的 tab group 同理一併恢復。
+                if (node.type === "tabs" && typeof node.currentTab === "number" && groupLeaves.length > 0) {
+                    const activeIndex = Math.max(0, Math.min(node.currentTab, groupLeaves.length - 1));
+                    const groupActive = groupLeaves[activeIndex];
+                    if (groupActive) {
+                        try {
+                            yield workspace.revealLeaf(groupActive);
+                            workspace.setActiveLeaf(groupActive, { focus: false });
+                        }
+                        catch (_a) {
+                            // Ignore focus/activation error during structure build
+                        }
+                    }
                 }
                 return last;
             });
@@ -5000,7 +5151,7 @@ class WindowLayoutManager {
             if (progressNotice) {
                 progressNotice.hide();
             }
-            const leafToFocus = targetActiveLeaf || windowLeaves[0] || null;
+            const leafToFocus = targetActiveLeaf || null;
             if (leafToFocus) {
                 try {
                     yield this.app.workspace.revealLeaf(leafToFocus);
@@ -5011,6 +5162,27 @@ class WindowLayoutManager {
                 }
                 catch (e) {
                     console.warn("Failed to set active leaf:", e);
+                }
+            }
+            else {
+                // 無 activeFile 時不要 fallback 到 windowLeaves[0]：leaf 層級重建
+                // （fillTabs 已恢復各 tab group 的 currentTab）或 changeLayout 已把
+                // active 指到視窗內的 leaf。此處只在 active 完全未指向此視窗時才補指，
+                // 避免把第一個 column 的第一個 tab 搶成 active（原本選中的 tab lost active）。
+                const currentActive = typeof this.app.workspace.getMostRecentLeaf === "function"
+                    ? this.app.workspace.getMostRecentLeaf()
+                    : this.app.workspace.activeLeaf;
+                if (!currentActive || !windowLeaves.includes(currentActive)) {
+                    const fallbackLeaf = windowLeaves[0] || null;
+                    if (fallbackLeaf) {
+                        try {
+                            yield this.app.workspace.revealLeaf(fallbackLeaf);
+                            this.app.workspace.setActiveLeaf(fallbackLeaf, { focus: true });
+                        }
+                        catch (e) {
+                            console.warn("Failed to set active leaf:", e);
+                        }
+                    }
                 }
             }
             return missingFiles;
@@ -5034,6 +5206,7 @@ class WindowLayoutManager {
     }
     /** 根據保存的 leaf 集合辨識還原後的目標視窗。 */
     findWindowForSavedLeaves(leaves, excludedWindow, preferredWindow, claimedWindows = new Set(), requirePositiveScore = false) {
+        var _a;
         if (leaves.length === 0)
             return null;
         const savedIds = new Set(leaves.map((leaf) => leaf.id));
@@ -5041,6 +5214,10 @@ class WindowLayoutManager {
             .map((leaf) => this.getFilePathFromLeafState(leaf))
             .filter((filePath) => !!filePath));
         const windows = new Map();
+        // 追蹤各視窗的 leaf-id 命中數與被命中的 saved 檔案集合（供覆蓋率門檻使用），
+        // 避免只靠通用檔名（如多個 space 共用的 Untitled.md）造成誤匹配。
+        const idMatches = new Map();
+        const matchedSavedFiles = new Map();
         let bestWindow = null;
         let bestScore = 0;
         this.app.workspace.iterateAllLeaves((leaf) => {
@@ -5056,10 +5233,18 @@ class WindowLayoutManager {
             const filePath = this.getFilePathFromLeafState({
                 state: (viewState === null || viewState === void 0 ? void 0 : viewState.state) || {},
             });
+            const idHit = savedIds.has(leaf.id) ? 1 : 0;
+            const fileHit = filePath && savedFiles.has(filePath) ? 1 : 0;
             const score = (windows.get(targetWindow) || 0) +
-                (savedIds.has(leaf.id) ? 100 : 0) +
-                (filePath && savedFiles.has(filePath) ? 10 : 0);
+                (idHit ? 100 : 0) +
+                (fileHit ? 10 : 0);
             windows.set(targetWindow, score);
+            idMatches.set(targetWindow, (idMatches.get(targetWindow) || 0) + idHit);
+            if (fileHit) {
+                const set = matchedSavedFiles.get(targetWindow) || new Set();
+                set.add(filePath);
+                matchedSavedFiles.set(targetWindow, set);
+            }
             if (score > bestScore) {
                 bestScore = score;
                 bestWindow = targetWindow;
@@ -5070,8 +5255,18 @@ class WindowLayoutManager {
         if (preferredWindow && windows.has(preferredWindow)) {
             return preferredWindow;
         }
-        if (bestWindow)
+        if (bestWindow) {
+            // 當要求正分數 (requirePositiveScore) 時，leaf-id 命中視為高置信直接接受；
+            // 純檔案匹配則需 saved 檔案覆蓋率 ≥ 50%，避免通用檔名（Untitled.md）誤判。
+            if (requirePositiveScore && (idMatches.get(bestWindow) || 0) === 0) {
+                const coverage = savedFiles.size > 0
+                    ? (((_a = matchedSavedFiles.get(bestWindow)) === null || _a === void 0 ? void 0 : _a.size) || 0) / savedFiles.size
+                    : 0;
+                if (coverage < 0.5)
+                    return null;
+            }
             return bestWindow;
+        }
         // 當要求正分數 (positive score) 時，若未匹配到任何 leaf/file (score 0)，禁止盲目 fallback 回傳唯一視窗
         if (requirePositiveScore)
             return null;
@@ -5669,7 +5864,6 @@ class WindowSpacesSettingTab extends obsidian.PluginSettingTab {
         const row = this.createSettingIn(container, (s) => {
             const resolvedLabel = resolveViewLabel(this.app, item.viewType);
             s.setName(item.label || resolvedLabel);
-            s.setDesc(item.viewType);
             s.addButton((button) => {
                 iconBtn = button;
                 button.setIcon(item.icon || resolveViewIcon(this.app, item.viewType)).setTooltip(t("settings.pickIcon"));
@@ -6048,6 +6242,10 @@ class SaveLayoutModal extends obsidian.Modal {
         statsContainer.createDiv({
             cls: "window-spaces-stat-item",
             text: `${t("manageModal.createdDate")}: ${i18n.formatDate(new Date(this.layout.timestamp))}`,
+        });
+        statsContainer.createDiv({
+            cls: "window-spaces-stat-item",
+            text: `${t("manageModal.updatedDate")}: ${i18n.formatDate(new Date(this.layout.updatedAt || this.layout.timestamp || this.layout.createdAt || Date.now()))}`,
         });
         statsContainer.createDiv({
             cls: "window-spaces-stat-item",
@@ -6490,7 +6688,6 @@ class SaveLayoutModal extends obsidian.Modal {
                 let iconButton = null;
                 const row = this.createSettingIn(activityGroup, (setting) => {
                     setting.setName(item.label || resolveViewLabel(this.app, item.viewType));
-                    setting.setDesc(item.viewType);
                 });
                 row.settingEl.setAttr("data-window-spaces-activity-item", side);
                 row.settingEl.setAttr("data-drag-index", String(index));
@@ -7874,8 +8071,8 @@ class PopoutActivityBarManager {
             spaceIdentity,
             viewButtons: new Map(),
             columnButtons: {
-                left: left.createEl("button", { cls: "window-spaces-activity-btn clickable-icon", attr: { type: "button", "aria-label": t("activityBar.toggleColumn"), title: t("activityBar.toggleColumn") } }),
-                right: right.createEl("button", { cls: "window-spaces-activity-btn clickable-icon", attr: { type: "button", "aria-label": t("activityBar.toggleColumn"), title: t("activityBar.toggleColumn") } }),
+                left: left.createEl("button", { cls: "window-spaces-activity-btn clickable-icon", attr: { type: "button", "aria-label": t("activityBar.toggleColumn") } }),
+                right: right.createEl("button", { cls: "window-spaces-activity-btn clickable-icon", attr: { type: "button", "aria-label": t("activityBar.toggleColumn") } }),
             },
         });
         body.classList.add("window-spaces-has-left-activity");
@@ -8080,7 +8277,7 @@ class PopoutActivityBarManager {
             const label = item.label || resolveViewLabel(this.app, item.viewType);
             const btn = bar.createEl("button", {
                 cls: "window-spaces-activity-btn window-spaces-activity-view clickable-icon",
-                attr: { type: "button", "aria-label": label, title: label },
+                attr: { type: "button", "aria-label": label },
             });
             // 自訂 icon 優先，否則走 A+B 機制
             applyItemIcon(btn, this.app, item);

@@ -38,6 +38,10 @@ export interface WindowLayout {
     windowId?: string;
     firstLeafId?: string;
   };
+  // 視窗識別記號：該 space 視窗目前的 live leaf id 集合。Obsidian 重啟後
+  // floating 視窗的 leaf id 穩定保留，重啟後可直接核對此記號識別 space，
+  // 不需內容比對（leaf id / 檔案 / panelId）。匹配或 restore 成功時回寫。
+  leafIdMarker?: string[];
   // 隱藏的側欄/分頁群組狀態（Activity Bar 與 Pane 隱藏功能持久化）
   hidden?: PopoutHiddenState;
 }

@@ -139,6 +139,8 @@ export const zhTW: TranslationStrings = {
     renameSection: "重命名 Section",
     sectionsLabel: "Section 分組標籤",
     sectionsPlaceholder: "輸入 Section 名稱後按 Enter...",
+    sectionHeaderHint: "點擊摺疊/展開 · 雙擊重新命名 · 拖曳排序",
+    sectionHeaderHintStatic: "點擊摺疊/展開",
   },
 
   settings: {

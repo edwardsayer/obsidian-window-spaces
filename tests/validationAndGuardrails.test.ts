@@ -206,7 +206,7 @@ describe("Validation & Auto-Save Guardrails (validationAndGuardrails.test.ts)", 
       showNotifications: false,
     });
 
-    expect(focusSpy).toHaveBeenCalledWith(existingWindow);
+    expect(focusSpy).toHaveBeenCalledWith(existingWindow, null);
     expect(openPopoutLeaf).not.toHaveBeenCalled();
   });
 
@@ -1036,5 +1036,189 @@ describe("Validation & Auto-Save Guardrails (validationAndGuardrails.test.ts)", 
     expect(setActiveLeaf).toHaveBeenCalledWith(popoutLeaf, { focus: true });
     expect(targetWin.focus).toHaveBeenCalledTimes(1);
     hasFocusSpy.mockRestore();
+  });
+});
+
+describe("findWindowForSavedLeaves coverage guard (Active badge accuracy)", () => {
+  let manager: WindowLayoutManager;
+  let mockPlugin: any;
+
+  beforeEach(() => {
+    mockPlugin = {
+      app: { workspace: {}, vault: {} },
+      settings: { spaces: [], sortBy: "updated-desc" },
+      saveSettings: async () => {},
+    };
+    initI18n(mockPlugin.app);
+    manager = new WindowLayoutManager(mockPlugin);
+  });
+
+  /** 建立一個 popout 視窗的 mock leaf（body 帶 is-popout-window class）。 */
+  const makePopoutLeaves = (entries: Array<{ id: string; type: string; file?: string }>) => {
+    const body = { classList: { contains: (cls: string) => cls === "is-popout-window" }, getAttribute: () => null };
+    const win = { document: { body }, closed: false };
+    const leaves = entries.map((e) => ({
+      id: e.id,
+      containerEl: { ownerDocument: { defaultView: win, body } },
+      getViewState: () => ({ type: e.type, state: e.file ? { file: e.file } : {} }),
+    }));
+    mockPlugin.app.workspace.iterateAllLeaves = (cb: (leaf: unknown) => void) => leaves.forEach(cb);
+    return win;
+  };
+
+  test("通用檔名（Untitled.md）低覆蓋率時不誤匹配：IRM-1 saved 3 檔僅 1 檔命中 → null", () => {
+    makePopoutLeaves([
+      { id: "a1", type: "markdown", file: "Professional/4.md" },
+      { id: "a2", type: "markdown", file: "Untitled.md" },
+      { id: "a3", type: "markdown", file: "Untitled.md" },
+      { id: "a4", type: "markdown", file: "Untitled.md" },
+      { id: "a5", type: "markdown", file: "Untitled.md" },
+    ]);
+    const saved = [
+      { id: "x1", type: "markdown", state: { file: "Untitled.md" } },
+      { id: "x2", type: "markdown", state: { file: "IRM-MOC.md" } },
+      { id: "x3", type: "markdown", state: { file: "IRM/IMR-P1/P1-RA.md" } },
+    ];
+    const win = (manager as any).findWindowForSavedLeaves(saved, undefined, null, new Set(), true);
+    expect(win).toBeNull();
+  });
+
+  test("saved 檔案高覆蓋率（4/4）時正常匹配", () => {
+    const win = makePopoutLeaves([
+      { id: "a1", type: "markdown", file: "Professional/4.md" },
+      { id: "a2", type: "markdown", file: "Untitled.md" },
+      { id: "a3", type: "markdown", file: "Professional/productivity/12-weeks one Year.md" },
+      { id: "a4", type: "markdown", file: "my self/My TASK.md" },
+    ]);
+    const saved = [
+      { id: "x1", type: "markdown", state: { file: "Professional/4.md" } },
+      { id: "x2", type: "markdown", state: { file: "Untitled.md" } },
+      { id: "x3", type: "markdown", state: { file: "Professional/productivity/12-weeks one Year.md" } },
+      { id: "x4", type: "markdown", state: { file: "my self/My TASK.md" } },
+    ];
+    const result = (manager as any).findWindowForSavedLeaves(saved, undefined, null, new Set(), true);
+    expect(result).toBe(win);
+  });
+
+  test("leaf id 命中（高置信）即使檔案覆蓋率低也接受", () => {
+    const win = makePopoutLeaves([
+      { id: "x1", type: "markdown", file: "Untitled.md" },
+      { id: "other", type: "search" },
+    ]);
+    const saved = [
+      { id: "x1", type: "markdown", state: { file: "IRM-MOC.md" } },
+      { id: "x2", type: "markdown", state: { file: "IRM/IMR-P1/P1-RA.md" } },
+      { id: "x3", type: "markdown", state: { file: "Untitled.md" } },
+    ];
+    const result = (manager as any).findWindowForSavedLeaves(saved, undefined, null, new Set(), true);
+    expect(result).toBe(win);
+  });
+
+  test("restore 不覆蓋已選中的 tab（全域 activeLeaf 已在 popout 內時，不再強設第一個 leaf）", async () => {
+    const setActiveLeaf = vi.fn();
+    const targetWin = {
+      document: {
+        hasFocus: vi.fn(() => true),
+        body: { classList: { contains: (cls: string) => cls === "is-popout-window" } },
+      },
+      focus: vi.fn(),
+      setTimeout: () => 0,
+      closed: false,
+    } as unknown as Window;
+    const firstTabLeaf = { containerEl: { ownerDocument: { defaultView: targetWin } } };
+    const selectedTabLeaf = { containerEl: { ownerDocument: { defaultView: targetWin } } };
+    const hasFocusSpy = vi.spyOn(document, "hasFocus").mockReturnValue(false);
+
+    mockPlugin.settings.showNotifications = false;
+    mockPlugin.app.workspace = {
+      getLayout: () => ({ floating: [] }),
+      openPopoutLeaf: () => selectedTabLeaf,
+      changeLayout: vi.fn().mockResolvedValue(undefined),
+      setActiveLeaf,
+      // restoreFileStatesForWindow 已把 active 設到「layout 保存時選中的 tab」
+      activeLeaf: selectedTabLeaf,
+      iterateAllLeaves: () => {},
+    };
+
+    vi.spyOn(manager as any, "getOpenWindowForLayout").mockReturnValue(null);
+    vi.spyOn(manager as any, "capturePreservedWindowLayouts").mockReturnValue([]);
+    vi.spyOn(manager as any, "getSavedViewStates").mockReturnValue([]);
+    vi.spyOn(manager, "getLivePopoutWindows")
+      .mockReturnValueOnce([])
+      .mockReturnValue([targetWin]);
+    // 第一個 leaf 是「第一個 column 的第一個 tab」（不同於選中的 tab）
+    vi.spyOn(manager as any, "getLeavesForWindow").mockReturnValue([firstTabLeaf, selectedTabLeaf]);
+    vi.spyOn(manager as any, "restoreWindowGeometry").mockImplementation(() => {});
+    vi.spyOn(manager as any, "restorePreservedWindowLabels").mockImplementation(() => {});
+    vi.spyOn(manager as any, "setLayoutLabelForWindow").mockImplementation(() => {});
+    vi.spyOn(manager as any, "refreshLayoutLabels").mockImplementation(() => {});
+
+    const layout: WindowLayout = {
+      id: "no-steal-active",
+      name: "No Steal Active",
+      timestamp: Date.now(),
+      windowState: { size: { width: 800, height: 600 } },
+      workspace: {
+        layout: { type: "leaf", id: "leaf-ns", state: { type: "empty", state: {} } },
+        leaves: [],
+      },
+      metadata: { fileCount: 0, tabCount: 0, splitCount: 0 },
+    };
+
+    await manager.restoreLayout(layout, { forceNewWindow: true, showNotifications: false });
+
+    // 全域 activeLeaf 已是選中的 tab → 不得被覆蓋為第一個 leaf
+    expect(setActiveLeaf).not.toHaveBeenCalled();
+    expect(targetWin.focus).toHaveBeenCalledTimes(1);
+    hasFocusSpy.mockRestore();
+  });
+
+  test("buildSimpleWindowStructure 恢復每個 tab group 的 currentTab（不把第一個 tab 設為 active）", async () => {
+    const setActiveLeaf = vi.fn();
+    const revealLeaf = vi.fn().mockResolvedValue(undefined);
+    const targetWin = { document: { body: {} } } as unknown as Window;
+    const initialLeaf = { parent: {} };
+    const leafA = { parent: {} };
+    const leafB = { parent: {} };
+
+    mockPlugin.app.workspace = {
+      createLeafInParent: vi.fn().mockReturnValueOnce(leafA).mockReturnValueOnce(leafB),
+      createLeafBySplit: vi.fn(),
+      revealLeaf,
+      setActiveLeaf,
+      iterateAllLeaves: () => {},
+    };
+
+    vi.spyOn(manager as any, "getLeavesForWindow").mockReturnValue([initialLeaf]);
+    vi.spyOn(manager as any, "applyBuiltLeafState").mockResolvedValue(undefined);
+    vi.spyOn(manager as any, "applySavedSplitDimensions").mockImplementation(() => {});
+
+    // 單一 split 內的 tabs 群組：saved currentTab = 1（選中第 2 個 tab）
+    const rootNode = {
+      type: "window",
+      children: [
+        {
+          type: "split",
+          direction: "horizontal",
+          children: [
+            {
+              type: "tabs",
+              currentTab: 1,
+              children: [
+                { type: "leaf", id: "l0", state: { type: "empty" } },
+                { type: "leaf", id: "l1", state: { type: "empty" } },
+                { type: "leaf", id: "l2", state: { type: "empty" } },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    await (manager as any).buildSimpleWindowStructure(targetWin, rootNode);
+
+    // groupLeaves = [initialLeaf, leafA, leafB]；currentTab=1 → leafA
+    expect(revealLeaf).toHaveBeenCalledWith(leafA);
+    expect(setActiveLeaf).toHaveBeenCalledWith(leafA, { focus: false });
   });
 });
