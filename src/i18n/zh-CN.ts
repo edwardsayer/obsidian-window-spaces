@@ -27,6 +27,7 @@ export const zhCN: TranslationStrings = {
 
   commands: {
     saveLayout: "保存当前空间",
+    saveLayoutDirect: "直接保存当前空间",
     openLayouts: "打开切换器",
     openLayoutsRibbon: "打开 Window Spaces 切换器",
     openLayoutsPanel: "作为标签页面板打开",
@@ -38,7 +39,7 @@ export const zhCN: TranslationStrings = {
   },
 
   saveModal: {
-    title: "保存空间",
+    title: "空间设置",
     nameLabel: "空间名称",
     namePlaceholder: "输入空间名称...",
     descriptionLabel: "描述（可选）",
@@ -70,6 +71,10 @@ export const zhCN: TranslationStrings = {
     foldedCornerDesc: "未修改时跟随全局默认值",
     activityBarsSection: "Activity Bars",
     showActivityBar: "显示",
+    showActivityBarTitle: "显示此侧 Activity Bar",
+    showActivityBarDesc: "开启时，此空间会在 Popout 窗口显示该侧 Activity Bar",
+    showLeftActivityBar: "显示左侧 Activity Bar",
+    showRightActivityBar: "显示右侧 Activity Bar",
     activityBarViewButtons: "View 按钮",
     spaceSection: "空间",
     windowAppearanceSection: "窗口外观",

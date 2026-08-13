@@ -107,10 +107,28 @@ export class SaveLayoutModal extends Modal {
       right: this.createActivityBarDraft("right", isExistingSpace),
     };
 
-    new Setting(contentEl).setName(t("saveModal.spaceSection")).setHeading();
+    // 0. 置頂精簡佈局資訊 (在對話框標題正下方，無標題、無分隔線、不占空間)
+    const i18n = getI18n();
+    const totalTabs = this.layout.metadata?.tabCount || this.layout.workspace?.leaves?.length || 0;
+
+    const statsContainer = contentEl.createDiv("window-spaces-modal-top-stats");
+    statsContainer.createDiv({
+      cls: "window-spaces-stat-item",
+      text: `${t("manageModal.tabCount")}: ${totalTabs}`,
+    });
+    statsContainer.createDiv({
+      cls: "window-spaces-stat-item",
+      text: `${t("manageModal.createdDate")}: ${i18n.formatDate(new Date(this.layout.timestamp))}`,
+    });
+    statsContainer.createDiv({
+      cls: "window-spaces-stat-item",
+      text: `${t("saveModal.windowSize")}: ${this.layout.windowState.size.width} x ${this.layout.windowState.size.height}`,
+    });
+
+    // 1. 第一個 Group Panel (原本 Space Group 與 Sections 合併，無 Space 標題)
     const identityGroup = this.createGroup(contentEl) ?? contentEl;
 
-    // 名稱輸入與動態同名提示
+    // (1) 空間名稱輸入框
     let nameInput!: HTMLInputElement;
     const nameSetting = this.createSettingIn(identityGroup, (setting) => {
       setting.setName(t("saveModal.nameLabel"));
@@ -138,9 +156,63 @@ export class SaveLayoutModal extends Modal {
         });
       });
     });
-    nameSetting.settingEl.addClass("window-spaces-setting-full-width");
 
-    // Icon / Emoji 輸入框與預覽
+    // (2) 覆蓋既有空間提示：精確放置在 Space Name 標籤 (infoEl) 正下方
+    const noticeContainer = nameSetting.infoEl.createDiv("save-overwrite-notice");
+
+    // (3) Sections 分組標籤選單 Setting
+    const allSpaces: WindowLayout[] = this.plugin.manager.getSavedLayouts();
+    const existingSectionsSet = new Set<string>();
+    (this.plugin.settings?.sectionsOrder || []).forEach((s: string) => existingSectionsSet.add(s));
+    allSpaces.forEach((s) => (s.sections || []).forEach((sec) => existingSectionsSet.add(sec)));
+    const existingSections = Array.from(existingSectionsSet);
+
+    const sectionsSetting = this.createSettingIn(identityGroup, (setting) => {
+      setting.setName(t("manageModal.sectionsLabel") || "Sections");
+      setting.addText((text) => {
+        text.setPlaceholder(t("manageModal.sectionsPlaceholder") || "Add section...");
+        text.inputEl.addEventListener("keydown", (e: KeyboardEvent) => {
+          if (e.key === "Enter" || e.key === ",") {
+            e.preventDefault();
+            const val = text.inputEl.value.trim().replace(/^,+|,+$/g, "");
+            if (val && !selectedSections.includes(val)) {
+              selectedSections.push(val);
+              text.inputEl.value = "";
+              renderPills();
+            }
+          }
+        });
+      });
+    });
+
+    // (4) 既有的 Section 標籤 Pills：精確放置在 Sections 標籤 (infoEl) 正下方
+    const pillsContainer = sectionsSetting.infoEl.createDiv("space-sections-pills");
+    const renderPills = () => {
+      pillsContainer.empty();
+      selectedSections.forEach((sec) => {
+        const pill = pillsContainer.createDiv("space-section-pill");
+        pill.createSpan({ text: sec });
+        const closeSpan = pill.createSpan({ text: "✖", cls: "space-section-pill-close" });
+        closeSpan.onclick = (e) => {
+          e.stopPropagation();
+          selectedSections = selectedSections.filter((s) => s !== sec);
+          renderPills();
+        };
+      });
+
+      existingSections.forEach((sec) => {
+        if (selectedSections.includes(sec)) return;
+        const unselectedPill = pillsContainer.createDiv("space-section-pill-unselected");
+        unselectedPill.setText(`+ ${sec}`);
+        unselectedPill.onclick = () => {
+          selectedSections.push(sec);
+          renderPills();
+        };
+      });
+    };
+    renderPills();
+
+    // (5) Icon / Emoji 輸入框與預覽
     let currentIcon = this.layout.icon || "";
     let currentColor = this.layout.color || "";
 
@@ -189,7 +261,7 @@ export class SaveLayoutModal extends Modal {
     };
     updateIconPreview();
 
-    // 邊框顏色選擇器與 Swatches
+    // (6) 邊框顏色選擇器與 Swatches
     const presets = this.plugin.settings.colorPresets || DEFAULT_COLOR_PRESETS;
     const colorSetting = this.createSettingIn(identityGroup, (setting) => {
       setting.setName(t("saveModal.colorLabel"));
@@ -233,40 +305,17 @@ export class SaveLayoutModal extends Modal {
     };
     renderSwatches();
 
-    const noticeContainer = contentEl.createDiv("save-overwrite-notice");
-
-    let autoSave = this.layout.autoSave ?? false;
-    let autoSaveToggleComponent: ToggleComponent | null = null;
-
-    // 佈局資訊顯示
-    const i18n = getI18n();
-    const infoEl = contentEl.createDiv();
-    infoEl.createDiv({
-      text: t("saveModal.infoSection"),
-      cls: "setting-item-name ws-info-title",
-    });
-
-    const infoList = infoEl.createEl("ul");
-    const totalTabs = this.layout.metadata?.tabCount || this.layout.workspace?.leaves?.length || 0;
-    infoList.createEl("li", {
-      text: `${t("manageModal.tabCount")}: ${totalTabs}`,
-    });
-    infoList.createEl("li", {
-      text: `${t("manageModal.createdDate")}: ${i18n.formatDate(new Date(this.layout.timestamp))}`,
-    });
-    infoList.createEl("li", {
-      text: `${t("saveModal.windowSize")}: ${this.layout.windowState.size.width} x ${this.layout.windowState.size.height}`,
-    });
-
+    // 2. 視窗外觀 Section / Group
     new Setting(contentEl).setName(t("saveModal.windowAppearanceSection")).setHeading();
     const windowGroup = this.createGroup(contentEl) ?? contentEl;
 
-    // 視窗外觀與位置
     let includeGeometry = this.layout.includeGeometry ?? (
       this.layout.windowState.position !== undefined ||
       (this.layout.windowState.size && this.layout.windowState.size.width > 0)
     );
     let geometryToggleComponent: ToggleComponent | null = null;
+    let autoSave = this.layout.autoSave ?? false;
+    let autoSaveToggleComponent: ToggleComponent | null = null;
 
     this.createSettingIn(windowGroup, (setting) => {
       setting.setName(t("saveModal.includeGeometry")).setDesc(t("saveModal.includeGeometryDesc"));
@@ -283,7 +332,7 @@ export class SaveLayoutModal extends Modal {
       setting.setName(t("saveModal.borderInset")).setDesc(t("saveModal.borderInsetDesc"));
       setting.addSlider((slider) => {
         slider
-          .setLimits(0, 20, 1)
+          .setLimits(0, 5, 1)
           .setValue(borderInset)
           .setDynamicTooltip()
           .onChange((value) => {
@@ -304,6 +353,7 @@ export class SaveLayoutModal extends Modal {
       });
     });
 
+    // 3. 空間行為 Section / Group
     new Setting(contentEl).setName(t("saveModal.behaviorSection")).setHeading();
     const behaviorGroup = this.createGroup(contentEl) ?? contentEl;
     let archived = this.layout.archived ?? false;
@@ -329,72 +379,9 @@ export class SaveLayoutModal extends Modal {
       });
     });
 
+    // 4. Popout Activity Bars
     this.renderActivityBarSettings(contentEl, "left", activityBarSettings.left);
     this.renderActivityBarSettings(contentEl, "right", activityBarSettings.right);
-
-    // Section 分組標籤選單與 Tag-Pills 輸入框
-    new Setting(contentEl).setName(t("saveModal.sectionsSection")).setHeading();
-    const sectionsGroup = this.createGroup(contentEl) ?? contentEl;
-    selectedSections = Array.from(this.layout.sections || []);
-    
-    // 獲取目前全域已存在的所有 Sections
-    const allSpaces: WindowLayout[] = this.plugin.manager.getSavedLayouts();
-    const existingSectionsSet = new Set<string>();
-    (this.plugin.settings?.sectionsOrder || []).forEach((s: string) => existingSectionsSet.add(s));
-    allSpaces.forEach((s) => (s.sections || []).forEach((sec) => existingSectionsSet.add(sec)));
-    const existingSections = Array.from(existingSectionsSet);
-
-    // 1. 上方 Setting 列：左側 Sections 標籤，右側 新標籤輸入欄 (對齊 Space Name 樣式與大小)
-    const sectionsSetting = this.createSettingIn(sectionsGroup, (setting) => {
-      setting.setName(t("manageModal.sectionsLabel") || "Sections");
-      setting.addText((text) => {
-        text.setPlaceholder(t("manageModal.sectionsPlaceholder") || "Add section...");
-        text.inputEl.addEventListener("keydown", (e: KeyboardEvent) => {
-          if (e.key === "Enter" || e.key === ",") {
-            e.preventDefault();
-            const val = text.inputEl.value.trim().replace(/^,+|,+$/g, "");
-            if (val && !selectedSections.includes(val)) {
-              selectedSections.push(val);
-              text.inputEl.value = "";
-              renderPills();
-            }
-          }
-        });
-      });
-    });
-    sectionsSetting.settingEl.addClass("window-spaces-setting-full-width");
-
-    // 2. 底下：Section 列表選擇器 (Pills Container)
-    const sectionsGroupEl = this.getGroupElement(sectionsGroup, contentEl);
-    const pillsContainer = sectionsGroupEl.createDiv("space-sections-pills");
-
-    const renderPills = () => {
-      pillsContainer.empty();
-      selectedSections.forEach((sec) => {
-        const pill = pillsContainer.createDiv("space-section-pill");
-
-        pill.createSpan({ text: sec });
-        const closeSpan = pill.createSpan({ text: "✖", cls: "space-section-pill-close" });
-        closeSpan.onclick = (e) => {
-          e.stopPropagation();
-          selectedSections = selectedSections.filter((s) => s !== sec);
-          renderPills();
-        };
-      });
-
-      // 呈現在 settings 中但未勾選的既有標籤
-      existingSections.forEach((sec) => {
-        if (selectedSections.includes(sec)) return;
-        const unselectedPill = pillsContainer.createDiv("space-section-pill-unselected");
-        unselectedPill.setText(`+ ${sec}`);
-        unselectedPill.onclick = () => {
-          selectedSections.push(sec);
-          renderPills();
-        };
-      });
-    };
-
-    renderPills();
 
     const checkDuplicateName = () => {
       const currentName = nameInput?.value.trim() || "";
@@ -426,7 +413,7 @@ export class SaveLayoutModal extends Modal {
     nameInput.addEventListener("input", checkDuplicateName);
     checkDuplicateName();
 
-    // 按鈕
+    // 按鈕區
     const buttonContainer = contentEl.createDiv("ws-dialog-actions");
 
     const cancelButton = buttonContainer.createEl("button", {
@@ -475,7 +462,6 @@ export class SaveLayoutModal extends Modal {
       return;
     }
 
-    // 更新佈局數據
     this.layout.name = name;
     this.layout.autoSave = autoSave;
     this.layout.includeGeometry = includeGeometry;
@@ -512,13 +498,13 @@ export class SaveLayoutModal extends Modal {
   private getDefaultBorderInset(): number {
     const value = this.plugin.settings.defaultBorderInset;
     return typeof value === "number" && Number.isFinite(value)
-      ? Math.max(0, Math.min(20, value))
+      ? Math.max(0, Math.min(5, value))
       : 1;
   }
 
   private getEffectiveBorderInset(): number {
     const value = this.layout.borderInset ?? this.getDefaultBorderInset();
-    return Math.max(0, Math.min(20, Number.isFinite(value) ? value : 1));
+    return Math.max(0, Math.min(5, Number.isFinite(value) ? value : 1));
   }
 
   private getEffectiveFoldedCorner(): boolean {
@@ -537,7 +523,6 @@ export class SaveLayoutModal extends Modal {
         ? globalItems.filter((item) => saved.viewTypes?.includes(item.viewType))
         : globalItems;
     return {
-      // Legacy spaces without a per-space setting are intentionally unchecked.
       show: saved?.show ?? (isExistingSpace ? false : this.plugin.settings.activityBarDefaults?.[side] !== false),
       items: savedItems.map((item) => ({ ...item })),
     };
@@ -553,9 +538,14 @@ export class SaveLayoutModal extends Modal {
     ).setHeading();
     const activityGroup = this.createGroup(contentEl) ?? contentEl;
     const groupEl = this.getGroupElement(activityGroup, contentEl);
+
     this.createSettingIn(activityGroup, (setting) => {
-      setting.setName(t("settings.defaultActivityBarVisibility"));
-      setting.setDesc(t("settings.defaultActivityBarVisibilityDesc"));
+      setting.setName(
+        side === "left"
+          ? (t("saveModal.showLeftActivityBar") || "顯示左側 Activity Bar")
+          : (t("saveModal.showRightActivityBar") || "顯示右側 Activity Bar")
+      );
+      setting.setDesc(t("saveModal.showActivityBarDesc") || "開啟時，此空間會在 Popout 視窗顯示該側 Activity Bar");
       setting.addToggle((toggle) => {
         toggle.setValue(draft.show);
         toggle.onChange((value) => {
@@ -593,10 +583,52 @@ export class SaveLayoutModal extends Modal {
       });
     });
 
+    // 為整個 groupEl 綁定 dragover 與 drop 監聽器
+    groupEl.addEventListener("dragover", (e: DragEvent) => {
+      e.preventDefault();
+      groupEl.querySelectorAll(
+        `[data-window-spaces-activity-item="${side}"].drag-over-top, [data-window-spaces-activity-item="${side}"].drag-over-bottom`
+      ).forEach((el) => { el.classList.remove("drag-over-top", "drag-over-bottom"); });
+
+      const target = (e.target as HTMLElement).closest(`[data-window-spaces-activity-item="${side}"]`);
+      if (!target) return;
+
+      const rect = target.getBoundingClientRect();
+      const isBottom = e.clientY > rect.top + rect.height / 2;
+      target.classList.add(isBottom ? "drag-over-bottom" : "drag-over-top");
+    });
+
+    groupEl.addEventListener("drop", (e: DragEvent) => {
+      e.preventDefault();
+
+      const indicatorEl = groupEl.querySelector(
+        `[data-window-spaces-activity-item="${side}"].drag-over-top, [data-window-spaces-activity-item="${side}"].drag-over-bottom`
+      );
+
+      const isBottom = indicatorEl?.classList.contains("drag-over-bottom") ?? false;
+
+      groupEl.querySelectorAll(
+        `[data-window-spaces-activity-item="${side}"].drag-over-top, [data-window-spaces-activity-item="${side}"].drag-over-bottom`
+      ).forEach((el) => { el.classList.remove("drag-over-top", "drag-over-bottom"); });
+
+      if (!indicatorEl) return;
+
+      const draggedViewType = e.dataTransfer?.getData(ACTIVITY_BAR_DRAG_DATA_TYPE) ?? "";
+      const targetViewType = indicatorEl.getAttribute("data-drag-view-type") ?? "";
+      if (!draggedViewType || !targetViewType) return;
+
+      const current = draft.items ?? [];
+      const reordered = reorderActivityBarItems(current, draggedViewType, targetViewType, isBottom);
+      if (!reordered) return;
+
+      draft.items = reordered;
+      renderItems();
+    });
+
     const renderItems = () => {
       const existingRows = new Map<string, HTMLElement>();
-      groupEl.querySelectorAll<HTMLElement>("[data-window-spaces-save-activity-item]").forEach((el) => {
-        const viewType = el.getAttribute("data-view-type");
+      groupEl.querySelectorAll<HTMLElement>(`[data-window-spaces-activity-item="${side}"]`).forEach((el) => {
+        const viewType = el.getAttribute("data-drag-view-type");
         if (viewType) existingRows.set(viewType, el);
       });
 
@@ -619,10 +651,31 @@ export class SaveLayoutModal extends Modal {
           setting.setName(item.label || resolveViewLabel(this.app, item.viewType));
           setting.setDesc(item.viewType);
         });
-        row.settingEl.setAttr("data-window-spaces-save-activity-item", "true");
-        row.settingEl.setAttr("data-view-type", item.viewType);
+
+        row.settingEl.setAttr("data-window-spaces-activity-item", side);
         row.settingEl.setAttr("data-drag-index", String(index));
+        row.settingEl.setAttr("data-drag-view-type", item.viewType);
         row.settingEl.setAttr("draggable", "true");
+
+        row.settingEl.addEventListener("dragstart", (e: DragEvent) => {
+          row.settingEl.classList.add("drag-source");
+          if (!e.dataTransfer) return;
+          e.dataTransfer.effectAllowed = "move";
+          e.dataTransfer.setData(ACTIVITY_BAR_DRAG_DATA_TYPE, item.viewType);
+        });
+
+        row.settingEl.addEventListener("dragend", () => {
+          row.settingEl.classList.remove("drag-source");
+        });
+
+        row.settingEl.querySelectorAll("button, input, select, .checkbox-container, .slider").forEach((el) => {
+          el.setAttribute("draggable", "false");
+        });
+
+        const gripEl = row.settingEl.createDiv({ cls: "window-spaces-activity-drag-handle" });
+        gripEl.setAttr("aria-label", t("settings.dragToReorder"));
+        setIcon(gripEl, "grip-vertical");
+        row.settingEl.insertBefore(gripEl, row.settingEl.firstChild);
 
         row.addButton((button) => {
           iconButton = button;
@@ -653,27 +706,6 @@ export class SaveLayoutModal extends Modal {
           });
         });
 
-        row.settingEl.addEventListener("dragstart", (event: DragEvent) => {
-          if (!event.dataTransfer) return;
-          event.dataTransfer.effectAllowed = "move";
-          event.dataTransfer.setData(ACTIVITY_BAR_DRAG_DATA_TYPE, item.viewType);
-        });
-        row.settingEl.addEventListener("dragover", (event) => event.preventDefault());
-        row.settingEl.addEventListener("drop", (event: DragEvent) => {
-          event.preventDefault();
-          const source = event.dataTransfer?.getData(ACTIVITY_BAR_DRAG_DATA_TYPE) ?? "";
-          const target = item.viewType;
-          const reordered = reorderActivityBarItems(
-            draft.items ?? [],
-            source,
-            target,
-            event.clientY > row.settingEl.getBoundingClientRect().top + row.settingEl.offsetHeight / 2
-          );
-          if (reordered) {
-            draft.items = reordered;
-            renderItems();
-          }
-        });
         addRow.settingEl.before(row.settingEl);
       });
 
@@ -692,4 +724,3 @@ export class SaveLayoutModal extends Modal {
     addRow.settingEl.parentElement?.appendChild(addRow.settingEl);
   }
 }
-

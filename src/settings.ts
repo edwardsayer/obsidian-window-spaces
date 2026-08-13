@@ -171,14 +171,7 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
       });
     });
 
-    // ===== Popout 側欄（Activity Bars） =====
-    this.renderActivityBarSection(containerEl);
-
-    // ===== 視窗外觀與圖示 (Accent & Icons) =====
-    new Setting(containerEl).setName(t("settings.accentSection")).setHeading();
-    const accentGroup = this.createGroup(containerEl) ?? containerEl;
-
-    this.createSettingIn(accentGroup, (s) => {
+    this.createSettingIn(displayGroup, (s) => {
       s.setName(t("settings.defaultIcon")).setDesc(t("settings.defaultIconDesc"));
       s.controlEl.addClass("window-space-icon-setting-control");
 
@@ -231,11 +224,11 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
       updatePreview();
     });
 
-    this.createSettingIn(accentGroup, (s) => {
+    this.createSettingIn(displayGroup, (s) => {
       s.setName(t("settings.defaultBorderInset")).setDesc(t("settings.defaultBorderInsetDesc"));
       s.addSlider((slider) => {
         slider
-          .setLimits(0, 20, 1)
+          .setLimits(0, 5, 1)
           .setValue(this.getDefaultBorderInset())
           .setDynamicTooltip()
           .onChange(async (value) => {
@@ -246,7 +239,7 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
       });
     });
 
-    this.createSettingIn(accentGroup, (s) => {
+    this.createSettingIn(displayGroup, (s) => {
       s.setName(t("settings.defaultFoldedCorner")).setDesc(t("settings.defaultFoldedCornerDesc"));
       s.addToggle((toggle) => {
         toggle.setValue(this.plugin.settings.defaultShowFoldedCorner !== false);
@@ -257,6 +250,21 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
         });
       });
     });
+
+    this.createSettingIn(displayGroup, (s) => {
+      s.setName(t("settings.enableInterceptor")).setDesc(t("settings.enableInterceptorDesc"));
+      s.addToggle((toggle) => {
+        toggle.setValue(this.plugin.settings.workspaceInterceptorEnabled !== false);
+        toggle.onChange(async (value) => {
+          this.plugin.settings.workspaceInterceptorEnabled = value;
+          this.plugin.workspaceInterceptor.enabled = value;
+          await this.plugin.saveSettings();
+        });
+      });
+    });
+
+    this.renderActivityBarSide(containerEl, "left", t("settings.leftBar"));
+    this.renderActivityBarSide(containerEl, "right", t("settings.rightBar"));
 
     // ===== 危險操作（單一 panel） =====
     new Setting(containerEl).setName(t("settings.resetSettings")).setHeading();
@@ -286,28 +294,7 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
 
   private getDefaultBorderInset(): number {
     const value = this.plugin.settings.defaultBorderInset;
-    return typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.min(20, value)) : 1;
-  }
-
-  /** 渲染 Popout 側欄（Activity Bars）設定區塊（每個子區塊各自一個 SettingGroup panel）。 */
-  private renderActivityBarSection(section: HTMLElement): void {
-    new Setting(section).setName(t("settings.popoutSidebarSection")).setHeading();
-    const mainGroup = this.createGroup(section) ?? section;
-
-    this.createSettingIn(mainGroup, (s) => {
-      s.setName(t("settings.enableInterceptor")).setDesc(t("settings.enableInterceptorDesc"));
-      s.addToggle((toggle) => {
-        toggle.setValue(this.plugin.settings.workspaceInterceptorEnabled !== false);
-        toggle.onChange(async (value) => {
-          this.plugin.settings.workspaceInterceptorEnabled = value;
-          this.plugin.workspaceInterceptor.enabled = value;
-          await this.plugin.saveSettings();
-        });
-      });
-    });
-
-    this.renderActivityBarSide(section, "left", t("settings.leftBar"));
-    this.renderActivityBarSide(section, "right", t("settings.rightBar"));
+    return typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.min(5, value)) : 1;
   }
 
   /** 渲染單一側欄 view 項目列，回傳用於 surgical 更新的 handle。 */

@@ -498,7 +498,7 @@ export class PopoutActivityBarManager {
     const hasCustomColor = Boolean(color);
     const hasCustomBorderInset = typeof layout?.borderInset === "number" && Number.isFinite(layout.borderInset);
     const borderInset = hasCustomBorderInset
-      ? Math.max(0, Math.min(20, layout?.borderInset as number))
+      ? Math.max(0, Math.min(5, layout?.borderInset as number))
       : 0;
     const showFoldedCorner = hasCustomColor && (layout?.showFoldedCorner ?? this.settings.defaultShowFoldedCorner !== false);
 

@@ -27,6 +27,7 @@ export interface TranslationStrings {
   // 命令
   commands: {
     saveLayout: string;
+    saveLayoutDirect?: string;
     openLayouts: string;
     openLayoutsRibbon: string;
     openLayoutsPanel: string;
@@ -71,6 +72,10 @@ export interface TranslationStrings {
     foldedCornerDesc: string;
     activityBarsSection: string;
     showActivityBar: string;
+    showActivityBarTitle?: string;
+    showActivityBarDesc?: string;
+    showLeftActivityBar?: string;
+    showRightActivityBar?: string;
     activityBarViewButtons: string;
     spaceSection: string;
     windowAppearanceSection: string;

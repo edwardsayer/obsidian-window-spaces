@@ -33,7 +33,41 @@ describe("popoutLayout helpers", () => {
     expect(isPopoutWindow(null)).toBe(false);
   });
 
-  test("getColumnElement returns first/last top-level column (structural, no geometry)", () => {
+  test("getColumnElement returns sidebar-marked first/last top-level column (structural, no geometry)", () => {
+    const rootEl = document.createElement("div");
+    rootEl.classList.add("workspace-split", "mod-root");
+    const leftTabsEl = document.createElement("div");
+    leftTabsEl.classList.add("workspace-tabs");
+    leftTabsEl.classList.add("window-spaces-sidebar-column");
+    const leftLeafEl = document.createElement("div");
+    leftTabsEl.appendChild(leftLeafEl);
+    rootEl.appendChild(leftTabsEl);
+    const rightTabsEl = document.createElement("div");
+    rightTabsEl.classList.add("workspace-tabs");
+    rightTabsEl.classList.add("window-spaces-sidebar-column");
+    const rightLeafEl = document.createElement("div");
+    rightTabsEl.appendChild(rightLeafEl);
+    rootEl.appendChild(rightTabsEl);
+    document.body.appendChild(rootEl);
+
+    const leftLeaf = { containerEl: leftLeafEl, view: { containerEl: leftLeafEl } } as any;
+    const rightLeaf = { containerEl: rightLeafEl, view: { containerEl: rightLeafEl } } as any;
+    const workspace = {
+      activeLeaf: leftLeaf,
+      iterateAllLeaves: (cb: (leaf: any) => void) => {
+        cb(leftLeaf);
+        cb(rightLeaf);
+      },
+    } as any;
+
+    const engine = new PopoutLayoutEngine({ workspace } as any);
+    expect(engine.getColumnElement(window, "left")).toBe(leftTabsEl);
+    expect(engine.getColumnElement(window, "right")).toBe(rightTabsEl);
+
+    document.body.removeChild(rootEl);
+  });
+
+  test("getColumnElement without hints requires the sidebar class marker (no class → null)", () => {
     const rootEl = document.createElement("div");
     rootEl.classList.add("workspace-split", "mod-root");
     const leftTabsEl = document.createElement("div");
@@ -59,8 +93,12 @@ describe("popoutLayout helpers", () => {
     } as any;
 
     const engine = new PopoutLayoutEngine({ workspace } as any);
-    expect(engine.getColumnElement(window, "left")).toBe(leftTabsEl);
-    expect(engine.getColumnElement(window, "right")).toBe(rightTabsEl);
+    // 沒有 hints 也沒有 sidebar class：不得把最左/最右欄位當作 sidebar
+    expect(engine.getColumnElement(window, "left")).toBeNull();
+    expect(engine.getColumnElement(window, "right")).toBeNull();
+    // 最外側欄位仍可透過 getEdgeColumnElement 定位（供 open-in-sidebar 主動定位）
+    expect(engine.getEdgeColumnElement(window, "left")).toBe(leftTabsEl);
+    expect(engine.getEdgeColumnElement(window, "right")).toBe(rightTabsEl);
 
     document.body.removeChild(rootEl);
   });
@@ -71,6 +109,7 @@ describe("popoutLayout helpers", () => {
     // 左側欄為巢狀水平 split（兩個 tab group）＝第一頂層欄位
     const leftNestedSplit = document.createElement("div");
     leftNestedSplit.classList.add("workspace-split", "mod-horizontal");
+    leftNestedSplit.classList.add("window-spaces-sidebar-column");
     const leftTopTabsEl = document.createElement("div");
     leftTopTabsEl.classList.add("workspace-tabs");
     const leftTopLeafEl = document.createElement("div");
@@ -197,12 +236,14 @@ describe("PopoutLayoutEngine hide/show + persistence", () => {
 
     const leftTabsEl = document.createElement("div");
     leftTabsEl.classList.add("workspace-tabs");
+    leftTabsEl.classList.add("window-spaces-sidebar-column");
     const leftLeafEl = document.createElement("div");
     leftTabsEl.appendChild(leftLeafEl);
     rootEl.appendChild(leftTabsEl);
 
     const rightTabsEl = document.createElement("div");
     rightTabsEl.classList.add("workspace-tabs");
+    rightTabsEl.classList.add("window-spaces-sidebar-column");
     const rightLeafEl = document.createElement("div");
     rightTabsEl.appendChild(rightLeafEl);
     rootEl.appendChild(rightTabsEl);
@@ -287,12 +328,14 @@ describe("PopoutLayoutEngine hide/show + persistence", () => {
 
     const leftTabsEl = document.createElement("div");
     leftTabsEl.classList.add("workspace-tabs");
+    leftTabsEl.classList.add("window-spaces-sidebar-column");
     const leftLeafEl = document.createElement("div");
     leftTabsEl.appendChild(leftLeafEl);
     rootEl.appendChild(leftTabsEl);
 
     const rightColumnEl = document.createElement("div");
     rightColumnEl.classList.add("workspace-split", "mod-vertical");
+    rightColumnEl.classList.add("window-spaces-sidebar-column");
     const topTabsEl = document.createElement("div");
     topTabsEl.classList.add("workspace-tabs");
     const topLeafEl = document.createElement("div");
@@ -508,12 +551,13 @@ describe("WorkspaceInterceptor", () => {
     }
   });
 
-  test("isLeafInSideColumn detects whether leaf is inside left or right column", () => {
+  test("isLeafInSideColumn detects whether leaf is inside a sidebar-marked column", () => {
     const rootEl = document.createElement("div");
     rootEl.classList.add("workspace-split", "mod-root");
 
     const leftColEl = document.createElement("div");
     leftColEl.classList.add("workspace-tabs");
+    leftColEl.classList.add("window-spaces-sidebar-column");
     const leftLeafEl = document.createElement("div");
     leftColEl.appendChild(leftLeafEl);
 
@@ -524,6 +568,7 @@ describe("WorkspaceInterceptor", () => {
 
     const rightColEl = document.createElement("div");
     rightColEl.classList.add("workspace-tabs");
+    rightColEl.classList.add("window-spaces-sidebar-column");
     const rightLeafEl = document.createElement("div");
     rightColEl.appendChild(rightLeafEl);
 
@@ -865,6 +910,8 @@ describe("PopoutActivityBarManager toggle behavior", () => {
 
     const app = { workspace } as any;
     const engine = new PopoutLayoutEngine(app);
+    // 模擬 managed Popout：activityBar 已寫入物理側欄 hints（左右皆有）
+    engine.setSidebarSides(window, { left: true, right: true });
     const manager = new PopoutActivityBarManager(
       {
         app,

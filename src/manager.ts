@@ -505,10 +505,9 @@ export class WindowLayoutManager {
     layoutName: string,
     targetWin: Window
   ): void {
-    let iconElement = element.querySelector<HTMLElement>(".window-spaces-layout-icon");
-    if (!iconElement) {
-      iconElement = element.createSpan({ cls: "window-spaces-layout-icon" });
-      setIcon(iconElement, "history");
+    const iconElement = element.querySelector<HTMLElement>(".window-spaces-layout-icon");
+    if (iconElement) {
+      iconElement.remove();
     }
 
     let nameElement = element.querySelector<HTMLElement>(".window-spaces-layout-name");
@@ -550,10 +549,23 @@ export class WindowLayoutManager {
     const currentLayout = this.plugin.settings.spaces.find((l: WindowLayout) => l.name === layoutName);
     const isAutoSave = !!currentLayout?.autoSave;
 
+    // 移除舊版 window-spaces-layout-save 按鈕（若存在）
+    const oldSaveBtn = actionsElement?.querySelector(".window-spaces-layout-save");
+    if (oldSaveBtn) oldSaveBtn.remove();
+
+    // 1. 直接儲存 Space (不開啟對話框)
     ensureActionButton(
-      "window-spaces-layout-save",
+      "window-spaces-layout-direct-save",
       "save",
-      t("commands.saveLayout"),
+      t("commands.saveLayoutDirect") || t("commands.saveLayout"),
+      () => void this.saveLayoutDirectFromWindow(targetWin)
+    );
+
+    // 2. 空間設定對話框 (Pencil icon, 開啟 Space Setting 對話框)
+    ensureActionButton(
+      "window-spaces-layout-edit-settings",
+      "pencil",
+      t("saveModal.title"),
       () => void this.saveLayoutFromWindow(targetWin)
     );
 
@@ -692,6 +704,39 @@ export class WindowLayoutManager {
       this.plugin.openSaveLayoutModal(layout, targetWin);
     } catch (error: unknown) {
       console.error("Failed to capture layout from Popout:", error);
+      const message = error instanceof Error ? error.message : String(error);
+      new Notice(`${t("errors.failedToSave")}: ${message}`);
+    }
+  }
+
+  private async saveLayoutDirectFromWindow(targetWin: Window): Promise<void> {
+    try {
+      const layoutName = this.layoutNames.get(targetWin) || "";
+      const existing = this.plugin.settings.spaces.find((l: WindowLayout) => l.name === layoutName);
+
+      const layout = await this.captureCurrentLayout(
+        { name: layoutName },
+        targetWin
+      );
+
+      if (existing) {
+        layout.id = existing.id;
+        layout.autoSave = existing.autoSave;
+        layout.icon = existing.icon;
+        layout.color = existing.color;
+        layout.borderInset = existing.borderInset;
+        layout.showFoldedCorner = existing.showFoldedCorner;
+        layout.activityBars = existing.activityBars;
+        layout.sections = existing.sections;
+        layout.archived = existing.archived;
+      }
+
+      await this.saveLayout(layout);
+      if (this.plugin.settings.showNotifications !== false) {
+        new Notice(`${t("notifications.layoutSaved")}: ${layout.name}`);
+      }
+    } catch (error: unknown) {
+      console.error("Failed to direct save layout from Popout:", error);
       const message = error instanceof Error ? error.message : String(error);
       new Notice(`${t("errors.failedToSave")}: ${message}`);
     }

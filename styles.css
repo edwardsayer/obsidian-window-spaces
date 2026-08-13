@@ -220,13 +220,21 @@
   background-color: var(--background-modifier-hover);
 }
 
+button.mod-warning,
+button.mod-destructive,
 .layout-actions button.mod-warning {
-  background: var(--color-red);
-  color: white;
+  background-color: var(--background-modifier-error, var(--color-red)) !important;
+  color: var(--text-on-accent, #ffffff) !important;
+  border: 1px solid transparent !important;
+  box-shadow: none !important;
 }
 
+button.mod-warning:hover,
+button.mod-destructive:hover,
 .layout-actions button.mod-warning:hover {
-  background: var(--color-red-hover, #dc2626);
+  background-color: var(--background-modifier-error-hover, var(--color-red-hover, #dc2626)) !important;
+  color: var(--text-on-accent, #ffffff) !important;
+  border-color: transparent !important;
 }
 
 /* Layout Stats */
@@ -610,8 +618,8 @@
   content: "";
   position: absolute;
   inset: 0 auto auto 0;
-  width: 18px;
-  height: 18px;
+  width: 12px;
+  height: 12px;
   z-index: 0;
   background: linear-gradient(
     to bottom right,
@@ -1024,9 +1032,8 @@
 .save-overwrite-notice {
   font-size: var(--font-ui-smaller, 12px);
   color: var(--text-accent, #70a7ff);
-  margin-top: -8px;
-  margin-bottom: 12px;
-  padding-left: 2px;
+  margin-top: 4px;
+  line-height: 1.4;
 }
 .ws-info-title {
   margin-bottom: 4px;
@@ -1035,9 +1042,27 @@
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  margin-top: 6px;
+}
+.window-spaces-modal-top-stats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
   margin-top: -4px;
-  margin-bottom: 16px;
-  padding-left: 2px;
+  margin-bottom: 12px;
+  font-size: var(--font-ui-smaller, 12px);
+  color: var(--text-muted);
+}
+
+.window-layouts-modal .setting-item-heading,
+.window-layouts-modal .setting-group-heading {
+  margin-top: 18px !important;
+  margin-bottom: 8px !important;
+}
+.window-spaces-stat-item {
+  display: inline-flex;
+  align-items: center;
 }
 .space-section-pill {
   background: var(--interactive-accent);
@@ -1089,6 +1114,16 @@
   right: 0;
   top: var(--titlebar-height, 40px);
   border-left: 1px solid var(--background-modifier-border);
+}
+
+/* 右側 Activity Bar 顯示時，最右邊 column 的 tab header 以負 margin 延伸至視窗右緣：
+   mod-root 的 margin-right 只避讓 view-content（不被 Activity Bar 覆蓋），
+   tab header 則回填 titlebar 區域（系統按鈕左側），避免右上角出現與 Activity
+   Bar 等寬的色差區塊。系統按鈕 z-index 較高仍可正常點擊，tab header 延伸區
+   同時是拖曳區（-webkit-app-region: drag），與左側 Activity Bar 全高覆蓋對稱。 */
+body.is-popout-window.window-spaces-has-right-activity
+  .workspace-split.mod-root > :last-child .workspace-tab-header-container {
+  margin-right: calc(-1 * var(--window-spaces-activity-bar-width, 44px));
 }
 
 /* 讓 popout 內容避開左右固定列 */
@@ -1144,22 +1179,22 @@ body.is-popout-window.window-spaces-has-right-activity .workspace-split.mod-root
 }
 .window-spaces-space-identity .window-spaces-space-icon {
   position: absolute;
-  top: 15px;
-  left: 13px;
+  top: 2px;
+  left: 4px;
   z-index: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 14px;
-  line-height: 14px;
-  font-size: 14px;
+  width: 36px;
+  height: 36px;
+  line-height: 1;
+  font-size: 18px;
   pointer-events: auto;
   -webkit-app-region: drag;
 }
 .window-spaces-space-identity .window-spaces-space-icon svg {
-  width: 14px;
-  height: 14px;
+  width: 18px;
+  height: 18px;
   color: var(--window-space-color, var(--text-muted));
 }
 
@@ -1168,9 +1203,9 @@ body.is-popout-window.window-spaces-has-right-activity .workspace-split.mod-root
    Activity Bar toggle or view buttons. */
 body.is-popout-window.window-spaces-has-left-activity:not(.window-spaces-left-activity-hidden)
   .window-spaces-space-identity {
-  left: 14px;
-  width: 16px;
-  height: 14px;
+  left: 0;
+  width: var(--window-spaces-activity-bar-width, 44px);
+  height: var(--titlebar-height, 40px);
   top: 0;
   pointer-events: none;
   -webkit-app-region: no-drag;
@@ -1178,7 +1213,10 @@ body.is-popout-window.window-spaces-has-left-activity:not(.window-spaces-left-ac
 
 body.is-popout-window.window-spaces-has-left-activity:not(.window-spaces-left-activity-hidden)
   .window-spaces-space-identity .window-spaces-space-icon {
-  left: 0;
+  top: 2px;
+  left: 4px;
+  width: 36px;
+  height: 36px;
   pointer-events: none;
   -webkit-app-region: no-drag;
 }
@@ -1234,19 +1272,21 @@ body.is-popout-window.has-window-space-border::after {
   position: fixed;
   top: 0;
   left: 0;
-  right: 0;
-  bottom: 0;
-  box-shadow: inset 0 0 0 var(--window-space-border-inset) var(--window-space-color) !important;
+  width: 100vw;
+  height: 100vh;
+  box-sizing: border-box !important;
+  border: var(--window-space-border-inset, 1px) solid var(--window-space-color) !important;
   pointer-events: none !important;
   z-index: 999999 !important;
   /* 視窗本身由 OS（Windows 11 DWM）套用圓角，若 ::after 維持直角會讓四個角落
      的邊框被圓角裁切、角落看不到顏色。此處以相同圓角讓邊框沿角落弧線延伸。
      預設 8px 對應 Windows 11 frameless 視窗圓角，可依 OS/主題調整。 */
   border-radius: var(--window-space-corner-radius, 8px) !important;
+  box-shadow: none !important;
 }
 
 body.is-popout-window.has-window-space-border .window-spaces-activity-left {
-  border-left: 2px solid var(--window-space-color);
+  border-left: none;
 }
 
 .window-spaces-activity-hidden {

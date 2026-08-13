@@ -263,6 +263,18 @@ function findLeafInTabs(tabs: WorkspaceParent | null | undefined, viewType: stri
   return null;
 }
 
+/**
+ * 判斷頂層欄位是否被 UI 標記為 sidebar（`window-spaces-sidebar-column` class）。
+ *
+ * 此 class 由 Window Spaces 的 activityBar（syncSidebarColumnClasses）依
+ * 「該側 activity bar 可見 + 位於最左/最右 + 頂層欄位數 ≥ 2」套用，並同時
+ * 驅動側欄底色與 tab header 樣式。被動判定（isLeafInSideColumn /
+ * getCenterPanes）以它為唯一依據，確保「開檔排除」與「視覺樣式」永遠一致。
+ */
+function isSidebarColumnElement(columnEl: HTMLElement | null | undefined): boolean {
+  return !!columnEl && columnEl.classList.contains("window-spaces-sidebar-column");
+}
+
 export class PopoutLayoutEngine {
   private app: App;
   private sidebarSidesByWindow = new WeakMap<Window, { left: boolean; right: boolean }>();
@@ -399,10 +411,14 @@ export class PopoutLayoutEngine {
    * 並開啟/聚焦指定 view type。
    * - viewType 有值：建立/聚焦該 view 的 leaf。
    * - viewType 無值：僅確保欄位存在並回傳一個空 leaf（供攔截器由第三方設定 view）。
+   *
+   * 主動定位語意：open-in-left/right-sidebar 應把 view 開到「最左/最右邊的 split」。
+   * 因此當該側沒有被標記為 sidebar 的欄位時（例如 activity bar 未開啟），仍回退到
+   * 最左/最右現有的頂層欄位；完全沒有欄位時才建立新的垂直 Split 欄位。
    */
   async ensureSideColumn(win: Window, side: PopoutSide, viewType?: string): Promise<WorkspaceLeaf> {
     const workspace = this.workspace;
-    const columnEl = this.getColumnElement(win, side);
+    const columnEl = this.getColumnElement(win, side) ?? this.getEdgeColumnElement(win, side);
 
     if (columnEl) {
       const tabs = this.getSidebarTabsInColumn(win, columnEl);
@@ -509,7 +525,8 @@ export class PopoutLayoutEngine {
    */
   openSideLeafSync(win: Window, side: PopoutSide): WorkspaceLeaf | null {
     const workspace = this.workspace;
-    const columnEl = this.getColumnElement(win, side);
+    // 與 ensureSideColumn 相同的主動定位語意：無標記側欄時回退到最左/最右欄位。
+    const columnEl = this.getColumnElement(win, side) ?? this.getEdgeColumnElement(win, side);
 
     if (columnEl) {
       const tabs = this.getSidebarTabsInColumn(win, columnEl);
@@ -642,47 +659,43 @@ export class PopoutLayoutEngine {
     return viewType ? this.openPanelInTabs(tabs, viewType) : this.createLeafInTabs(tabs);
   }
 
-  /** 判斷 leaf 是否位於 Popout 視窗的「偽側欄」（左側或右側頂層欄位）中。 */
+  /** 判斷 leaf 是否位於 Popout 視窗的「偽側欄」（被 UI 標記為 sidebar 的頂層欄位）中。 */
   isLeafInSideColumn(win: Window, leaf: WorkspaceLeaf | null | undefined): boolean {
     if (!leaf || getWindowOfLeaf(leaf) !== win) return false;
     const extLeaf = leaf as unknown as ExtendedWorkspaceLeaf;
     const container = extLeaf.containerEl || (leaf.view as { containerEl?: HTMLElement } | null)?.containerEl;
     if (!(container instanceof HTMLElement)) return false;
 
-    const leftCol = this.getColumnElement(win, "left");
-    if (leftCol && leftCol.contains(container)) return true;
+    return isSidebarColumnElement(this.getTopLevelColumnForContainer(container));
+  }
 
-    const rightCol = this.getColumnElement(win, "right");
-    if (rightCol && rightCol.contains(container)) return true;
-
-    return false;
+  /** 回傳 container 所在的頂層欄位元素（root split 的 direct child）。 */
+  private getTopLevelColumnForContainer(container: HTMLElement): HTMLElement | null {
+    const rootEl = findRootSplitElement(container);
+    if (!rootEl) return null;
+    return getDirectChildOf(rootEl, container);
   }
 
   /**
    * 取得 Popout 視窗非側欄的「中央編輯區」Tabs 群組。
-   * 排除包含在左側欄位或右側欄位內的 Tabs。
+   * 排除被 UI 標記為 sidebar（window-spaces-sidebar-column）的頂層欄位內 Tabs。
    */
   getCenterPanes(win: Window): PopoutPane[] {
     const panes = this.collectPopoutPanes(win);
     if (panes.length === 0) return [];
 
-    const leftCol = this.getColumnElement(win, "left");
-    const rightCol = this.getColumnElement(win, "right");
-
     const centerPanes = panes.filter((pane) => {
       const tabs = pane.tabs;
       const container = tabs.containerEl;
       if (container instanceof HTMLElement) {
-        if (leftCol && leftCol.contains(container)) return false;
-        if (rightCol && rightCol.contains(container)) return false;
+        if (isSidebarColumnElement(this.getTopLevelColumnForContainer(container))) return false;
       }
       const children = (tabs.children ?? []) as WorkspaceLeaf[];
       for (const leaf of children) {
         const extLeaf = leaf as unknown as ExtendedWorkspaceLeaf;
         const leafContainer = extLeaf.containerEl || (leaf.view as { containerEl?: HTMLElement } | null)?.containerEl;
         if (leafContainer instanceof HTMLElement) {
-          if (leftCol && leftCol.contains(leafContainer)) return false;
-          if (rightCol && rightCol.contains(leafContainer)) return false;
+          if (isSidebarColumnElement(this.getTopLevelColumnForContainer(leafContainer))) return false;
         }
       }
       return true;
@@ -754,26 +767,37 @@ export class PopoutLayoutEngine {
     });
   }
 
-  /** 取得指定側的頂層欄位元素（DOM 結構優先，display-independent）。 */
-  getColumnElement(win: Window, side: PopoutSide): HTMLElement | null {
-    // 幾何測量（collectPopoutColumns）量不到 display:none 的欄位，側欄隱藏時會被
-    // 誤判為最右/最左的可見欄位；因此一律先以 root split 的 direct children
-    // （DOM 順序）定位左右側欄，隱藏中的側欄仍在 DOM 中，不受影響。
+  /** 取得指定側「最外側」的頂層欄位（不問是否為 sidebar），供主動 open-in-sidebar 定位。 */
+  getEdgeColumnElement(win: Window, side: PopoutSide): HTMLElement | null {
     const topEls = this.getTopLevelColumnElements(win);
+    if (topEls.length === 0) return null;
+    return side === "left" ? topEls[0] ?? null : topEls[topEls.length - 1] ?? null;
+  }
+
+  /**
+   * 取得指定側的「物理側欄」頂層欄位元素（DOM 結構優先，display-independent）。
+   *
+   * 語意：主動/實體定位（open-in-sidebar、hide/show column、隱藏狀態 capture/apply）。
+   * - 有 hints（activityBar 寫入的物理側欄映射）：該側有側欄 → 最左/最右欄位；
+   *   該側無側欄 → null。
+   * - 無 hints（非 Window Spaces 管理或尚未同步）：以 UI 標記
+   *   （window-spaces-sidebar-column class）保守推斷；無標記 → null。
+   *
+   * 注意：被動判定（isLeafInSideColumn / getCenterPanes）不使用本方法，
+   * 一律以 UI 標記 class 為準，確保開檔排除與視覺樣式永遠一致。
+   */
+  getColumnElement(win: Window, side: PopoutSide): HTMLElement | null {
+    const edge = this.getEdgeColumnElement(win, side);
+    if (!edge) return null;
+
     const configuredSides = this.sidebarSidesByWindow.get(win);
     if (configuredSides) {
       if (!configuredSides[side]) return null;
       const requiredColumns = Number(configuredSides.left) + Number(configuredSides.right) + 1;
-      if (topEls.length < requiredColumns) return null;
-      if (configuredSides.left && configuredSides.right) {
-        return side === "left" ? topEls[0] ?? null : topEls[topEls.length - 1] ?? null;
-      }
-      return configuredSides.left ? topEls[0] ?? null : topEls[topEls.length - 1] ?? null;
+      if (this.getTopLevelColumnElements(win).length < requiredColumns) return null;
+      return edge;
     }
-    if (topEls.length >= 2) {
-      return side === "left" ? topEls[0] ?? null : topEls[topEls.length - 1] ?? null;
-    }
-    return null;
+    return isSidebarColumnElement(edge) ? edge : null;
   }
 
   /** 目前仍可見的頂層欄位數量（display:none 的欄位不計）。 */

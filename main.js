@@ -98,7 +98,7 @@ const en = {
         toggleCurrentPaneGroup: "Toggle current pane group",
     },
     saveModal: {
-        title: "Save Space",
+        title: "Space Settings",
         nameLabel: "Space Name",
         namePlaceholder: "Enter space name...",
         descriptionLabel: "Description (optional)",
@@ -130,6 +130,10 @@ const en = {
         foldedCornerDesc: "Leave unchanged to follow the global default",
         activityBarsSection: "Activity Bars",
         showActivityBar: "Show",
+        showActivityBarTitle: "Show Activity Bar",
+        showActivityBarDesc: "When enabled, this space will display this side Activity Bar in popout windows",
+        showLeftActivityBar: "Show Left Activity Bar",
+        showRightActivityBar: "Show Right Activity Bar",
         activityBarViewButtons: "View buttons",
         spaceSection: "Space",
         windowAppearanceSection: "Window Appearance",
@@ -302,6 +306,7 @@ const zhTW = {
     },
     commands: {
         saveLayout: "儲存目前空間",
+        saveLayoutDirect: "直接儲存目前空間",
         openLayouts: "開啟切換器",
         openLayoutsRibbon: "開啟 Window Spaces 切換器",
         openLayoutsPanel: "開啟為標籤面板",
@@ -312,7 +317,7 @@ const zhTW = {
         toggleCurrentPaneGroup: "切換目前分頁群組",
     },
     saveModal: {
-        title: "儲存空間",
+        title: "空間設定",
         nameLabel: "空間名稱",
         namePlaceholder: "輸入空間名稱...",
         descriptionLabel: "描述（選填）",
@@ -344,6 +349,10 @@ const zhTW = {
         foldedCornerDesc: "未修改時跟隨全域預設值",
         activityBarsSection: "Activity Bars",
         showActivityBar: "顯示",
+        showActivityBarTitle: "顯示此側 Activity Bar",
+        showActivityBarDesc: "開啟時，此空間會在 Popout 視窗顯示該側 Activity Bar",
+        showLeftActivityBar: "顯示左側 Activity Bar",
+        showRightActivityBar: "顯示右側 Activity Bar",
         activityBarViewButtons: "View 按鈕",
         spaceSection: "空間",
         windowAppearanceSection: "視窗外觀",
@@ -516,6 +525,7 @@ const zhCN = {
     },
     commands: {
         saveLayout: "保存当前空间",
+        saveLayoutDirect: "直接保存当前空间",
         openLayouts: "打开切换器",
         openLayoutsRibbon: "打开 Window Spaces 切换器",
         openLayoutsPanel: "作为标签页面板打开",
@@ -526,7 +536,7 @@ const zhCN = {
         toggleCurrentPaneGroup: "切换当前标签组",
     },
     saveModal: {
-        title: "保存空间",
+        title: "空间设置",
         nameLabel: "空间名称",
         namePlaceholder: "输入空间名称...",
         descriptionLabel: "描述（可选）",
@@ -558,6 +568,10 @@ const zhCN = {
         foldedCornerDesc: "未修改时跟随全局默认值",
         activityBarsSection: "Activity Bars",
         showActivityBar: "显示",
+        showActivityBarTitle: "显示此侧 Activity Bar",
+        showActivityBarDesc: "开启时，此空间会在 Popout 窗口显示该侧 Activity Bar",
+        showLeftActivityBar: "显示左侧 Activity Bar",
+        showRightActivityBar: "显示右侧 Activity Bar",
         activityBarViewButtons: "View 按钮",
         spaceSection: "空间",
         windowAppearanceSection: "窗口外观",
@@ -2909,10 +2923,9 @@ class WindowLayoutManager {
         return element;
     }
     updateLayoutLabelElement(element, layoutName, targetWin) {
-        let iconElement = element.querySelector(".window-spaces-layout-icon");
-        if (!iconElement) {
-            iconElement = element.createSpan({ cls: "window-spaces-layout-icon" });
-            obsidian.setIcon(iconElement, "history");
+        const iconElement = element.querySelector(".window-spaces-layout-icon");
+        if (iconElement) {
+            iconElement.remove();
         }
         let nameElement = element.querySelector(".window-spaces-layout-name");
         if (!nameElement) {
@@ -2943,7 +2956,14 @@ class WindowLayoutManager {
         nameElement.textContent = layoutName;
         const currentLayout = this.plugin.settings.spaces.find((l) => l.name === layoutName);
         const isAutoSave = !!(currentLayout === null || currentLayout === void 0 ? void 0 : currentLayout.autoSave);
-        ensureActionButton("window-spaces-layout-save", "save", t("commands.saveLayout"), () => void this.saveLayoutFromWindow(targetWin));
+        // 移除舊版 window-spaces-layout-save 按鈕（若存在）
+        const oldSaveBtn = actionsElement === null || actionsElement === void 0 ? void 0 : actionsElement.querySelector(".window-spaces-layout-save");
+        if (oldSaveBtn)
+            oldSaveBtn.remove();
+        // 1. 直接儲存 Space (不開啟對話框)
+        ensureActionButton("window-spaces-layout-direct-save", "save", t("commands.saveLayoutDirect") || t("commands.saveLayout"), () => void this.saveLayoutDirectFromWindow(targetWin));
+        // 2. 空間設定對話框 (Pencil icon, 開啟 Space Setting 對話框)
+        ensureActionButton("window-spaces-layout-edit-settings", "pencil", t("saveModal.title"), () => void this.saveLayoutFromWindow(targetWin));
         const autoSaveBtn = ensureActionButton("window-spaces-layout-auto-save", "refresh-cw", isAutoSave ? t("manageModal.autoSaveEnabled") : t("manageModal.autoSaveDisabled"), () => {
             void (() => __awaiter(this, void 0, void 0, function* () {
                 const targetLayout = this.plugin.settings.spaces.find((l) => l.name === layoutName);
@@ -3056,6 +3076,35 @@ class WindowLayoutManager {
             }
             catch (error) {
                 console.error("Failed to capture layout from Popout:", error);
+                const message = error instanceof Error ? error.message : String(error);
+                new obsidian.Notice(`${t("errors.failedToSave")}: ${message}`);
+            }
+        });
+    }
+    saveLayoutDirectFromWindow(targetWin) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const layoutName = this.layoutNames.get(targetWin) || "";
+                const existing = this.plugin.settings.spaces.find((l) => l.name === layoutName);
+                const layout = yield this.captureCurrentLayout({ name: layoutName }, targetWin);
+                if (existing) {
+                    layout.id = existing.id;
+                    layout.autoSave = existing.autoSave;
+                    layout.icon = existing.icon;
+                    layout.color = existing.color;
+                    layout.borderInset = existing.borderInset;
+                    layout.showFoldedCorner = existing.showFoldedCorner;
+                    layout.activityBars = existing.activityBars;
+                    layout.sections = existing.sections;
+                    layout.archived = existing.archived;
+                }
+                yield this.saveLayout(layout);
+                if (this.plugin.settings.showNotifications !== false) {
+                    new obsidian.Notice(`${t("notifications.layoutSaved")}: ${layout.name}`);
+                }
+            }
+            catch (error) {
+                console.error("Failed to direct save layout from Popout:", error);
                 const message = error instanceof Error ? error.message : String(error);
                 new obsidian.Notice(`${t("errors.failedToSave")}: ${message}`);
             }
@@ -5445,7 +5494,7 @@ class WindowSpacesSettingTab extends obsidian.PluginSettingTab {
         return setting;
     }
     display() {
-        var _a, _b, _c, _d;
+        var _a, _b, _c;
         const { containerEl } = this;
         containerEl.empty();
         // ===== 一般設定（單一 panel） =====
@@ -5502,12 +5551,7 @@ class WindowSpacesSettingTab extends obsidian.PluginSettingTab {
                 }));
             });
         });
-        // ===== Popout 側欄（Activity Bars） =====
-        this.renderActivityBarSection(containerEl);
-        // ===== 視窗外觀與圖示 (Accent & Icons) =====
-        new obsidian.Setting(containerEl).setName(t("settings.accentSection")).setHeading();
-        const accentGroup = (_c = this.createGroup(containerEl)) !== null && _c !== void 0 ? _c : containerEl;
-        this.createSettingIn(accentGroup, (s) => {
+        this.createSettingIn(displayGroup, (s) => {
             s.setName(t("settings.defaultIcon")).setDesc(t("settings.defaultIconDesc"));
             s.controlEl.addClass("window-space-icon-setting-control");
             let currentIcon = this.plugin.settings.defaultIcon || DEFAULT_SPACE_ICON;
@@ -5556,11 +5600,11 @@ class WindowSpacesSettingTab extends obsidian.PluginSettingTab {
             };
             updatePreview();
         });
-        this.createSettingIn(accentGroup, (s) => {
+        this.createSettingIn(displayGroup, (s) => {
             s.setName(t("settings.defaultBorderInset")).setDesc(t("settings.defaultBorderInsetDesc"));
             s.addSlider((slider) => {
                 slider
-                    .setLimits(0, 20, 1)
+                    .setLimits(0, 5, 1)
                     .setValue(this.getDefaultBorderInset())
                     .setDynamicTooltip()
                     .onChange((value) => __awaiter(this, void 0, void 0, function* () {
@@ -5570,7 +5614,7 @@ class WindowSpacesSettingTab extends obsidian.PluginSettingTab {
                 }));
             });
         });
-        this.createSettingIn(accentGroup, (s) => {
+        this.createSettingIn(displayGroup, (s) => {
             s.setName(t("settings.defaultFoldedCorner")).setDesc(t("settings.defaultFoldedCornerDesc"));
             s.addToggle((toggle) => {
                 toggle.setValue(this.plugin.settings.defaultShowFoldedCorner !== false);
@@ -5581,9 +5625,22 @@ class WindowSpacesSettingTab extends obsidian.PluginSettingTab {
                 }));
             });
         });
+        this.createSettingIn(displayGroup, (s) => {
+            s.setName(t("settings.enableInterceptor")).setDesc(t("settings.enableInterceptorDesc"));
+            s.addToggle((toggle) => {
+                toggle.setValue(this.plugin.settings.workspaceInterceptorEnabled !== false);
+                toggle.onChange((value) => __awaiter(this, void 0, void 0, function* () {
+                    this.plugin.settings.workspaceInterceptorEnabled = value;
+                    this.plugin.workspaceInterceptor.enabled = value;
+                    yield this.plugin.saveSettings();
+                }));
+            });
+        });
+        this.renderActivityBarSide(containerEl, "left", t("settings.leftBar"));
+        this.renderActivityBarSide(containerEl, "right", t("settings.rightBar"));
         // ===== 危險操作（單一 panel） =====
         new obsidian.Setting(containerEl).setName(t("settings.resetSettings")).setHeading();
-        const dangerGroup = (_d = this.createGroup(containerEl)) !== null && _d !== void 0 ? _d : containerEl;
+        const dangerGroup = (_c = this.createGroup(containerEl)) !== null && _c !== void 0 ? _c : containerEl;
         this.createSettingIn(dangerGroup, (s) => {
             s.setName(t("settings.resetSettings")).setDesc(t("settings.resetSettingsDescription"));
             s.addButton((button) => {
@@ -5604,26 +5661,7 @@ class WindowSpacesSettingTab extends obsidian.PluginSettingTab {
     }
     getDefaultBorderInset() {
         const value = this.plugin.settings.defaultBorderInset;
-        return typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.min(20, value)) : 1;
-    }
-    /** 渲染 Popout 側欄（Activity Bars）設定區塊（每個子區塊各自一個 SettingGroup panel）。 */
-    renderActivityBarSection(section) {
-        var _a;
-        new obsidian.Setting(section).setName(t("settings.popoutSidebarSection")).setHeading();
-        const mainGroup = (_a = this.createGroup(section)) !== null && _a !== void 0 ? _a : section;
-        this.createSettingIn(mainGroup, (s) => {
-            s.setName(t("settings.enableInterceptor")).setDesc(t("settings.enableInterceptorDesc"));
-            s.addToggle((toggle) => {
-                toggle.setValue(this.plugin.settings.workspaceInterceptorEnabled !== false);
-                toggle.onChange((value) => __awaiter(this, void 0, void 0, function* () {
-                    this.plugin.settings.workspaceInterceptorEnabled = value;
-                    this.plugin.workspaceInterceptor.enabled = value;
-                    yield this.plugin.saveSettings();
-                }));
-            });
-        });
-        this.renderActivityBarSide(section, "left", t("settings.leftBar"));
-        this.renderActivityBarSide(section, "right", t("settings.rightBar"));
+        return typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.min(5, value)) : 1;
     }
     /** 渲染單一側欄 view 項目列，回傳用於 surgical 更新的 handle。 */
     renderSideItemRow(container, side, item, index, onChanged) {
@@ -5984,7 +6022,7 @@ class SaveLayoutModal extends obsidian.Modal {
         return (_a = groups[groups.length - 1]) !== null && _a !== void 0 ? _a : fallback;
     }
     onOpen() {
-        var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l;
+        var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
         this.setTitle(t("saveModal.title"));
         const { contentEl } = this;
         contentEl.empty();
@@ -5999,9 +6037,25 @@ class SaveLayoutModal extends obsidian.Modal {
             left: this.createActivityBarDraft("left", isExistingSpace),
             right: this.createActivityBarDraft("right", isExistingSpace),
         };
-        new obsidian.Setting(contentEl).setName(t("saveModal.spaceSection")).setHeading();
-        const identityGroup = (_a = this.createGroup(contentEl)) !== null && _a !== void 0 ? _a : contentEl;
-        // 名稱輸入與動態同名提示
+        // 0. 置頂精簡佈局資訊 (在對話框標題正下方，無標題、無分隔線、不占空間)
+        const i18n = getI18n();
+        const totalTabs = ((_a = this.layout.metadata) === null || _a === void 0 ? void 0 : _a.tabCount) || ((_c = (_b = this.layout.workspace) === null || _b === void 0 ? void 0 : _b.leaves) === null || _c === void 0 ? void 0 : _c.length) || 0;
+        const statsContainer = contentEl.createDiv("window-spaces-modal-top-stats");
+        statsContainer.createDiv({
+            cls: "window-spaces-stat-item",
+            text: `${t("manageModal.tabCount")}: ${totalTabs}`,
+        });
+        statsContainer.createDiv({
+            cls: "window-spaces-stat-item",
+            text: `${t("manageModal.createdDate")}: ${i18n.formatDate(new Date(this.layout.timestamp))}`,
+        });
+        statsContainer.createDiv({
+            cls: "window-spaces-stat-item",
+            text: `${t("saveModal.windowSize")}: ${this.layout.windowState.size.width} x ${this.layout.windowState.size.height}`,
+        });
+        // 1. 第一個 Group Panel (原本 Space Group 與 Sections 合併，無 Space 標題)
+        const identityGroup = (_d = this.createGroup(contentEl)) !== null && _d !== void 0 ? _d : contentEl;
+        // (1) 空間名稱輸入框
         let nameInput;
         const nameSetting = this.createSettingIn(identityGroup, (setting) => {
             setting.setName(t("saveModal.nameLabel"));
@@ -6018,8 +6072,58 @@ class SaveLayoutModal extends obsidian.Modal {
                 });
             });
         });
-        nameSetting.settingEl.addClass("window-spaces-setting-full-width");
-        // Icon / Emoji 輸入框與預覽
+        // (2) 覆蓋既有空間提示：精確放置在 Space Name 標籤 (infoEl) 正下方
+        const noticeContainer = nameSetting.infoEl.createDiv("save-overwrite-notice");
+        // (3) Sections 分組標籤選單 Setting
+        const allSpaces = this.plugin.manager.getSavedLayouts();
+        const existingSectionsSet = new Set();
+        (((_e = this.plugin.settings) === null || _e === void 0 ? void 0 : _e.sectionsOrder) || []).forEach((s) => existingSectionsSet.add(s));
+        allSpaces.forEach((s) => (s.sections || []).forEach((sec) => existingSectionsSet.add(sec)));
+        const existingSections = Array.from(existingSectionsSet);
+        const sectionsSetting = this.createSettingIn(identityGroup, (setting) => {
+            setting.setName(t("manageModal.sectionsLabel") || "Sections");
+            setting.addText((text) => {
+                text.setPlaceholder(t("manageModal.sectionsPlaceholder") || "Add section...");
+                text.inputEl.addEventListener("keydown", (e) => {
+                    if (e.key === "Enter" || e.key === ",") {
+                        e.preventDefault();
+                        const val = text.inputEl.value.trim().replace(/^,+|,+$/g, "");
+                        if (val && !selectedSections.includes(val)) {
+                            selectedSections.push(val);
+                            text.inputEl.value = "";
+                            renderPills();
+                        }
+                    }
+                });
+            });
+        });
+        // (4) 既有的 Section 標籤 Pills：精確放置在 Sections 標籤 (infoEl) 正下方
+        const pillsContainer = sectionsSetting.infoEl.createDiv("space-sections-pills");
+        const renderPills = () => {
+            pillsContainer.empty();
+            selectedSections.forEach((sec) => {
+                const pill = pillsContainer.createDiv("space-section-pill");
+                pill.createSpan({ text: sec });
+                const closeSpan = pill.createSpan({ text: "✖", cls: "space-section-pill-close" });
+                closeSpan.onclick = (e) => {
+                    e.stopPropagation();
+                    selectedSections = selectedSections.filter((s) => s !== sec);
+                    renderPills();
+                };
+            });
+            existingSections.forEach((sec) => {
+                if (selectedSections.includes(sec))
+                    return;
+                const unselectedPill = pillsContainer.createDiv("space-section-pill-unselected");
+                unselectedPill.setText(`+ ${sec}`);
+                unselectedPill.onclick = () => {
+                    selectedSections.push(sec);
+                    renderPills();
+                };
+            });
+        };
+        renderPills();
+        // (5) Icon / Emoji 輸入框與預覽
         let currentIcon = this.layout.icon || "";
         let currentColor = this.layout.color || "";
         let iconInputEl;
@@ -6064,7 +6168,7 @@ class SaveLayoutModal extends obsidian.Modal {
             }
         };
         updateIconPreview();
-        // 邊框顏色選擇器與 Swatches
+        // (6) 邊框顏色選擇器與 Swatches
         const presets = this.plugin.settings.colorPresets || DEFAULT_COLOR_PRESETS;
         const colorSetting = this.createSettingIn(identityGroup, (setting) => {
             setting.setName(t("saveModal.colorLabel"));
@@ -6105,33 +6209,14 @@ class SaveLayoutModal extends obsidian.Modal {
             renderSwatches();
         };
         renderSwatches();
-        const noticeContainer = contentEl.createDiv("save-overwrite-notice");
-        let autoSave = (_b = this.layout.autoSave) !== null && _b !== void 0 ? _b : false;
-        let autoSaveToggleComponent = null;
-        // 佈局資訊顯示
-        const i18n = getI18n();
-        const infoEl = contentEl.createDiv();
-        infoEl.createDiv({
-            text: t("saveModal.infoSection"),
-            cls: "setting-item-name ws-info-title",
-        });
-        const infoList = infoEl.createEl("ul");
-        const totalTabs = ((_c = this.layout.metadata) === null || _c === void 0 ? void 0 : _c.tabCount) || ((_e = (_d = this.layout.workspace) === null || _d === void 0 ? void 0 : _d.leaves) === null || _e === void 0 ? void 0 : _e.length) || 0;
-        infoList.createEl("li", {
-            text: `${t("manageModal.tabCount")}: ${totalTabs}`,
-        });
-        infoList.createEl("li", {
-            text: `${t("manageModal.createdDate")}: ${i18n.formatDate(new Date(this.layout.timestamp))}`,
-        });
-        infoList.createEl("li", {
-            text: `${t("saveModal.windowSize")}: ${this.layout.windowState.size.width} x ${this.layout.windowState.size.height}`,
-        });
+        // 2. 視窗外觀 Section / Group
         new obsidian.Setting(contentEl).setName(t("saveModal.windowAppearanceSection")).setHeading();
         const windowGroup = (_f = this.createGroup(contentEl)) !== null && _f !== void 0 ? _f : contentEl;
-        // 視窗外觀與位置
         let includeGeometry = (_g = this.layout.includeGeometry) !== null && _g !== void 0 ? _g : (this.layout.windowState.position !== undefined ||
             (this.layout.windowState.size && this.layout.windowState.size.width > 0));
         let geometryToggleComponent = null;
+        let autoSave = (_h = this.layout.autoSave) !== null && _h !== void 0 ? _h : false;
+        let autoSaveToggleComponent = null;
         this.createSettingIn(windowGroup, (setting) => {
             setting.setName(t("saveModal.includeGeometry")).setDesc(t("saveModal.includeGeometryDesc"));
             setting.addToggle((toggle) => {
@@ -6146,7 +6231,7 @@ class SaveLayoutModal extends obsidian.Modal {
             setting.setName(t("saveModal.borderInset")).setDesc(t("saveModal.borderInsetDesc"));
             setting.addSlider((slider) => {
                 slider
-                    .setLimits(0, 20, 1)
+                    .setLimits(0, 5, 1)
                     .setValue(borderInset)
                     .setDynamicTooltip()
                     .onChange((value) => {
@@ -6165,9 +6250,10 @@ class SaveLayoutModal extends obsidian.Modal {
                 });
             });
         });
+        // 3. 空間行為 Section / Group
         new obsidian.Setting(contentEl).setName(t("saveModal.behaviorSection")).setHeading();
-        const behaviorGroup = (_h = this.createGroup(contentEl)) !== null && _h !== void 0 ? _h : contentEl;
-        let archived = (_j = this.layout.archived) !== null && _j !== void 0 ? _j : false;
+        const behaviorGroup = (_j = this.createGroup(contentEl)) !== null && _j !== void 0 ? _j : contentEl;
+        let archived = (_k = this.layout.archived) !== null && _k !== void 0 ? _k : false;
         this.createSettingIn(behaviorGroup, (setting) => {
             setting.setName(t("saveModal.autoSaveToggle"));
             setting.addToggle((toggle) => {
@@ -6187,65 +6273,9 @@ class SaveLayoutModal extends obsidian.Modal {
                 });
             });
         });
+        // 4. Popout Activity Bars
         this.renderActivityBarSettings(contentEl, "left", activityBarSettings.left);
         this.renderActivityBarSettings(contentEl, "right", activityBarSettings.right);
-        // Section 分組標籤選單與 Tag-Pills 輸入框
-        new obsidian.Setting(contentEl).setName(t("saveModal.sectionsSection")).setHeading();
-        const sectionsGroup = (_k = this.createGroup(contentEl)) !== null && _k !== void 0 ? _k : contentEl;
-        selectedSections = Array.from(this.layout.sections || []);
-        // 獲取目前全域已存在的所有 Sections
-        const allSpaces = this.plugin.manager.getSavedLayouts();
-        const existingSectionsSet = new Set();
-        (((_l = this.plugin.settings) === null || _l === void 0 ? void 0 : _l.sectionsOrder) || []).forEach((s) => existingSectionsSet.add(s));
-        allSpaces.forEach((s) => (s.sections || []).forEach((sec) => existingSectionsSet.add(sec)));
-        const existingSections = Array.from(existingSectionsSet);
-        // 1. 上方 Setting 列：左側 Sections 標籤，右側 新標籤輸入欄 (對齊 Space Name 樣式與大小)
-        const sectionsSetting = this.createSettingIn(sectionsGroup, (setting) => {
-            setting.setName(t("manageModal.sectionsLabel") || "Sections");
-            setting.addText((text) => {
-                text.setPlaceholder(t("manageModal.sectionsPlaceholder") || "Add section...");
-                text.inputEl.addEventListener("keydown", (e) => {
-                    if (e.key === "Enter" || e.key === ",") {
-                        e.preventDefault();
-                        const val = text.inputEl.value.trim().replace(/^,+|,+$/g, "");
-                        if (val && !selectedSections.includes(val)) {
-                            selectedSections.push(val);
-                            text.inputEl.value = "";
-                            renderPills();
-                        }
-                    }
-                });
-            });
-        });
-        sectionsSetting.settingEl.addClass("window-spaces-setting-full-width");
-        // 2. 底下：Section 列表選擇器 (Pills Container)
-        const sectionsGroupEl = this.getGroupElement(sectionsGroup, contentEl);
-        const pillsContainer = sectionsGroupEl.createDiv("space-sections-pills");
-        const renderPills = () => {
-            pillsContainer.empty();
-            selectedSections.forEach((sec) => {
-                const pill = pillsContainer.createDiv("space-section-pill");
-                pill.createSpan({ text: sec });
-                const closeSpan = pill.createSpan({ text: "✖", cls: "space-section-pill-close" });
-                closeSpan.onclick = (e) => {
-                    e.stopPropagation();
-                    selectedSections = selectedSections.filter((s) => s !== sec);
-                    renderPills();
-                };
-            });
-            // 呈現在 settings 中但未勾選的既有標籤
-            existingSections.forEach((sec) => {
-                if (selectedSections.includes(sec))
-                    return;
-                const unselectedPill = pillsContainer.createDiv("space-section-pill-unselected");
-                unselectedPill.setText(`+ ${sec}`);
-                unselectedPill.onclick = () => {
-                    selectedSections.push(sec);
-                    renderPills();
-                };
-            });
-        };
-        renderPills();
         const checkDuplicateName = () => {
             const currentName = (nameInput === null || nameInput === void 0 ? void 0 : nameInput.value.trim()) || "";
             if (!currentName) {
@@ -6275,7 +6305,7 @@ class SaveLayoutModal extends obsidian.Modal {
         };
         nameInput.addEventListener("input", checkDuplicateName);
         checkDuplicateName();
-        // 按鈕
+        // 按鈕區
         const buttonContainer = contentEl.createDiv("ws-dialog-actions");
         const cancelButton = buttonContainer.createEl("button", {
             text: t("common.cancel"),
@@ -6298,7 +6328,6 @@ class SaveLayoutModal extends obsidian.Modal {
                 nameInput.focus();
                 return;
             }
-            // 更新佈局數據
             this.layout.name = name;
             this.layout.autoSave = autoSave;
             this.layout.includeGeometry = includeGeometry;
@@ -6333,13 +6362,13 @@ class SaveLayoutModal extends obsidian.Modal {
     getDefaultBorderInset() {
         const value = this.plugin.settings.defaultBorderInset;
         return typeof value === "number" && Number.isFinite(value)
-            ? Math.max(0, Math.min(20, value))
+            ? Math.max(0, Math.min(5, value))
             : 1;
     }
     getEffectiveBorderInset() {
         var _a;
         const value = (_a = this.layout.borderInset) !== null && _a !== void 0 ? _a : this.getDefaultBorderInset();
-        return Math.max(0, Math.min(20, Number.isFinite(value) ? value : 1));
+        return Math.max(0, Math.min(5, Number.isFinite(value) ? value : 1));
     }
     getEffectiveFoldedCorner() {
         var _a;
@@ -6355,7 +6384,6 @@ class SaveLayoutModal extends obsidian.Modal {
                 ? globalItems.filter((item) => { var _a; return (_a = saved.viewTypes) === null || _a === void 0 ? void 0 : _a.includes(item.viewType); })
                 : globalItems;
         return {
-            // Legacy spaces without a per-space setting are intentionally unchecked.
             show: (_d = saved === null || saved === void 0 ? void 0 : saved.show) !== null && _d !== void 0 ? _d : (isExistingSpace ? false : ((_e = this.plugin.settings.activityBarDefaults) === null || _e === void 0 ? void 0 : _e[side]) !== false),
             items: savedItems.map((item) => (Object.assign({}, item))),
         };
@@ -6366,8 +6394,10 @@ class SaveLayoutModal extends obsidian.Modal {
         const activityGroup = (_a = this.createGroup(contentEl)) !== null && _a !== void 0 ? _a : contentEl;
         const groupEl = this.getGroupElement(activityGroup, contentEl);
         this.createSettingIn(activityGroup, (setting) => {
-            setting.setName(t("settings.defaultActivityBarVisibility"));
-            setting.setDesc(t("settings.defaultActivityBarVisibilityDesc"));
+            setting.setName(side === "left"
+                ? (t("saveModal.showLeftActivityBar") || "顯示左側 Activity Bar")
+                : (t("saveModal.showRightActivityBar") || "顯示右側 Activity Bar"));
+            setting.setDesc(t("saveModal.showActivityBarDesc") || "開啟時，此空間會在 Popout 視窗顯示該側 Activity Bar");
             setting.addToggle((toggle) => {
                 toggle.setValue(draft.show);
                 toggle.onChange((value) => {
@@ -6406,11 +6436,41 @@ class SaveLayoutModal extends obsidian.Modal {
                 }
             });
         });
+        // 為整個 groupEl 綁定 dragover 與 drop 監聽器
+        groupEl.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            groupEl.querySelectorAll(`[data-window-spaces-activity-item="${side}"].drag-over-top, [data-window-spaces-activity-item="${side}"].drag-over-bottom`).forEach((el) => { el.classList.remove("drag-over-top", "drag-over-bottom"); });
+            const target = e.target.closest(`[data-window-spaces-activity-item="${side}"]`);
+            if (!target)
+                return;
+            const rect = target.getBoundingClientRect();
+            const isBottom = e.clientY > rect.top + rect.height / 2;
+            target.classList.add(isBottom ? "drag-over-bottom" : "drag-over-top");
+        });
+        groupEl.addEventListener("drop", (e) => {
+            var _a, _b, _c, _d, _e;
+            e.preventDefault();
+            const indicatorEl = groupEl.querySelector(`[data-window-spaces-activity-item="${side}"].drag-over-top, [data-window-spaces-activity-item="${side}"].drag-over-bottom`);
+            const isBottom = (_a = indicatorEl === null || indicatorEl === void 0 ? void 0 : indicatorEl.classList.contains("drag-over-bottom")) !== null && _a !== void 0 ? _a : false;
+            groupEl.querySelectorAll(`[data-window-spaces-activity-item="${side}"].drag-over-top, [data-window-spaces-activity-item="${side}"].drag-over-bottom`).forEach((el) => { el.classList.remove("drag-over-top", "drag-over-bottom"); });
+            if (!indicatorEl)
+                return;
+            const draggedViewType = (_c = (_b = e.dataTransfer) === null || _b === void 0 ? void 0 : _b.getData(ACTIVITY_BAR_DRAG_DATA_TYPE)) !== null && _c !== void 0 ? _c : "";
+            const targetViewType = (_d = indicatorEl.getAttribute("data-drag-view-type")) !== null && _d !== void 0 ? _d : "";
+            if (!draggedViewType || !targetViewType)
+                return;
+            const current = (_e = draft.items) !== null && _e !== void 0 ? _e : [];
+            const reordered = reorderActivityBarItems(current, draggedViewType, targetViewType, isBottom);
+            if (!reordered)
+                return;
+            draft.items = reordered;
+            renderItems();
+        });
         const renderItems = () => {
             var _a;
             const existingRows = new Map();
-            groupEl.querySelectorAll("[data-window-spaces-save-activity-item]").forEach((el) => {
-                const viewType = el.getAttribute("data-view-type");
+            groupEl.querySelectorAll(`[data-window-spaces-activity-item="${side}"]`).forEach((el) => {
+                const viewType = el.getAttribute("data-drag-view-type");
                 if (viewType)
                     existingRows.set(viewType, el);
             });
@@ -6432,10 +6492,27 @@ class SaveLayoutModal extends obsidian.Modal {
                     setting.setName(item.label || resolveViewLabel(this.app, item.viewType));
                     setting.setDesc(item.viewType);
                 });
-                row.settingEl.setAttr("data-window-spaces-save-activity-item", "true");
-                row.settingEl.setAttr("data-view-type", item.viewType);
+                row.settingEl.setAttr("data-window-spaces-activity-item", side);
                 row.settingEl.setAttr("data-drag-index", String(index));
+                row.settingEl.setAttr("data-drag-view-type", item.viewType);
                 row.settingEl.setAttr("draggable", "true");
+                row.settingEl.addEventListener("dragstart", (e) => {
+                    row.settingEl.classList.add("drag-source");
+                    if (!e.dataTransfer)
+                        return;
+                    e.dataTransfer.effectAllowed = "move";
+                    e.dataTransfer.setData(ACTIVITY_BAR_DRAG_DATA_TYPE, item.viewType);
+                });
+                row.settingEl.addEventListener("dragend", () => {
+                    row.settingEl.classList.remove("drag-source");
+                });
+                row.settingEl.querySelectorAll("button, input, select, .checkbox-container, .slider").forEach((el) => {
+                    el.setAttribute("draggable", "false");
+                });
+                const gripEl = row.settingEl.createDiv({ cls: "window-spaces-activity-drag-handle" });
+                gripEl.setAttr("aria-label", t("settings.dragToReorder"));
+                obsidian.setIcon(gripEl, "grip-vertical");
+                row.settingEl.insertBefore(gripEl, row.settingEl.firstChild);
                 row.addButton((button) => {
                     iconButton = button;
                     button.setIcon(item.icon || resolveViewIcon(this.app, item.viewType)).setTooltip(t("settings.pickIcon"));
@@ -6464,24 +6541,6 @@ class SaveLayoutModal extends obsidian.Modal {
                         draft.items = items.filter((entry) => entry !== item);
                         renderItems();
                     });
-                });
-                row.settingEl.addEventListener("dragstart", (event) => {
-                    if (!event.dataTransfer)
-                        return;
-                    event.dataTransfer.effectAllowed = "move";
-                    event.dataTransfer.setData(ACTIVITY_BAR_DRAG_DATA_TYPE, item.viewType);
-                });
-                row.settingEl.addEventListener("dragover", (event) => event.preventDefault());
-                row.settingEl.addEventListener("drop", (event) => {
-                    var _a, _b, _c;
-                    event.preventDefault();
-                    const source = (_b = (_a = event.dataTransfer) === null || _a === void 0 ? void 0 : _a.getData(ACTIVITY_BAR_DRAG_DATA_TYPE)) !== null && _b !== void 0 ? _b : "";
-                    const target = item.viewType;
-                    const reordered = reorderActivityBarItems((_c = draft.items) !== null && _c !== void 0 ? _c : [], source, target, event.clientY > row.settingEl.getBoundingClientRect().top + row.settingEl.offsetHeight / 2);
-                    if (reordered) {
-                        draft.items = reordered;
-                        renderItems();
-                    }
                 });
                 addRow.settingEl.before(row.settingEl);
             });
@@ -6609,6 +6668,14 @@ function findRootSplitElement(element) {
     }
     return null;
 }
+/** 從 element 向上找到 root 的 direct child（即頂層欄位元素）。 */
+function getDirectChildOf(root, element) {
+    let current = element;
+    while (current && current.parentElement !== root) {
+        current = current.parentElement;
+    }
+    return current && current.parentElement === root ? current : null;
+}
 /** 找到 leaf 在其 parent split 下的 direct child 元素（`.workspace-tabs` 或巢狀 split）。 */
 function getPaneContainerElement(leaf) {
     var _a;
@@ -6700,6 +6767,17 @@ function findLeafInTabs(tabs, viewType) {
         }
     }
     return null;
+}
+/**
+ * 判斷頂層欄位是否被 UI 標記為 sidebar（`window-spaces-sidebar-column` class）。
+ *
+ * 此 class 由 Window Spaces 的 activityBar（syncSidebarColumnClasses）依
+ * 「該側 activity bar 可見 + 位於最左/最右 + 頂層欄位數 ≥ 2」套用，並同時
+ * 驅動側欄底色與 tab header 樣式。被動判定（isLeafInSideColumn /
+ * getCenterPanes）以它為唯一依據，確保「開檔排除」與「視覺樣式」永遠一致。
+ */
+function isSidebarColumnElement(columnEl) {
+    return !!columnEl && columnEl.classList.contains("window-spaces-sidebar-column");
 }
 class PopoutLayoutEngine {
     constructor(app) {
@@ -6825,12 +6903,16 @@ class PopoutLayoutEngine {
      * 並開啟/聚焦指定 view type。
      * - viewType 有值：建立/聚焦該 view 的 leaf。
      * - viewType 無值：僅確保欄位存在並回傳一個空 leaf（供攔截器由第三方設定 view）。
+     *
+     * 主動定位語意：open-in-left/right-sidebar 應把 view 開到「最左/最右邊的 split」。
+     * 因此當該側沒有被標記為 sidebar 的欄位時（例如 activity bar 未開啟），仍回退到
+     * 最左/最右現有的頂層欄位；完全沒有欄位時才建立新的垂直 Split 欄位。
      */
     ensureSideColumn(win, side, viewType) {
-        var _a, _b;
+        var _a, _b, _c;
         return __awaiter(this, void 0, void 0, function* () {
             const workspace = this.workspace;
-            const columnEl = this.getColumnElement(win, side);
+            const columnEl = (_a = this.getColumnElement(win, side)) !== null && _a !== void 0 ? _a : this.getEdgeColumnElement(win, side);
             if (columnEl) {
                 const tabs = this.getSidebarTabsInColumn(win, columnEl);
                 if (tabs) {
@@ -6856,10 +6938,10 @@ class PopoutLayoutEngine {
             // Activity Bar button; splitting that leaf would turn a sidebar into the
             // content area and leave the layout with no real center column.
             const centerPane = this.getCenterPanes(win)[0];
-            let editorLeaf = ((_a = centerPane === null || centerPane === void 0 ? void 0 : centerPane.tabs.children) === null || _a === void 0 ? void 0 : _a[0])
+            let editorLeaf = ((_b = centerPane === null || centerPane === void 0 ? void 0 : centerPane.tabs.children) === null || _b === void 0 ? void 0 : _b[0])
                 || this.getActiveLeafInWindow(win)
                 || this.getLastLeafInWindow(win);
-            if (editorLeaf && viewType && ((_b = editorLeaf.getViewState()) === null || _b === void 0 ? void 0 : _b.type) === viewType) {
+            if (editorLeaf && viewType && ((_c = editorLeaf.getViewState()) === null || _c === void 0 ? void 0 : _c.type) === viewType) {
                 let otherLeaf = null;
                 workspace.iterateAllLeaves((l) => {
                     var _a;
@@ -6934,8 +7016,10 @@ class PopoutLayoutEngine {
      * 同步建立/回傳側欄 leaf，不進行 reveal / setViewState（由第三方呼叫端後續設定）。
      */
     openSideLeafSync(win, side) {
+        var _a;
         const workspace = this.workspace;
-        const columnEl = this.getColumnElement(win, side);
+        // 與 ensureSideColumn 相同的主動定位語意：無標記側欄時回退到最左/最右欄位。
+        const columnEl = (_a = this.getColumnElement(win, side)) !== null && _a !== void 0 ? _a : this.getEdgeColumnElement(win, side);
         if (columnEl) {
             const tabs = this.getSidebarTabsInColumn(win, columnEl);
             if (tabs) {
@@ -7059,7 +7143,7 @@ class PopoutLayoutEngine {
             return viewType ? this.openPanelInTabs(tabs, viewType) : this.createLeafInTabs(tabs);
         });
     }
-    /** 判斷 leaf 是否位於 Popout 視窗的「偽側欄」（左側或右側頂層欄位）中。 */
+    /** 判斷 leaf 是否位於 Popout 視窗的「偽側欄」（被 UI 標記為 sidebar 的頂層欄位）中。 */
     isLeafInSideColumn(win, leaf) {
         var _a;
         if (!leaf || getWindowOfLeaf(leaf) !== win)
@@ -7068,32 +7152,29 @@ class PopoutLayoutEngine {
         const container = extLeaf.containerEl || ((_a = leaf.view) === null || _a === void 0 ? void 0 : _a.containerEl);
         if (!(container instanceof HTMLElement))
             return false;
-        const leftCol = this.getColumnElement(win, "left");
-        if (leftCol && leftCol.contains(container))
-            return true;
-        const rightCol = this.getColumnElement(win, "right");
-        if (rightCol && rightCol.contains(container))
-            return true;
-        return false;
+        return isSidebarColumnElement(this.getTopLevelColumnForContainer(container));
+    }
+    /** 回傳 container 所在的頂層欄位元素（root split 的 direct child）。 */
+    getTopLevelColumnForContainer(container) {
+        const rootEl = findRootSplitElement(container);
+        if (!rootEl)
+            return null;
+        return getDirectChildOf(rootEl, container);
     }
     /**
      * 取得 Popout 視窗非側欄的「中央編輯區」Tabs 群組。
-     * 排除包含在左側欄位或右側欄位內的 Tabs。
+     * 排除被 UI 標記為 sidebar（window-spaces-sidebar-column）的頂層欄位內 Tabs。
      */
     getCenterPanes(win) {
         const panes = this.collectPopoutPanes(win);
         if (panes.length === 0)
             return [];
-        const leftCol = this.getColumnElement(win, "left");
-        const rightCol = this.getColumnElement(win, "right");
         const centerPanes = panes.filter((pane) => {
             var _a, _b;
             const tabs = pane.tabs;
             const container = tabs.containerEl;
             if (container instanceof HTMLElement) {
-                if (leftCol && leftCol.contains(container))
-                    return false;
-                if (rightCol && rightCol.contains(container))
+                if (isSidebarColumnElement(this.getTopLevelColumnForContainer(container)))
                     return false;
             }
             const children = ((_a = tabs.children) !== null && _a !== void 0 ? _a : []);
@@ -7101,9 +7182,7 @@ class PopoutLayoutEngine {
                 const extLeaf = leaf;
                 const leafContainer = extLeaf.containerEl || ((_b = leaf.view) === null || _b === void 0 ? void 0 : _b.containerEl);
                 if (leafContainer instanceof HTMLElement) {
-                    if (leftCol && leftCol.contains(leafContainer))
-                        return false;
-                    if (rightCol && rightCol.contains(leafContainer))
+                    if (isSidebarColumnElement(this.getTopLevelColumnForContainer(leafContainer)))
                         return false;
                 }
             }
@@ -7170,29 +7249,40 @@ class PopoutLayoutEngine {
                 el.classList.contains("workspace-split"));
         });
     }
-    /** 取得指定側的頂層欄位元素（DOM 結構優先，display-independent）。 */
-    getColumnElement(win, side) {
-        var _a, _b, _c, _d, _e, _f;
-        // 幾何測量（collectPopoutColumns）量不到 display:none 的欄位，側欄隱藏時會被
-        // 誤判為最右/最左的可見欄位；因此一律先以 root split 的 direct children
-        // （DOM 順序）定位左右側欄，隱藏中的側欄仍在 DOM 中，不受影響。
+    /** 取得指定側「最外側」的頂層欄位（不問是否為 sidebar），供主動 open-in-sidebar 定位。 */
+    getEdgeColumnElement(win, side) {
+        var _a, _b;
         const topEls = this.getTopLevelColumnElements(win);
+        if (topEls.length === 0)
+            return null;
+        return side === "left" ? (_a = topEls[0]) !== null && _a !== void 0 ? _a : null : (_b = topEls[topEls.length - 1]) !== null && _b !== void 0 ? _b : null;
+    }
+    /**
+     * 取得指定側的「物理側欄」頂層欄位元素（DOM 結構優先，display-independent）。
+     *
+     * 語意：主動/實體定位（open-in-sidebar、hide/show column、隱藏狀態 capture/apply）。
+     * - 有 hints（activityBar 寫入的物理側欄映射）：該側有側欄 → 最左/最右欄位；
+     *   該側無側欄 → null。
+     * - 無 hints（非 Window Spaces 管理或尚未同步）：以 UI 標記
+     *   （window-spaces-sidebar-column class）保守推斷；無標記 → null。
+     *
+     * 注意：被動判定（isLeafInSideColumn / getCenterPanes）不使用本方法，
+     * 一律以 UI 標記 class 為準，確保開檔排除與視覺樣式永遠一致。
+     */
+    getColumnElement(win, side) {
+        const edge = this.getEdgeColumnElement(win, side);
+        if (!edge)
+            return null;
         const configuredSides = this.sidebarSidesByWindow.get(win);
         if (configuredSides) {
             if (!configuredSides[side])
                 return null;
             const requiredColumns = Number(configuredSides.left) + Number(configuredSides.right) + 1;
-            if (topEls.length < requiredColumns)
+            if (this.getTopLevelColumnElements(win).length < requiredColumns)
                 return null;
-            if (configuredSides.left && configuredSides.right) {
-                return side === "left" ? (_a = topEls[0]) !== null && _a !== void 0 ? _a : null : (_b = topEls[topEls.length - 1]) !== null && _b !== void 0 ? _b : null;
-            }
-            return configuredSides.left ? (_c = topEls[0]) !== null && _c !== void 0 ? _c : null : (_d = topEls[topEls.length - 1]) !== null && _d !== void 0 ? _d : null;
+            return edge;
         }
-        if (topEls.length >= 2) {
-            return side === "left" ? (_e = topEls[0]) !== null && _e !== void 0 ? _e : null : (_f = topEls[topEls.length - 1]) !== null && _f !== void 0 ? _f : null;
-        }
-        return null;
+        return isSidebarColumnElement(edge) ? edge : null;
     }
     /** 目前仍可見的頂層欄位數量（display:none 的欄位不計）。 */
     getVisibleColumnCount(win) {
@@ -7435,7 +7525,7 @@ const SHARED_API_VERSION = 5;
 /** Oldest shared API version implemented by this copy. */
 const SHARED_COMPATIBLE_FROM_VERSION = 1;
 /** Monotonic implementation identifier used when API versions are equal. */
-const SHARED_IMPLEMENTATION_REVISION = "2026-08-12T12:21:16Z";
+const SHARED_IMPLEMENTATION_REVISION = "2026-08-12T16:10:00Z";
 
 /**
  * Popout Activity Bar 控制器。
@@ -7871,7 +7961,7 @@ class PopoutActivityBarManager {
         const hasCustomColor = Boolean(color);
         const hasCustomBorderInset = typeof (layout === null || layout === void 0 ? void 0 : layout.borderInset) === "number" && Number.isFinite(layout.borderInset);
         const borderInset = hasCustomBorderInset
-            ? Math.max(0, Math.min(20, layout === null || layout === void 0 ? void 0 : layout.borderInset))
+            ? Math.max(0, Math.min(5, layout === null || layout === void 0 ? void 0 : layout.borderInset))
             : 0;
         const showFoldedCorner = hasCustomColor && ((_b = layout === null || layout === void 0 ? void 0 : layout.showFoldedCorner) !== null && _b !== void 0 ? _b : this.settings.defaultShowFoldedCorner !== false);
         const body = (_c = win.document) === null || _c === void 0 ? void 0 : _c.body;

@@ -38,7 +38,7 @@ export const en: TranslationStrings = {
   },
 
   saveModal: {
-    title: "Save Space",
+    title: "Space Settings",
     nameLabel: "Space Name",
     namePlaceholder: "Enter space name...",
     descriptionLabel: "Description (optional)",
@@ -70,6 +70,10 @@ export const en: TranslationStrings = {
     foldedCornerDesc: "Leave unchanged to follow the global default",
     activityBarsSection: "Activity Bars",
     showActivityBar: "Show",
+    showActivityBarTitle: "Show Activity Bar",
+    showActivityBarDesc: "When enabled, this space will display this side Activity Bar in popout windows",
+    showLeftActivityBar: "Show Left Activity Bar",
+    showRightActivityBar: "Show Right Activity Bar",
     activityBarViewButtons: "View buttons",
     spaceSection: "Space",
     windowAppearanceSection: "Window Appearance",
