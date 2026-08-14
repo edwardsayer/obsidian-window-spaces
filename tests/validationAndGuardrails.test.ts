@@ -122,7 +122,7 @@ describe("Validation & Auto-Save Guardrails (validationAndGuardrails.test.ts)", 
     leafEl.remove();
   });
 
-  test("openNewPopoutWindow waits for the leaf view before resolving its Window", async () => {
+  test("openNewPopoutWindow delegates to the shared popout window API", async () => {
     const popoutWindow = {
       document: {
         body: {
@@ -134,20 +134,20 @@ describe("Validation & Auto-Save Guardrails (validationAndGuardrails.test.ts)", 
       focus: vi.fn(),
     } as unknown as Window;
 
-    const leaf: any = {
-      containerEl: { ownerDocument: { defaultView: null } },
-      setViewState: vi.fn(async () => {
-        await Promise.resolve();
-        leaf.containerEl.ownerDocument.defaultView = popoutWindow;
-      }),
+    const leaf: any = { setViewState: vi.fn() };
+    const centerLeaf: any = { id: "center-leaf" };
+    mockPlugin.popoutLayout = {
+      openNewPopoutWindow: vi.fn().mockResolvedValue({ win: popoutWindow, leaf }),
+      getCenterLeafSync: vi.fn().mockReturnValue(centerLeaf),
     };
-    mockPlugin.app.workspace.openPopoutLeaf = vi.fn(() => leaf);
+    mockPlugin.app.workspace.setActiveLeaf = vi.fn();
 
     const result = await manager.openNewPopoutWindow();
 
-    expect(leaf.setViewState).toHaveBeenCalledWith({ type: "empty" });
+    expect(mockPlugin.popoutLayout.openNewPopoutWindow).toHaveBeenCalled();
     expect(result).toBe(popoutWindow);
-    expect(popoutWindow.focus).toHaveBeenCalled();
+    expect(mockPlugin.popoutLayout.getCenterLeafSync).toHaveBeenCalledWith(popoutWindow);
+    expect(mockPlugin.app.workspace.setActiveLeaf).toHaveBeenCalledWith(centerLeaf, { focus: true });
   });
 
   test("restore focuses the existing popout window for an already-open space when focusExistingWindow is set", async () => {

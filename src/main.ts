@@ -87,6 +87,11 @@ export default class WindowSpacesPlugin extends Plugin {
       compatibleFrom: SHARED_COMPATIBLE_FROM_VERSION,
       implementationRevision: SHARED_IMPLEMENTATION_REVISION,
       create: () => new PopoutLayoutEngine(this.app),
+      // 新 popout window 的初始化 policy：注入 activity bars、依 activityBarDefaults
+      // 建立側欄結構與 sizing。供 Folder Spaces 等外掛經 shared openNewPopoutWindow()
+      // 開啟視窗時，仍由 Window Spaces 統一管理「新視窗行為」。
+      initializeNewPopoutWindow: (win: Window) =>
+        this.activityBars ? this.activityBars.initializeNewWindow(win) : Promise.resolve(),
     });
     this.activityBars = new PopoutActivityBarManager(this, this.popoutLayout);
     this.workspaceInterceptor = new WorkspaceInterceptor(this.app, this.popoutLayout);

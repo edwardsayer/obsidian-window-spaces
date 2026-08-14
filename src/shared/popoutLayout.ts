@@ -723,6 +723,14 @@ export class PopoutLayoutEngine {
     return centerPanes;
   }
 
+  /** 判斷 leaf 的 containerEl 目前是否真的顯示在視窗中（非 display:none / 隱藏 tab）。 */
+  private isLeafVisibleInPane(leaf: WorkspaceLeaf): boolean {
+    const extLeaf = leaf as unknown as ExtendedWorkspaceLeaf;
+    const container = extLeaf.containerEl || (leaf.view as { containerEl?: HTMLElement } | null)?.containerEl;
+    if (!(container instanceof HTMLElement)) return false;
+    return container.offsetParent !== null;
+  }
+
   /**
    * 同步取得/建立位於 Popout 視窗「中央編輯區」的 WorkspaceLeaf。
    * 用於避免側欄觸發開啟檔案時覆蓋側欄 View。
@@ -736,11 +744,17 @@ export class PopoutLayoutEngine {
       const isNewTabRequested = newLeaf === true || newLeaf === "tab" || newLeaf === "split";
       if (!isNewTabRequested) {
         const children = (targetPane.tabs.children ?? []) as WorkspaceLeaf[];
-        for (const leaf of children) {
-          const extLeaf = leaf as unknown as ExtendedWorkspaceLeaf & { pinned?: boolean };
-          const isPinned = Boolean(extLeaf.pinned || (leaf.getViewState() as { pinned?: boolean })?.pinned);
+        // 使用者預期：開檔落在「目前顯示（active）的 tab」，而非 tab 群組中的
+        // 第一個 unpinned tab。該 tab 被 pin 時才開新 tab，避免覆蓋使用者
+        // 目前正在看的內容或其他舊 tab。
+        const visibleLeaf = children.find((leaf) => this.isLeafVisibleInPane(leaf));
+        if (visibleLeaf) {
+          const isPinned = Boolean(
+            (visibleLeaf as unknown as ExtendedWorkspaceLeaf & { pinned?: boolean }).pinned ||
+              (visibleLeaf.getViewState() as { pinned?: boolean })?.pinned
+          );
           if (!isPinned) {
-            return leaf;
+            return visibleLeaf;
           }
         }
       }

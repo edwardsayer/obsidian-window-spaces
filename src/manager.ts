@@ -705,43 +705,25 @@ export class WindowLayoutManager {
   /** 開啟全新的 Popout 視窗（等待 leaf 與 DOM 都完成掛載後再回傳視窗物件） */
   async openNewPopoutWindow(options: { initializeDefaults?: boolean } = {}): Promise<Window | null> {
     try {
-      const workspace = this.app.workspace as unknown as ExtendedWorkspace & { openPopoutLeaf?: () => WorkspaceLeaf };
-      const leaf = workspace.openPopoutLeaf?.();
-      if (!leaf) return null;
+      // shared 統一開窗：openPopoutLeaf + 初始 empty tab + 等待 window mount +
+      // 依序呼叫所有已註冊 candidate 的 initializeNewPopoutWindow policy
+      // （Window Spaces 的 activity bar 初始化即由此提供）。
+      const result = await this.plugin.popoutLayout.openNewPopoutWindow();
+      if (!result) return null;
 
-      // openPopoutLeaf() 同步回傳 leaf，但 setViewState() 會非同步完成
-      // view/container 的建立。若不等待這個 Promise，下面讀到的 ownerDocument
-      // 可能仍是空值或尚未切換到真正的 Popout Window。
-      const extLeaf = leaf as unknown as ExtendedWorkspaceLeaf;
-      await Promise.resolve(extLeaf.setViewState({ type: "empty" }));
-
-      let targetWin: Window | null = null;
-      for (let attempt = 0; attempt < 40; attempt++) {
-        const candidate = extLeaf.containerEl?.ownerDocument?.defaultView as Window | undefined;
-        if (candidate && this.isPopoutDocument(candidate.document)) {
-          targetWin = candidate;
-          break;
-        }
-
-        await new Promise((resolve) => window.setTimeout(resolve, 50));
-      }
-
-      if (!targetWin) {
-        console.warn("Popout leaf was created, but its Window was not mounted in time.");
-        return null;
-      }
-
-      if (typeof targetWin.focus === "function") {
+      if (options.initializeDefaults !== false) {
+        // 初始化完成後把 active 切回中央編輯區（New tab），讓使用者可直接開始編輯；
+        // 避免 active 停留在右側欄第一個 view（「開啟完成時 New tab 被切走」的錯覺）。
         try {
-          targetWin.focus();
+          const centerLeaf = this.plugin.popoutLayout.getCenterLeafSync(result.win);
+          if (centerLeaf) {
+            this.app.workspace.setActiveLeaf(centerLeaf, { focus: true });
+          }
         } catch (e) {
-          console.warn("Failed to focus new popout window:", e);
+          console.warn("Failed to focus center leaf after New Window init:", e);
         }
       }
-      if (options.initializeDefaults) {
-        await this.plugin.activityBars?.initializeNewWindow(targetWin);
-      }
-      return targetWin;
+      return result.win;
     } catch (e) {
       console.warn("Failed to open new popout window:", e);
     }

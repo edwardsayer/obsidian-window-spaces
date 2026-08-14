@@ -1,7 +1,20 @@
-import { PopoutLayoutEngine } from "./popoutLayout";
+import { PopoutLayoutEngine, ExtendedWorkspace, ExtendedWorkspaceLeaf } from "./popoutLayout";
+import { WorkspaceLeaf } from "obsidian";
 
 /** Fixed cross-bundle key. Both plugins must use this exact namespace. */
 export const POPOUT_LAYOUT_REGISTRY_KEY = "__obsidian_popout_layout_registry_v1__";
+
+/** Registry-level API exposed on the stable proxy (not part of the engine class). */
+export interface PopoutLayoutWindowApi {
+  /**
+   * 開一個新的 Popout window（初始 empty tab），等待 window mount 後依序呼叫
+   * 所有已註冊 candidate 的 initializeNewPopoutWindow policy。無 provider 註冊
+   * initializer 時僅做原生開窗（shared 獨立運作原則）。
+   */
+  openNewPopoutWindow(): Promise<{ win: Window; leaf: WorkspaceLeaf } | null>;
+}
+
+export type PopoutLayoutEngineWithWindow = PopoutLayoutEngine & PopoutLayoutWindowApi;
 
 export interface PopoutLayoutEngineCandidate {
   id: string;
@@ -9,6 +22,11 @@ export interface PopoutLayoutEngineCandidate {
   compatibleFrom: number;
   implementationRevision: string;
   create: () => PopoutLayoutEngine;
+  /**
+   * 選用 policy：新 popout window 建立並 mount 後被呼叫（供外掛初始化
+   * activity bars / 欄位結構等「新視窗行為」）。多個 candidate 都會被呼叫。
+   */
+  initializeNewPopoutWindow?: (win: Window) => Promise<void> | void;
 }
 
 interface StoredCandidate extends Omit<PopoutLayoutEngineCandidate, "create"> {
@@ -20,7 +38,7 @@ interface PopoutLayoutRegistryState {
   activeId: string | null;
   activeEngine: PopoutLayoutEngine | null;
   methodWrappers: Map<PropertyKey, (...args: unknown[]) => unknown>;
-  proxy: PopoutLayoutEngine;
+  proxy: PopoutLayoutEngineWithWindow;
 }
 
 type GlobalNamespace = typeof globalThis & {
@@ -86,8 +104,59 @@ function selectActiveCandidate(state: PopoutLayoutRegistryState): void {
   state.activeEngine = active?.engine ?? null;
 }
 
-function createStableProxy(state: PopoutLayoutRegistryState): PopoutLayoutEngine {
-  const target = Object.create(null) as PopoutLayoutEngine;
+function isPopoutDocument(targetDocument: Document | null | undefined): boolean {
+  const body = targetDocument?.body;
+  return !!body && (body.classList.contains("is-popout-window") || body.classList.contains("mod-popout"));
+}
+
+async function waitForPopoutWindow(leaf: WorkspaceLeaf): Promise<Window | null> {
+  const extLeaf = leaf as unknown as ExtendedWorkspaceLeaf;
+  for (let attempt = 0; attempt < 40; attempt++) {
+    const candidate = extLeaf.containerEl?.ownerDocument?.defaultView as Window | undefined;
+    if (candidate && isPopoutDocument(candidate.document)) return candidate;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  return null;
+}
+
+function createStableProxy(state: PopoutLayoutRegistryState): PopoutLayoutEngineWithWindow {
+  const target = Object.create(null) as PopoutLayoutEngineWithWindow;
+
+  // Registry-level API（不委託 active engine）：開新 popout、等待 window mount、
+  // 然後依序呼叫所有已註冊 candidate 的 initializeNewPopoutWindow policy。
+  // 無 provider 註冊 initializer 時僅做原生開窗（shared 獨立運作原則）。
+  target.openNewPopoutWindow = async () => {
+    const engine = state.activeEngine;
+    if (!engine) return null;
+    const workspace = engine.workspace as ExtendedWorkspace & { openPopoutLeaf?: () => WorkspaceLeaf };
+    const leaf = workspace.openPopoutLeaf?.();
+    if (!leaf) return null;
+
+    const extLeaf = leaf as unknown as ExtendedWorkspaceLeaf;
+    await Promise.resolve(extLeaf.setViewState({ type: "empty" }));
+
+    const win = await waitForPopoutWindow(leaf);
+    if (!win) {
+      console.warn("Popout leaf was created, but its Window was not mounted in time.");
+      return null;
+    }
+    try {
+      win.focus?.();
+    } catch (e) {
+      console.warn("Failed to focus new popout window:", e);
+    }
+
+    for (const candidate of state.candidates.values()) {
+      if (candidate.initializeNewPopoutWindow) {
+        try {
+          await candidate.initializeNewPopoutWindow(win);
+        } catch (e) {
+          console.warn(`Popout new-window initializer failed (${candidate.id}):`, e);
+        }
+      }
+    }
+    return { win, leaf };
+  };
 
   return new Proxy(target, {
     get(proxyTarget, property, receiver) {
@@ -152,7 +221,7 @@ function getRegistryState(): PopoutLayoutRegistryState {
     activeId: null,
     activeEngine: null,
     methodWrappers: new Map<PropertyKey, (...args: unknown[]) => unknown>(),
-    proxy: undefined as unknown as PopoutLayoutEngine,
+    proxy: undefined as unknown as PopoutLayoutEngineWithWindow,
   };
   state.proxy = createStableProxy(state);
   namespace[POPOUT_LAYOUT_REGISTRY_KEY] = state;
@@ -164,7 +233,9 @@ function getRegistryState(): PopoutLayoutRegistryState {
  * singleton proxy. A later compatible candidate only changes the proxy's
  * delegate; existing references therefore remain valid after an upgrade.
  */
-export function acquirePopoutLayoutEngine(candidate: PopoutLayoutEngineCandidate): PopoutLayoutEngine {
+export function acquirePopoutLayoutEngine(
+  candidate: PopoutLayoutEngineCandidate
+): PopoutLayoutEngineWithWindow {
   if (!candidate.id) throw new Error("Popout layout candidate id is required");
   if (!Number.isInteger(candidate.apiVersion) || candidate.apiVersion < 1) {
     throw new Error("Popout layout candidate apiVersion must be a positive integer");
@@ -189,6 +260,7 @@ export function acquirePopoutLayoutEngine(candidate: PopoutLayoutEngineCandidate
     compatibleFrom: candidate.compatibleFrom,
     implementationRevision: candidate.implementationRevision,
     engine,
+    initializeNewPopoutWindow: candidate.initializeNewPopoutWindow,
   });
   selectActiveCandidate(state);
   return state.proxy;

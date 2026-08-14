@@ -3109,43 +3109,28 @@ class WindowLayoutManager {
     }
     /** 開啟全新的 Popout 視窗（等待 leaf 與 DOM 都完成掛載後再回傳視窗物件） */
     openNewPopoutWindow(options = {}) {
-        var _a, _b, _c, _d;
         return __awaiter(this, void 0, void 0, function* () {
             try {
-                const workspace = this.app.workspace;
-                const leaf = (_a = workspace.openPopoutLeaf) === null || _a === void 0 ? void 0 : _a.call(workspace);
-                if (!leaf)
+                // shared 統一開窗：openPopoutLeaf + 初始 empty tab + 等待 window mount +
+                // 依序呼叫所有已註冊 candidate 的 initializeNewPopoutWindow policy
+                // （Window Spaces 的 activity bar 初始化即由此提供）。
+                const result = yield this.plugin.popoutLayout.openNewPopoutWindow();
+                if (!result)
                     return null;
-                // openPopoutLeaf() 同步回傳 leaf，但 setViewState() 會非同步完成
-                // view/container 的建立。若不等待這個 Promise，下面讀到的 ownerDocument
-                // 可能仍是空值或尚未切換到真正的 Popout Window。
-                const extLeaf = leaf;
-                yield Promise.resolve(extLeaf.setViewState({ type: "empty" }));
-                let targetWin = null;
-                for (let attempt = 0; attempt < 40; attempt++) {
-                    const candidate = (_c = (_b = extLeaf.containerEl) === null || _b === void 0 ? void 0 : _b.ownerDocument) === null || _c === void 0 ? void 0 : _c.defaultView;
-                    if (candidate && this.isPopoutDocument(candidate.document)) {
-                        targetWin = candidate;
-                        break;
-                    }
-                    yield new Promise((resolve) => window.setTimeout(resolve, 50));
-                }
-                if (!targetWin) {
-                    console.warn("Popout leaf was created, but its Window was not mounted in time.");
-                    return null;
-                }
-                if (typeof targetWin.focus === "function") {
+                if (options.initializeDefaults !== false) {
+                    // 初始化完成後把 active 切回中央編輯區（New tab），讓使用者可直接開始編輯；
+                    // 避免 active 停留在右側欄第一個 view（「開啟完成時 New tab 被切走」的錯覺）。
                     try {
-                        targetWin.focus();
+                        const centerLeaf = this.plugin.popoutLayout.getCenterLeafSync(result.win);
+                        if (centerLeaf) {
+                            this.app.workspace.setActiveLeaf(centerLeaf, { focus: true });
+                        }
                     }
                     catch (e) {
-                        console.warn("Failed to focus new popout window:", e);
+                        console.warn("Failed to focus center leaf after New Window init:", e);
                     }
                 }
-                if (options.initializeDefaults) {
-                    yield ((_d = this.plugin.activityBars) === null || _d === void 0 ? void 0 : _d.initializeNewWindow(targetWin));
-                }
-                return targetWin;
+                return result.win;
             }
             catch (e) {
                 console.warn("Failed to open new popout window:", e);
@@ -7387,6 +7372,15 @@ class PopoutLayoutEngine {
         });
         return centerPanes;
     }
+    /** 判斷 leaf 的 containerEl 目前是否真的顯示在視窗中（非 display:none / 隱藏 tab）。 */
+    isLeafVisibleInPane(leaf) {
+        var _a;
+        const extLeaf = leaf;
+        const container = extLeaf.containerEl || ((_a = leaf.view) === null || _a === void 0 ? void 0 : _a.containerEl);
+        if (!(container instanceof HTMLElement))
+            return false;
+        return container.offsetParent !== null;
+    }
     /**
      * 同步取得/建立位於 Popout 視窗「中央編輯區」的 WorkspaceLeaf。
      * 用於避免側欄觸發開啟檔案時覆蓋側欄 View。
@@ -7400,11 +7394,15 @@ class PopoutLayoutEngine {
             const isNewTabRequested = newLeaf === true || newLeaf === "tab" || newLeaf === "split";
             if (!isNewTabRequested) {
                 const children = ((_a = targetPane.tabs.children) !== null && _a !== void 0 ? _a : []);
-                for (const leaf of children) {
-                    const extLeaf = leaf;
-                    const isPinned = Boolean(extLeaf.pinned || ((_b = leaf.getViewState()) === null || _b === void 0 ? void 0 : _b.pinned));
+                // 使用者預期：開檔落在「目前顯示（active）的 tab」，而非 tab 群組中的
+                // 第一個 unpinned tab。該 tab 被 pin 時才開新 tab，避免覆蓋使用者
+                // 目前正在看的內容或其他舊 tab。
+                const visibleLeaf = children.find((leaf) => this.isLeafVisibleInPane(leaf));
+                if (visibleLeaf) {
+                    const isPinned = Boolean(visibleLeaf.pinned ||
+                        ((_b = visibleLeaf.getViewState()) === null || _b === void 0 ? void 0 : _b.pinned));
                     if (!isPinned) {
-                        return leaf;
+                        return visibleLeaf;
                     }
                 }
             }
@@ -7707,8 +7705,62 @@ function selectActiveCandidate(state) {
     state.activeId = (_c = active === null || active === void 0 ? void 0 : active.id) !== null && _c !== void 0 ? _c : null;
     state.activeEngine = (_d = active === null || active === void 0 ? void 0 : active.engine) !== null && _d !== void 0 ? _d : null;
 }
+function isPopoutDocument(targetDocument) {
+    const body = targetDocument === null || targetDocument === void 0 ? void 0 : targetDocument.body;
+    return !!body && (body.classList.contains("is-popout-window") || body.classList.contains("mod-popout"));
+}
+function waitForPopoutWindow(leaf) {
+    var _a, _b;
+    return __awaiter(this, void 0, void 0, function* () {
+        const extLeaf = leaf;
+        for (let attempt = 0; attempt < 40; attempt++) {
+            const candidate = (_b = (_a = extLeaf.containerEl) === null || _a === void 0 ? void 0 : _a.ownerDocument) === null || _b === void 0 ? void 0 : _b.defaultView;
+            if (candidate && isPopoutDocument(candidate.document))
+                return candidate;
+            yield new Promise((resolve) => setTimeout(resolve, 50));
+        }
+        return null;
+    });
+}
 function createStableProxy(state) {
     const target = Object.create(null);
+    // Registry-level API（不委託 active engine）：開新 popout、等待 window mount、
+    // 然後依序呼叫所有已註冊 candidate 的 initializeNewPopoutWindow policy。
+    // 無 provider 註冊 initializer 時僅做原生開窗（shared 獨立運作原則）。
+    target.openNewPopoutWindow = () => __awaiter(this, void 0, void 0, function* () {
+        var _a, _b;
+        const engine = state.activeEngine;
+        if (!engine)
+            return null;
+        const workspace = engine.workspace;
+        const leaf = (_a = workspace.openPopoutLeaf) === null || _a === void 0 ? void 0 : _a.call(workspace);
+        if (!leaf)
+            return null;
+        const extLeaf = leaf;
+        yield Promise.resolve(extLeaf.setViewState({ type: "empty" }));
+        const win = yield waitForPopoutWindow(leaf);
+        if (!win) {
+            console.warn("Popout leaf was created, but its Window was not mounted in time.");
+            return null;
+        }
+        try {
+            (_b = win.focus) === null || _b === void 0 ? void 0 : _b.call(win);
+        }
+        catch (e) {
+            console.warn("Failed to focus new popout window:", e);
+        }
+        for (const candidate of state.candidates.values()) {
+            if (candidate.initializeNewPopoutWindow) {
+                try {
+                    yield candidate.initializeNewPopoutWindow(win);
+                }
+                catch (e) {
+                    console.warn(`Popout new-window initializer failed (${candidate.id}):`, e);
+                }
+            }
+        }
+        return { win, leaf };
+    });
     return new Proxy(target, {
         get(proxyTarget, property, receiver) {
             // Let test instrumentation or an explicitly attached property behave
@@ -7807,6 +7859,7 @@ function acquirePopoutLayoutEngine(candidate) {
         compatibleFrom: candidate.compatibleFrom,
         implementationRevision: candidate.implementationRevision,
         engine,
+        initializeNewPopoutWindow: candidate.initializeNewPopoutWindow,
     });
     selectActiveCandidate(state);
     return state.proxy;
@@ -7823,7 +7876,7 @@ const SHARED_API_VERSION = 5;
 /** Oldest shared API version implemented by this copy. */
 const SHARED_COMPATIBLE_FROM_VERSION = 1;
 /** Monotonic implementation identifier used when API versions are equal. */
-const SHARED_IMPLEMENTATION_REVISION = "2026-08-12T16:10:00Z";
+const SHARED_IMPLEMENTATION_REVISION = "2026-08-14T17:00:00Z";
 
 /**
  * Popout Activity Bar 控制器。
@@ -7838,6 +7891,8 @@ class PopoutActivityBarManager {
     constructor(plugin, engine) {
         this.barsByWindow = new WeakMap();
         this.injectedWindows = new Set();
+        /** 初始化中的視窗：初始化期間暫停 syncSidebarColumnClasses，避免過渡狀態誤判。 */
+        this.initializingWindows = new Set();
         this.sidebarHintsByWindow = new WeakMap();
         this.columnEnsurePromises = new WeakMap();
         // ===== 佈局完整性守護 =====
@@ -7880,6 +7935,21 @@ class PopoutActivityBarManager {
      * panel in that sidebar instead.
      */
     initializeNewWindow(win) {
+        return __awaiter(this, void 0, void 0, function* () {
+            if (!win || win.closed)
+                return;
+            this.initializingWindows.add(win);
+            try {
+                yield this.initializeNewWindowInternal(win);
+            }
+            finally {
+                this.initializingWindows.delete(win);
+                // 初始化完成後同步一次 sidebar class（此時結構已完整：左側欄 + 中央 + 右側欄）
+                this.syncSidebarColumnClasses(win);
+            }
+        });
+    }
+    initializeNewWindowInternal(win) {
         var _a, _b, _c, _d, _e;
         return __awaiter(this, void 0, void 0, function* () {
             if (!win || win.closed)
@@ -8464,6 +8534,10 @@ class PopoutActivityBarManager {
      * `flex-grow`（popout 的 resize 機制），sidebar 才不會消失、也才能拖寬。
      */
     syncSidebarColumnClasses(win) {
+        // 初始化中的視窗暫停同步：依序建左右側欄的過渡狀態（2 欄）會被誤判為
+        // 「左側欄 + 右側欄」，把中央編輯區標成側欄。初始化完成後再統一同步。
+        if (this.initializingWindows.has(win))
+            return;
         const columns = this.engine.getTopLevelColumnElements(win);
         const last = columns.length - 1;
         const leftActivityVisible = this.isSideVisibleForWindow(win, "left");
@@ -8994,12 +9068,29 @@ function routeGetLeaf(state, newLeaf) {
     }
     const activeLeaf = engine.getActiveLeafInWindow(activeWindow);
     if (activeLeaf && engine.isLeafInSideColumn(activeWindow, activeLeaf)) {
+        if (newLeaf === "split") {
+            // 側欄 active 時 split：以中央編輯區的 leaf 為錨點，避免 split 到側欄
+            // （原生 splitActiveLeaf 會 split「最近 active 的 leaf」，可能是側欄）。
+            const centerLeaf = engine.getCenterLeafSync(activeWindow);
+            return splitCenterLeaf(state.workspace, centerLeaf);
+        }
         return engine.getCenterLeafSync(activeWindow, newLeaf);
     }
     if (!activeLeaf || getWindowOfLeaf(activeLeaf) !== activeWindow) {
         return engine.getCenterLeafSync(activeWindow, newLeaf);
     }
     return null;
+}
+/** 以中央編輯區 leaf 為錨點建立 split；失敗或無 API 時回傳 null（fallback 原生）。 */
+function splitCenterLeaf(workspace, centerLeaf) {
+    if (!centerLeaf || typeof workspace.createLeafBySplit !== "function")
+        return null;
+    try {
+        return workspace.createLeafBySplit(centerLeaf);
+    }
+    catch (_a) {
+        return null;
+    }
 }
 function routeEnsureSideLeaf(state, viewType, side, options) {
     var _a, _b, _c, _d, _e, _f, _g;
@@ -9234,6 +9325,10 @@ class WindowSpacesPlugin extends obsidian.Plugin {
                 compatibleFrom: SHARED_COMPATIBLE_FROM_VERSION,
                 implementationRevision: SHARED_IMPLEMENTATION_REVISION,
                 create: () => new PopoutLayoutEngine(this.app),
+                // 新 popout window 的初始化 policy：注入 activity bars、依 activityBarDefaults
+                // 建立側欄結構與 sizing。供 Folder Spaces 等外掛經 shared openNewPopoutWindow()
+                // 開啟視窗時，仍由 Window Spaces 統一管理「新視窗行為」。
+                initializeNewPopoutWindow: (win) => this.activityBars ? this.activityBars.initializeNewWindow(win) : Promise.resolve(),
             });
             this.activityBars = new PopoutActivityBarManager(this, this.popoutLayout);
             this.workspaceInterceptor = new WorkspaceInterceptor(this.app, this.popoutLayout);

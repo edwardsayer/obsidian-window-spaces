@@ -559,6 +559,99 @@ describe("WorkspaceInterceptor", () => {
     }
   });
 
+  test("routes getLeaf('split') in popout to split the center leaf (not the side column)", () => {
+    const popoutWin = {
+      document: {
+        body: { classList: { contains: (cls: string) => cls === "is-popout-window" } },
+        hasFocus: () => true,
+      },
+    } as unknown as Window;
+
+    const centerLeaf = { id: "center-editor-leaf", getViewState: () => ({ type: "markdown" }) } as any;
+    const sideLeaf = { id: "file-explorer-leaf", getViewState: () => ({ type: "file-explorer" }) } as any;
+    const splitResult = { id: "split-leaf" } as any;
+
+    const originalGetLeaf = vi.fn().mockReturnValue("main-split-leaf");
+    const createLeafBySplit = vi.fn().mockReturnValue(splitResult);
+    const app = {
+      workspace: {
+        getLeftLeaf: vi.fn(),
+        getRightLeaf: vi.fn(),
+        getLeaf: originalGetLeaf,
+        createLeafBySplit,
+        revealLeaf: vi.fn(),
+        setActiveLeaf: vi.fn(),
+      },
+    } as any;
+
+    const engine = {
+      getActiveLeafInWindow: vi.fn().mockReturnValue(sideLeaf),
+      isLeafInSideColumn: vi.fn().mockImplementation((win, leaf) => leaf === sideLeaf),
+      getCenterLeafSync: vi.fn().mockReturnValue(centerLeaf),
+      openSideLeafSync: vi.fn(),
+    } as any;
+
+    const interceptor = new WorkspaceInterceptor(app, engine);
+    interceptor.isManagedWindow = () => true;
+    interceptor.install();
+    (globalThis as any).activeWindow = popoutWin;
+
+    try {
+      const leaf = app.workspace.getLeaf("split");
+      expect(leaf).toBe(splitResult);
+      expect(engine.getCenterLeafSync).toHaveBeenCalledWith(popoutWin);
+      expect(createLeafBySplit).toHaveBeenCalledWith(centerLeaf);
+      expect(originalGetLeaf).not.toHaveBeenCalled();
+    } finally {
+      interceptor.uninstall();
+      delete (globalThis as any).activeWindow;
+    }
+  });
+
+  test("getLeaf('split') in popout falls back to native when createLeafBySplit is unavailable", () => {
+    const popoutWin = {
+      document: {
+        body: { classList: { contains: (cls: string) => cls === "is-popout-window" } },
+        hasFocus: () => true,
+      },
+    } as unknown as Window;
+
+    const centerLeaf = { id: "center-editor-leaf", getViewState: () => ({ type: "markdown" }) } as any;
+    const sideLeaf = { id: "file-explorer-leaf", getViewState: () => ({ type: "file-explorer" }) } as any;
+
+    const originalGetLeaf = vi.fn().mockReturnValue("native-split-leaf");
+    const app = {
+      workspace: {
+        getLeftLeaf: vi.fn(),
+        getRightLeaf: vi.fn(),
+        getLeaf: originalGetLeaf,
+        revealLeaf: vi.fn(),
+        setActiveLeaf: vi.fn(),
+      },
+    } as any;
+
+    const engine = {
+      getActiveLeafInWindow: vi.fn().mockReturnValue(sideLeaf),
+      isLeafInSideColumn: vi.fn().mockImplementation((win, leaf) => leaf === sideLeaf),
+      getCenterLeafSync: vi.fn().mockReturnValue(centerLeaf),
+      openSideLeafSync: vi.fn(),
+    } as any;
+
+    const interceptor = new WorkspaceInterceptor(app, engine);
+    interceptor.isManagedWindow = () => true;
+    interceptor.install();
+    (globalThis as any).activeWindow = popoutWin;
+
+    try {
+      const leaf = app.workspace.getLeaf("split");
+      expect(leaf).toBe("native-split-leaf");
+      expect(originalGetLeaf).toHaveBeenCalled();
+    } finally {
+      interceptor.uninstall();
+      delete (globalThis as any).activeWindow;
+    }
+  });
+
   test("isLeafInSideColumn detects whether leaf is inside a sidebar-marked column", () => {
     const rootEl = document.createElement("div");
     rootEl.classList.add("workspace-split", "mod-root");

@@ -41,6 +41,8 @@ export class PopoutActivityBarManager {
   private engine: PopoutLayoutEngine;
   private barsByWindow = new WeakMap<Window, WindowBars>();
   private injectedWindows = new Set<Window>();
+  /** 初始化中的視窗：初始化期間暫停 syncSidebarColumnClasses，避免過渡狀態誤判。 */
+  private initializingWindows = new Set<Window>();
   private sidebarHintsByWindow = new WeakMap<Window, SidebarSides>();
   private columnEnsurePromises = new WeakMap<Window, Promise<void>>();
 
@@ -84,6 +86,19 @@ export class PopoutActivityBarManager {
    * panel in that sidebar instead.
    */
   async initializeNewWindow(win: Window): Promise<void> {
+    if (!win || win.closed) return;
+
+    this.initializingWindows.add(win);
+    try {
+      await this.initializeNewWindowInternal(win);
+    } finally {
+      this.initializingWindows.delete(win);
+      // 初始化完成後同步一次 sidebar class（此時結構已完整：左側欄 + 中央 + 右側欄）
+      this.syncSidebarColumnClasses(win);
+    }
+  }
+
+  private async initializeNewWindowInternal(win: Window): Promise<void> {
     if (!win || win.closed) return;
 
     this.injectForWindow(win);
@@ -723,6 +738,9 @@ export class PopoutActivityBarManager {
    * `flex-grow`（popout 的 resize 機制），sidebar 才不會消失、也才能拖寬。
    */
   private syncSidebarColumnClasses(win: Window): void {
+    // 初始化中的視窗暫停同步：依序建左右側欄的過渡狀態（2 欄）會被誤判為
+    // 「左側欄 + 右側欄」，把中央編輯區標成側欄。初始化完成後再統一同步。
+    if (this.initializingWindows.has(win)) return;
     const columns = this.engine.getTopLevelColumnElements(win);
     const last = columns.length - 1;
     const leftActivityVisible = this.isSideVisibleForWindow(win, "left");

@@ -130,4 +130,57 @@ describe("Popout layout registry", () => {
 
     expect((stable as unknown as { marker: string }).marker).toBe("broad");
   });
+
+  test("openNewPopoutWindow opens a popout, waits for mount, and broadcasts initializers", async () => {
+    const popoutWindow = {
+      document: {
+        body: { classList: { contains: (c: string) => c === "is-popout-window" } },
+      },
+      focus: vi.fn(),
+    } as unknown as Window;
+    const leaf: any = {
+      containerEl: { ownerDocument: { defaultView: null } },
+      setViewState: vi.fn(async () => {
+        await Promise.resolve();
+        leaf.containerEl.ownerDocument.defaultView = popoutWindow;
+      }),
+    };
+    const initializer = vi.fn();
+    const stable = acquirePopoutLayoutEngine({
+      id: "test-window",
+      apiVersion: 5,
+      compatibleFrom: 1,
+      implementationRevision: "2026-08-14T17:00:00Z",
+      create: () =>
+        ({ workspace: { openPopoutLeaf: () => leaf } }) as unknown as PopoutLayoutEngine,
+      initializeNewPopoutWindow: initializer,
+    });
+
+    const result = await stable.openNewPopoutWindow();
+
+    expect(leaf.setViewState).toHaveBeenCalledWith({ type: "empty" });
+    expect(initializer).toHaveBeenCalledWith(popoutWindow);
+    expect(result?.win).toBe(popoutWindow);
+    expect(popoutWindow.focus).toHaveBeenCalled();
+  });
+
+  test("openNewPopoutWindow resolves null when the popout window never mounts", async () => {
+    const leaf: any = {
+      containerEl: { ownerDocument: { defaultView: null } },
+      setViewState: vi.fn(async () => {
+        await Promise.resolve();
+      }),
+    };
+    const stable = acquirePopoutLayoutEngine({
+      id: "test-window",
+      apiVersion: 5,
+      compatibleFrom: 1,
+      implementationRevision: "2026-08-14T17:00:00Z",
+      create: () =>
+        ({ workspace: { openPopoutLeaf: () => leaf } }) as unknown as PopoutLayoutEngine,
+    });
+
+    const result = await stable.openNewPopoutWindow();
+    expect(result).toBeNull();
+  });
 });

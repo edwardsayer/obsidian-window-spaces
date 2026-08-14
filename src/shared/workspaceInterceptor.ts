@@ -32,6 +32,11 @@ interface InterceptableWorkspace {
     side: "left" | "right",
     options?: EnsureSideLeafOptions
   ) => Promise<WorkspaceLeaf>;
+  createLeafBySplit?: (
+    leaf: WorkspaceLeaf,
+    direction?: "vertical" | "horizontal",
+    before?: boolean
+  ) => WorkspaceLeaf;
   __workspaceInterceptorInstalled?: boolean;
   __workspaceInterceptorOriginalGetLeftLeaf?: (split: boolean) => WorkspaceLeaf | null;
   __workspaceInterceptorOriginalGetRightLeaf?: (split: boolean) => WorkspaceLeaf | null;
@@ -175,6 +180,12 @@ function routeGetLeaf(
 
   const activeLeaf = engine.getActiveLeafInWindow(activeWindow);
   if (activeLeaf && engine.isLeafInSideColumn(activeWindow, activeLeaf)) {
+    if (newLeaf === "split") {
+      // 側欄 active 時 split：以中央編輯區的 leaf 為錨點，避免 split 到側欄
+      // （原生 splitActiveLeaf 會 split「最近 active 的 leaf」，可能是側欄）。
+      const centerLeaf = engine.getCenterLeafSync(activeWindow);
+      return splitCenterLeaf(state.workspace, centerLeaf);
+    }
     return engine.getCenterLeafSync(activeWindow, newLeaf);
   }
 
@@ -183,6 +194,19 @@ function routeGetLeaf(
   }
 
   return null;
+}
+
+/** 以中央編輯區 leaf 為錨點建立 split；失敗或無 API 時回傳 null（fallback 原生）。 */
+function splitCenterLeaf(
+  workspace: InterceptableWorkspace,
+  centerLeaf: WorkspaceLeaf | null
+): WorkspaceLeaf | null {
+  if (!centerLeaf || typeof workspace.createLeafBySplit !== "function") return null;
+  try {
+    return workspace.createLeafBySplit(centerLeaf);
+  } catch {
+    return null;
+  }
 }
 
 async function routeEnsureSideLeaf(
