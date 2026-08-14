@@ -13,6 +13,8 @@ export interface WorkspaceParent {
   kind?: string;
   children?: (WorkspaceLeaf | WorkspaceParent)[];
   containerEl?: HTMLElement;
+  insertChild?: (index: number, item: WorkspaceParent) => void;
+  removeChild?: (item: WorkspaceParent) => void;
 }
 
 export interface ExtendedWorkspaceLeaf extends Omit<WorkspaceLeaf, "parent"> {
@@ -63,6 +65,22 @@ export interface PopoutColumn {
   left: number;
   width: number;
   panes: PopoutPane[];
+}
+
+/**
+ * 實體側欄映射（由 plugin 同步）。
+ *
+ * - left/right：該側「目前」是否有 sidebar（= 該側 activity bar 顯示）。
+ * - originalCount：首次記錄時的頂層欄位數（記憶原始結構，供補欄判斷）。
+ * - initialLeft/initialRight：首次記錄時兩側 activity bar 可見性。
+ *   需求欄位數 = originalCount + Σ(目前顯示 − 初始顯示)。
+ */
+export interface SidebarSides {
+  left: boolean;
+  right: boolean;
+  originalCount?: number;
+  initialLeft?: boolean;
+  initialRight?: boolean;
 }
 
 /** 判斷 DOM Window 是否為 Popout。 */
@@ -277,7 +295,7 @@ function isSidebarColumnElement(columnEl: HTMLElement | null | undefined): boole
 
 export class PopoutLayoutEngine {
   private app: App;
-  private sidebarSidesByWindow = new WeakMap<Window, { left: boolean; right: boolean }>();
+  private sidebarSidesByWindow = new WeakMap<Window, SidebarSides>();
 
   constructor(app: App) {
     this.app = app;
@@ -319,11 +337,11 @@ export class PopoutLayoutEngine {
   }
 
   /** Record which endpoint columns are real sidebars for a newly-created Popout. */
-  setSidebarSides(win: Window, sides: { left: boolean; right: boolean }): void {
+  setSidebarSides(win: Window, sides: SidebarSides): void {
     this.sidebarSidesByWindow.set(win, { ...sides });
   }
 
-  getSidebarSides(win: Window): { left: boolean; right: boolean } | undefined {
+  getSidebarSides(win: Window): SidebarSides | undefined {
     const sides = this.sidebarSidesByWindow.get(win);
     return sides ? { ...sides } : undefined;
   }
@@ -413,12 +431,12 @@ export class PopoutLayoutEngine {
    * - viewType 無值：僅確保欄位存在並回傳一個空 leaf（供攔截器由第三方設定 view）。
    *
    * 主動定位語意：open-in-left/right-sidebar 應把 view 開到「最左/最右邊的 split」。
-   * 因此當該側沒有被標記為 sidebar 的欄位時（例如 activity bar 未開啟），仍回退到
-   * 最左/最右現有的頂層欄位；完全沒有欄位時才建立新的垂直 Split 欄位。
+   * 該側沒有側欄欄位（getColumnElement null，例如欄位數不足或 activity bar 未開）時
+   * 直接建立新的頂層欄位，不再回退塞入現有的最外欄位（避免把 view 誤塞進內容欄位）。
    */
   async ensureSideColumn(win: Window, side: PopoutSide, viewType?: string): Promise<WorkspaceLeaf> {
     const workspace = this.workspace;
-    const columnEl = this.getColumnElement(win, side) ?? this.getEdgeColumnElement(win, side);
+    const columnEl = this.getColumnElement(win, side);
 
     if (columnEl) {
       const tabs = this.getSidebarTabsInColumn(win, columnEl);
@@ -525,8 +543,9 @@ export class PopoutLayoutEngine {
    */
   openSideLeafSync(win: Window, side: PopoutSide): WorkspaceLeaf | null {
     const workspace = this.workspace;
-    // 與 ensureSideColumn 相同的主動定位語意：無標記側欄時回退到最左/最右欄位。
-    const columnEl = this.getColumnElement(win, side) ?? this.getEdgeColumnElement(win, side);
+    // 與 ensureSideColumn 相同的主動定位語意：該側沒有側欄欄位時直接建立
+    // 新的頂層欄位，不回退塞入現有的最外欄位。
+    const columnEl = this.getColumnElement(win, side);
 
     if (columnEl) {
       const tabs = this.getSidebarTabsInColumn(win, columnEl);
@@ -728,15 +747,100 @@ export class PopoutLayoutEngine {
       return this.createLeafInTabs(targetPane.tabs);
     }
 
-    // 尚無中央編輯區 (例如 Popout 視窗目前只有側欄欄位)：建立垂直 Split 放置中央區
+    // 尚無中央編輯區（例如 Popout 只有側欄欄位）：建立新的頂層欄位放中央。
+    // Obsidian 的 createLeafBySplit 沿 target leaf 向上找第一個 WorkspaceSplit，
+    // 因此對「頂層 tabs」的 leaf 會在 root 層級建欄；對巢狀結構（如 Professional
+    // 兩欄皆為 split）則建在欄位內部或抛錯。建立後必須驗證頂層欄位數是否增加。
     const baseLeaf = this.getActiveLeafInWindow(win) || this.getLastLeafInWindow(win);
     if (!baseLeaf) {
       return workspace.getLeaf("tab");
     }
 
     const targetNode = getTopLevelNodeInWindow(baseLeaf) || baseLeaf;
-    const centerLeaf = workspace.createLeafBySplit(targetNode as WorkspaceLeaf, "vertical", false);
+    const topCountBefore = this.getTopLevelColumnElements(win).length;
+    // 建欄前記錄兩側欄位權重（建欄後還原，避免 Obsidian 重排時覆蓋）
+    const flexSnapshot = this.getTopLevelColumnElements(win).map(
+      (col) => Number(col.style.flexGrow || getComputedStyle(col).flexGrow) || 0
+    );
+    let centerLeaf: WorkspaceLeaf;
+    try {
+      centerLeaf = workspace.createLeafBySplit(targetNode as WorkspaceLeaf, "vertical", false);
+    } catch {
+      centerLeaf = null as unknown as WorkspaceLeaf;
+    }
+    const topCountAfter = this.getTopLevelColumnElements(win).length;
+    if (!centerLeaf || topCountAfter <= topCountBefore) {
+      // 巢狀結構無法建立頂層欄位 → fallback：開進「含 editor view 的 tabs」
+      // （如 Professional 欄0 內部的編輯群組），否則任一 leaf。
+      return this.pickBestEditorLeaf(win) || workspace.getLeaf("tab");
+    }
+
+    // 新欄位移到「第一個 column 之後」（index 1），並分配 flex 權重
+    const windowRoot = this.getWindowRootOf(win);
+    if (windowRoot && typeof windowRoot.removeChild === "function") {
+      const newTabs = (centerLeaf as unknown as ExtendedWorkspaceLeaf).parent;
+      if (newTabs) {
+        const children = (windowRoot.children ?? []) as WorkspaceParent[];
+        const newIdx = children.indexOf(newTabs);
+        if (newIdx >= 0 && newIdx !== 1 && typeof windowRoot.insertChild === "function") {
+          windowRoot.removeChild(newTabs);
+          windowRoot.insertChild(1, newTabs);
+        }
+      }
+    }
+    this.applyNewColumnSizing(win, centerLeaf, flexSnapshot);
     return centerLeaf;
+  }
+
+  /** 找出「含 editor view」的 leaf（開檔 fallback 用），否則第一個 leaf。 */
+  private pickBestEditorLeaf(win: Window): WorkspaceLeaf | null {
+    const editorViewTypes = new Set(["markdown", "pdf", "canvas", "excalidraw", "image", "audio", "video"]);
+    const leaves = this.getLeavesForWindow(win);
+    for (const leaf of leaves) {
+      const type = leaf.getViewState()?.type;
+      if (type && editorViewTypes.has(type)) return leaf;
+    }
+    return leaves[0] ?? null;
+  }
+
+  /** 取得指定視窗的 window root 節點（type === "window" 的最外層容器）。 */
+  private getWindowRootOf(win: Window): WorkspaceParent | null {
+    const leaves = this.getLeavesForWindow(win);
+    for (const leaf of leaves) {
+      let p = (leaf as unknown as ExtendedWorkspaceLeaf).parent;
+      while (p) {
+        if (p.type === "window" && Array.isArray(p.children)) return p;
+        p = p.parent;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * 新欄位建立後分配權重：最左/最右欄位還原建欄前權重，
+   * 新欄位（中央 content）取中間權重。透過 Obsidian 的 setDimension
+   * （等同 flex-grow 權重）設定，避免 inline style 被 Obsidian 重算覆蓋。
+   */
+  private applyNewColumnSizing(win: Window, centerLeaf: WorkspaceLeaf, flexSnapshot: number[]): void {
+    const windowRoot = this.getWindowRootOf(win);
+    const children = (windowRoot?.children ?? []) as WorkspaceParent[];
+    if (children.length < 3) return;
+    children.forEach((child, i) => {
+      let dimension: number;
+      if (i === 0) {
+        dimension = flexSnapshot[0] || 20;
+      } else if (i === children.length - 1) {
+        dimension = flexSnapshot[flexSnapshot.length - 1] || 20;
+      } else {
+        dimension = 40; // 新中央 content 權重
+      }
+      const item = child as WorkspaceParent & {
+        setDimension?: (value: number) => void;
+      };
+      if (typeof item.setDimension === "function") {
+        item.setDimension(dimension);
+      }
+    });
   }
 
   // ===== 隱藏/還原 =====
@@ -779,7 +883,8 @@ export class PopoutLayoutEngine {
    *
    * 語意：主動/實體定位（open-in-sidebar、hide/show column、隱藏狀態 capture/apply）。
    * - 有 hints（activityBar 寫入的物理側欄映射）：該側有側欄 → 最左/最右欄位；
-   *   該側無側欄 → null。
+   *   該側無側欄 → null。欄位數低於「需求欄位數」時也回 null（側欄可能被
+   *   close all 刪除，由 plugin 的完整性守護補欄）。
    * - 無 hints（非 Window Spaces 管理或尚未同步）：以 UI 標記
    *   （window-spaces-sidebar-column class）保守推斷；無標記 → null。
    *
@@ -793,8 +898,21 @@ export class PopoutLayoutEngine {
     const configuredSides = this.sidebarSidesByWindow.get(win);
     if (configuredSides) {
       if (!configuredSides[side]) return null;
-      const requiredColumns = Number(configuredSides.left) + Number(configuredSides.right) + 1;
-      if (this.getTopLevelColumnElements(win).length < requiredColumns) return null;
+      let requiredColumns: number;
+      if (typeof configuredSides.originalCount === "number") {
+        // 新式 hints：需求欄位數 = 原始欄位數 + activity bar 新開啟的側數。
+        // Professional 這類原始 2 欄的空間（兩側皆 sidebar）需求為 2；
+        // 原本 3 欄被 close all 破壞成 2 欄時需求為 3 → 回 null → 補欄。
+        const initialLeft = configuredSides.initialLeft ?? configuredSides.left;
+        const initialRight = configuredSides.initialRight ?? configuredSides.right;
+        const leftDelta = (configuredSides.left ? 1 : 0) - (initialLeft ? 1 : 0);
+        const rightDelta = (configuredSides.right ? 1 : 0) - (initialRight ? 1 : 0);
+        requiredColumns = configuredSides.originalCount + leftDelta + rightDelta;
+      } else {
+        // 舊式 hints（相容）：需求欄位數 = left + right + 1
+        requiredColumns = Number(configuredSides.left) + Number(configuredSides.right) + 1;
+      }
+      if (this.getTopLevelColumnElements(win).length < Math.max(2, requiredColumns)) return null;
       return edge;
     }
     return isSidebarColumnElement(edge) ? edge : null;

@@ -790,7 +790,18 @@ describe("WindowLayoutsModal restore target", () => {
     const plugin = Object.assign(Object.create(WindowSpacesPlugin.prototype), {
       app,
       manager: { getActiveWindow: () => popoutWin },
-      popoutLayout: new PopoutLayoutEngine(app as any),
+      popoutLayout: (() => {
+        const engine = new PopoutLayoutEngine(app as any);
+        // 模擬 managed popout：兩側皆有側欄 hints（originalCount 2 = 欄位數）
+        engine.setSidebarSides(popoutWin, {
+          left: true,
+          right: true,
+          originalCount: 2,
+          initialLeft: true,
+          initialRight: true,
+        });
+        return engine;
+      })(),
     });
 
     // 1. 開啟在 Left Sidebar -> 已有 leftPanelLeaf 在 leftTabs 中，重用該 panel

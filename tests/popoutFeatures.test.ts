@@ -186,6 +186,14 @@ describe("popoutLayout helpers", () => {
     } as any;
 
     const engine = new PopoutLayoutEngine({ workspace } as any);
+    // 模擬 managed popout：兩側皆有側欄 hints（originalCount 2 = 欄位數）
+    engine.setSidebarSides(window, {
+      left: true,
+      right: true,
+      originalCount: 2,
+      initialLeft: true,
+      initialRight: true,
+    });
     // active leaf 在 top pane → ensureSideColumn 應在 top tabs 建立 leaf
     const leaf = await engine.ensureSideColumn(window, "left", "window-spaces-layouts");
     expect(leaf.parent).toBe(leftTopTabs);
@@ -1433,5 +1441,197 @@ describe("viewRegistry enumeration", () => {
       "b-view",
       "z-view",
     ]);
+  });
+});
+
+describe("2-column layout sidebar inference (legacy / non-standard spaces)", () => {
+  /**
+   * 建立 2-column 結構：column 0 = vertical split（左欄 sidebar views + 中間
+   * markdown editor 同欄），column 1 = 純 sidebar views。模擬 Professional
+   * 這類由主視窗區域另開 popout 而保存的非標準 layout。
+   */
+  function buildTwoColumn() {
+    document.body.replaceChildren();
+    const rootEl = document.createElement("div");
+    rootEl.classList.add("workspace-split", "mod-root");
+    document.body.appendChild(rootEl);
+
+    const col0 = document.createElement("div");
+    col0.classList.add("workspace-split");
+    const leftTabsEl = document.createElement("div");
+    leftTabsEl.classList.add("workspace-tabs");
+    const midTabsEl = document.createElement("div");
+    midTabsEl.classList.add("workspace-tabs");
+    col0.appendChild(leftTabsEl);
+    col0.appendChild(midTabsEl);
+
+    const col1 = document.createElement("div");
+    col1.classList.add("workspace-tabs");
+    rootEl.appendChild(col0);
+    rootEl.appendChild(col1);
+
+    const mkLeaf = (type: string) => {
+      const containerEl = document.createElement("div");
+      const leaf = {
+        containerEl,
+        view: { containerEl },
+        getViewState: () => ({ type }),
+        getViewType: () => type,
+        tabEl: document.createElement("div"),
+      };
+      return leaf;
+    };
+    const leftLeaf = mkLeaf("folder-spaces-explorer");
+    const midLeaf = mkLeaf("markdown");
+    const rightLeaf = mkLeaf("bookmarks");
+    leftTabsEl.appendChild(leftLeaf.containerEl);
+    midTabsEl.appendChild(midLeaf.containerEl);
+    col1.appendChild(rightLeaf.containerEl);
+
+    const workspace = {
+      getMostRecentLeaf: () => midLeaf,
+      iterateAllLeaves: (cb: (leaf: any) => void) => {
+        cb(leftLeaf);
+        cb(midLeaf);
+        cb(rightLeaf);
+      },
+      revealLeaf: vi.fn().mockResolvedValue(undefined),
+      setActiveLeaf: vi.fn(),
+    };
+    const app = { workspace } as any;
+    const engine = new PopoutLayoutEngine(app);
+    const manager = new PopoutActivityBarManager(
+      {
+        app,
+        settings: {
+          activityBarDefaults: { left: true, right: true },
+          activityBars: {
+            left: [{ viewType: "window-spaces-layouts", side: "left" }],
+            right: [{ viewType: "bookmarks", side: "right" }],
+          },
+          spaces: [
+            {
+              id: "prof",
+              name: "Professional",
+              activityBars: {
+                left: { show: true, items: [{ viewType: "window-spaces-layouts", side: "left" }] },
+                right: { show: true, items: [{ viewType: "bookmarks", side: "right" }] },
+              },
+              workspace: { layout: { type: "window", children: [] } },
+            },
+          ],
+        } as any,
+      },
+      engine
+    );
+    (window as any)._windowSpacesLayoutId = "prof";
+
+    return { manager, engine, col0, leftTabsEl, midTabsEl, col1 };
+  }
+
+  test("editor-holding left column is a sidebar when an activity bar is adjacent", async () => {
+    const { manager, engine, col0, leftTabsEl, midTabsEl, col1 } = buildTwoColumn();
+
+    await (manager as any).ensureLayoutColumns(window);
+    (manager as any).syncSidebarColumnClasses(window);
+
+    // 規則：activity bar 旁的最外層欄位就是 sidebar（不看欄位內容）。
+    // 左欄與中間 markdown 同欄 ⇒ 整個 column 0 是左側欄（即使含 editor）。
+    expect(engine.getSidebarSides(window)).toMatchObject({ left: true, right: true });
+
+    // column 0（含 editor）被標記成 sidebar 樣式
+    expect(col0.classList.contains("mod-left-split")).toBe(true);
+    expect(col0.classList.contains("mod-sidedock")).toBe(true);
+    expect(leftTabsEl.classList.contains("mod-sidedock")).toBe(true);
+    expect(midTabsEl.classList.contains("mod-sidedock")).toBe(true);
+    expect(col1.classList.contains("mod-right-split")).toBe(true);
+    expect(col1.classList.contains("mod-sidedock")).toBe(true);
+
+    // 兩側欄都可定址（toggle / view 按鈕有效）
+    expect(engine.getColumnElement(window, "right")).toBe(col1);
+    expect(engine.getColumnElement(window, "left")).toBe(col0);
+  });
+
+  test("3-column standard layout still infers both sidebars", async () => {
+    document.body.replaceChildren();
+    const rootEl = document.createElement("div");
+    rootEl.classList.add("workspace-split", "mod-root");
+    document.body.appendChild(rootEl);
+
+    const mkLeaf = (type: string) => {
+      const containerEl = document.createElement("div");
+      const leaf = {
+        containerEl,
+        view: { containerEl },
+        getViewState: () => ({ type }),
+        getViewType: () => type,
+        tabEl: document.createElement("div"),
+      };
+      return leaf;
+    };
+    const leftLeaf = mkLeaf("folder-spaces-explorer");
+    const centerLeaf = mkLeaf("markdown");
+    const rightLeaf = mkLeaf("bookmarks");
+
+    const leftCol = document.createElement("div");
+    leftCol.classList.add("workspace-tabs");
+    leftCol.appendChild(leftLeaf.containerEl);
+    const centerCol = document.createElement("div");
+    centerCol.classList.add("workspace-tabs");
+    centerCol.appendChild(centerLeaf.containerEl);
+    const rightCol = document.createElement("div");
+    rightCol.classList.add("workspace-tabs");
+    rightCol.appendChild(rightLeaf.containerEl);
+    rootEl.appendChild(leftCol);
+    rootEl.appendChild(centerCol);
+    rootEl.appendChild(rightCol);
+
+    const workspace = {
+      getMostRecentLeaf: () => centerLeaf,
+      iterateAllLeaves: (cb: (leaf: any) => void) => {
+        cb(leftLeaf);
+        cb(centerLeaf);
+        cb(rightLeaf);
+      },
+      revealLeaf: vi.fn().mockResolvedValue(undefined),
+      setActiveLeaf: vi.fn(),
+    };
+    const app = { workspace } as any;
+    const engine = new PopoutLayoutEngine(app);
+    const manager = new PopoutActivityBarManager(
+      {
+        app,
+        settings: {
+          activityBarDefaults: { left: true, right: true },
+          activityBars: {
+            left: [{ viewType: "window-spaces-layouts", side: "left" }],
+            right: [{ viewType: "bookmarks", side: "right" }],
+          },
+          spaces: [
+            {
+              id: "three",
+              name: "Three",
+              activityBars: {
+                left: { show: true, items: [] },
+                right: { show: true, items: [] },
+              },
+              workspace: { layout: { type: "window", children: [] } },
+            },
+          ],
+        } as any,
+      },
+      engine
+    );
+    (window as any)._windowSpacesLayoutId = "three";
+
+    await (manager as any).ensureLayoutColumns(window);
+    (manager as any).syncSidebarColumnClasses(window);
+
+    expect(engine.getSidebarSides(window)).toMatchObject({ left: true, right: true });
+    expect(engine.getColumnElement(window, "left")).toBe(leftCol);
+    expect(engine.getColumnElement(window, "right")).toBe(rightCol);
+    expect(leftCol.classList.contains("mod-left-split")).toBe(true);
+    expect(rightCol.classList.contains("mod-right-split")).toBe(true);
+    expect(centerCol.classList.contains("mod-sidedock")).toBe(false);
   });
 });

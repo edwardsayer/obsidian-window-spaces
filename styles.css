@@ -1398,6 +1398,14 @@ body.is-popout-window .workspace-tab-header-spacer {
   border: none !important;
   box-shadow: none !important;
 }
+.window-spaces-activity-btn.is-disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.window-spaces-activity-btn.is-disabled:hover {
+  background-color: transparent;
+  color: var(--text-muted);
+}
 .window-spaces-activity-btn svg {
   width: var(--icon-s, 16px);
   height: var(--icon-s, 16px);
