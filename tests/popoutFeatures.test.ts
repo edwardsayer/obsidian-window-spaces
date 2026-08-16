@@ -1305,6 +1305,72 @@ describe("PopoutActivityBarManager toggle behavior", () => {
     document.body.removeChild(rootEl);
   });
 
+  test("all splits in a multi-split sidebar column clear sidebar classes when activity bar is hidden", () => {
+    const rootEl = document.createElement("div");
+    rootEl.classList.add("workspace-split", "mod-root");
+
+    const leftSplitEl = document.createElement("div");
+    leftSplitEl.classList.add("workspace-split", "mod-horizontal", "window-spaces-sidebar-column");
+    const leftTopTabsEl = document.createElement("div");
+    leftTopTabsEl.classList.add("workspace-tabs", "window-spaces-sidebar-column", "mod-sidedock", "mod-left-split");
+    const leftTopLeafEl = document.createElement("div");
+    leftTopTabsEl.appendChild(leftTopLeafEl);
+    leftSplitEl.appendChild(leftTopTabsEl);
+
+    const leftBottomTabsEl = document.createElement("div");
+    leftBottomTabsEl.classList.add("workspace-tabs", "mod-sidedock", "mod-left-split");
+    const leftBottomLeafEl = document.createElement("div");
+    leftBottomTabsEl.appendChild(leftBottomLeafEl);
+    leftSplitEl.appendChild(leftBottomTabsEl);
+    rootEl.appendChild(leftSplitEl);
+
+    const centerColEl = document.createElement("div");
+    centerColEl.classList.add("workspace-tabs");
+    const centerLeafEl = document.createElement("div");
+    centerColEl.appendChild(centerLeafEl);
+    rootEl.appendChild(centerColEl);
+
+    document.body.appendChild(rootEl);
+
+    const leftTopLeaf = { containerEl: leftTopLeafEl, view: { containerEl: leftTopLeafEl } } as any;
+    const leftBottomLeaf = { containerEl: leftBottomLeafEl, view: { containerEl: leftBottomLeafEl } } as any;
+    const centerLeaf = { containerEl: centerLeafEl, view: { containerEl: centerLeafEl } } as any;
+
+    const workspace = {
+      iterateAllLeaves: (cb: (leaf: any) => void) => {
+        cb(leftTopLeaf);
+        cb(leftBottomLeaf);
+        cb(centerLeaf);
+      },
+    } as any;
+    const app = { workspace } as any;
+    const engine = new PopoutLayoutEngine(app);
+    const manager = new PopoutActivityBarManager(
+      {
+        app,
+        settings: { showActivityBars: false, activityBarDefaults: { left: false, right: false } },
+      } as any,
+      engine
+    );
+
+    (manager as any).syncSidebarColumnClasses(window);
+
+    // 頂層 split 容器與內部所有的 tabs 皆必須完全清除 sidebar class
+    expect(leftSplitEl.classList.contains("window-spaces-sidebar-column")).toBe(false);
+    expect(leftSplitEl.classList.contains("mod-sidedock")).toBe(false);
+    expect(leftSplitEl.classList.contains("mod-left-split")).toBe(false);
+
+    expect(leftTopTabsEl.classList.contains("window-spaces-sidebar-column")).toBe(false);
+    expect(leftTopTabsEl.classList.contains("mod-sidedock")).toBe(false);
+    expect(leftTopTabsEl.classList.contains("mod-left-split")).toBe(false);
+
+    expect(leftBottomTabsEl.classList.contains("window-spaces-sidebar-column")).toBe(false);
+    expect(leftBottomTabsEl.classList.contains("mod-sidedock")).toBe(false);
+    expect(leftBottomTabsEl.classList.contains("mod-left-split")).toBe(false);
+
+    document.body.removeChild(rootEl);
+  });
+
   test("view button hides the sidebar when its view is displayed even if another view is workspace-active", async () => {
     const { manager, win, rightColEl, bookmarksLeaf, tagLeaf } = buildManager();
     // 模擬：使用者先點擊側欄外的 view（center 為 workspace active），bookmarks 的 tab

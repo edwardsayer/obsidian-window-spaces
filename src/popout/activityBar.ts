@@ -218,6 +218,23 @@ export class PopoutActivityBarManager {
     return hints;
   }
 
+  /**
+   * 清除該視窗的側欄 hints，讓下一次 ensureSidebarHints 以目前的頂層欄位數
+   * 重新記錄 originalCount。用於 leaf 層級重建（rebuildTargetWindowStructure）
+   * 完成後：舊 hints 的 originalCount 記錄的是重建前的欄位數，若重建後欄位
+   * 數減少，ensureLayoutIntegrity 會誤判側欄缺失而重複補欄（多出一個欄位）。
+   * 這裡不修改 shared engine 的刪除 API，僅以「目前顯示狀態」覆寫 sides，
+   * 使 getColumnElement 走舊式欄位數判斷（需求 = left + right + 1）。
+   */
+  resetSidebarHints(win: Window): void {
+    if (!win || win.closed) return;
+    this.sidebarHintsByWindow.delete(win);
+    this.engine.setSidebarSides(win, {
+      left: this.isSideVisibleForWindow(win, "left"),
+      right: this.isSideVisibleForWindow(win, "right"),
+    });
+  }
+
   private async waitForLayoutFrame(win: Window): Promise<void> {
     const raf = win.requestAnimationFrame?.bind(win);
     if (raf) {
@@ -779,9 +796,20 @@ export class PopoutActivityBarManager {
       el.classList.toggle("mod-right-split", isRightSidebar);
       const tabGroups = this.getSidebarTabGroups(el);
       tabGroups.forEach((tabsEl) => {
+        if (tabsEl !== el) {
+          tabsEl.classList.remove("window-spaces-sidebar-column");
+        }
         tabsEl.classList.toggle("mod-sidedock", isSidebar);
         tabsEl.classList.toggle("mod-left-split", isLeftSidebar);
         tabsEl.classList.toggle("mod-right-split", isRightSidebar);
+      });
+      el.querySelectorAll<HTMLElement>(".workspace-split").forEach((nestedSplit) => {
+        if (nestedSplit !== el) {
+          nestedSplit.classList.remove("window-spaces-sidebar-column");
+          nestedSplit.classList.toggle("mod-sidedock", isSidebar);
+          nestedSplit.classList.toggle("mod-left-split", isLeftSidebar);
+          nestedSplit.classList.toggle("mod-right-split", isRightSidebar);
+        }
       });
       if (isSidebar) {
         this.ensureSidebarFileTabIcons(win, el);

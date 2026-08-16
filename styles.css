@@ -1477,6 +1477,11 @@ body.is-popout-window.has-window-space-color.has-space-accents-tab {
     var(--window-space-color) 35%,
     var(--background-modifier-border)
   );
+  --tab-divider-color: color-mix(
+    in srgb,
+    var(--tab-outline-color) 40%,
+    transparent
+  );
 }
 
 body.is-popout-window.has-window-space-color.has-space-accents-tab
@@ -1500,10 +1505,14 @@ body.is-popout-window.has-window-space-color.has-space-accents-tab
   background: transparent !important;
 }
 
-/* tab 之間的 1px 垂直分隔線（inner::after）套用 accent 色 */
+/* tab 之間的 1px 垂直分隔線（inner::after）套用更透明的 accent 色 */
 body.is-popout-window.has-window-space-color.has-space-accents-tab
   .workspace-tab-header-inner::after {
-  background-color: var(--tab-outline-color) !important;
+  background-color: color-mix(
+    in srgb,
+    var(--tab-outline-color) 40%,
+    transparent
+  ) !important;
 }
 
 /* tab 的 pin 圖示（pip button）套用 accent color */
@@ -1513,16 +1522,48 @@ body.is-popout-window.has-window-space-color
 }
 
 /* 2. Splitters: 窗格調整分隔線常態微光與 Hover / 拖曳高亮 */
+/* 當欄位（包含左側欄、右側欄或編輯區）為上下分割（mod-horizontal）時，其內部各 tab 之間的 handle
+   必須為橫向分隔線（row-resize），覆蓋 Obsidian 原生 .mod-right-split 將其誤設為縱向 col-resize 的問題。 */
+body.is-popout-window .workspace-split.mod-horizontal > * > .workspace-leaf-resize-handle {
+  bottom: 0 !important;
+  top: unset !important;
+  inset-inline-start: 0 !important;
+  inset-inline-end: 0 !important;
+  width: 100% !important;
+  height: var(--divider-width-hover) !important;
+  cursor: row-resize !important;
+  border-bottom-style: solid !important;
+  border-bottom-width: var(--divider-width) !important;
+  border-inline-start-style: none !important;
+  border-inline-end-style: none !important;
+  border-top-style: none !important;
+}
+
+/* 縱向欄位間的分隔線（左側欄與編輯區、編輯區與右側欄）由前一欄的 right-edge handle 負責；
+   隱藏 mod-root 最後一欄自身頂層的 handle（> :last-child > .workspace-leaf-resize-handle），
+   避免右側欄左緣產生重複 handle 且拖曳時誤位移右側邊框（此規則不影響最後一欄內部的子 split）；
+   若右側欄收合隱藏（.window-spaces-column-hidden），則前一欄右側 handle 自動隱藏。 */
+body.is-popout-window .workspace-split.mod-root > :last-child > .workspace-leaf-resize-handle {
+  display: none !important;
+}
+
+body.is-popout-window .workspace-split.mod-root > *:has(+ .window-spaces-column-hidden) > .workspace-leaf-resize-handle {
+  display: none !important;
+}
+
 body.is-popout-window.has-window-space-color.has-space-accents-splitter
   .workspace-leaf-resize-handle {
-  /* 2026-02 反饋：30% mix 在 sidebar 的 secondary 背景上對比不足，右側 handle 看起來
-     像 panel border 而非可拉曳的 splitter；調亮至 40% 讓左右一致明顯。 */
   background-color: color-mix(
     in srgb,
     var(--window-space-color) 40%,
     var(--background-modifier-border)
   ) !important;
-  transition: background-color 0.15s ease, box-shadow 0.15s ease !important;
+  border-color: color-mix(
+    in srgb,
+    var(--window-space-color) 40%,
+    var(--background-modifier-border)
+  ) !important;
+  transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease !important;
 }
 
 body.is-popout-window.has-window-space-color.has-space-accents-splitter
@@ -1530,8 +1571,6 @@ body.is-popout-window.has-window-space-color.has-space-accents-splitter
 body.is-popout-window.has-window-space-color.has-space-accents-splitter
   .workspace-leaf-resize-handle:active {
   background-color: var(--window-space-color) !important;
-  /* 2026-02 反饋：Obsidian 的 hover 會把 handle border 改成 --divider-color-hover（粉紅），
-     與高亮色不一致；改為與背景相同的 space color，消除右側 hover 的粉紅線。 */
   border-color: var(--window-space-color) !important;
   box-shadow: 0 0 8px
     color-mix(in srgb, var(--window-space-color) 70%, transparent) !important;

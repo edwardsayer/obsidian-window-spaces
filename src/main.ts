@@ -131,10 +131,11 @@ export default class WindowSpacesPlugin extends Plugin {
     this.activityBars.refreshAll();
 
     // Native Obsidian restores retained Popout windows before the plugin can
-    // apply a saved Window Space. Wait for the workspace to finish restoring,
-    // then reapply every already-open, identified space without a notification.
+    // apply a saved Window Space. After layout-ready, reconcile each identified
+    // space in place (target-only) so an already-open Popout matches its saved
+    // snapshot without rebuilding the other windows.
     this.app.workspace.onLayoutReady(() => {
-      void this.manager.restoreOpenSpacesOnStartup();
+      void this.manager.reconcileOpenSpacesOnStartup();
     });
 
     // 添加狀態欄指示器（可選）

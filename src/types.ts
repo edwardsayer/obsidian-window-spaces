@@ -268,6 +268,12 @@ export interface RestoreLayoutOptions {
   forceNewWindow?: boolean;
   forceReload?: boolean;
   /**
+   * 啟動 reconcile 時跳過視窗幾何（position/size）套用。Obsidian 啟動時
+   * 已把保留的 Popout 開在「上次關閉的位置」，此時再搬到儲存位置會造成
+   * 無謂的跳動與位移；幾何只在「使用者主動 restore 該 space」時套用。
+   */
+  skipGeometry?: boolean;
+  /**
    * 當此 space 已在某個存活 Popout 視窗中開啟時，直接聚焦該視窗，
    * 避免重複 restore 產生重複視窗。clone 流程不會傳入此旗標。
    */

@@ -150,36 +150,7 @@ describe("Validation & Auto-Save Guardrails (validationAndGuardrails.test.ts)", 
     expect(mockPlugin.app.workspace.setActiveLeaf).toHaveBeenCalledWith(centerLeaf, { focus: true });
   });
 
-  test("startup restore reapplies the saved space to an already-open popout", async () => {
-    const popoutWindow = {
-      closed: false,
-      document: { body: { classList: { contains: (name: string) => name === "is-popout-window" } } },
-    } as unknown as Window;
-    const layout: WindowLayout = {
-      id: "startup-irm-1",
-      name: "IRM-1",
-      timestamp: Date.now(),
-      windowState: { size: { width: 800, height: 600 } },
-      workspace: { layout: { type: "leaf", id: "leaf-1", state: { type: "empty", state: {} } }, leaves: [] },
-      metadata: { fileCount: 0, tabCount: 1, splitCount: 0 },
-    };
-    mockPlugin.settings.spaces = [layout];
-
-    vi.spyOn(manager, "matchUnlabeledPopoutWindows").mockImplementation(() => {});
-    vi.spyOn(manager, "getLivePopoutWindows").mockReturnValue([popoutWindow]);
-    vi.spyOn(manager, "getLayoutNameForWindow").mockReturnValue("IRM-1");
-    const restoreSpy = vi.spyOn(manager, "restoreLayout").mockResolvedValue(undefined);
-
-    await manager.restoreOpenSpacesOnStartup();
-
-    expect(restoreSpy).toHaveBeenCalledWith(layout, {
-      targetWindow: popoutWindow,
-      forceReload: true,
-      showNotifications: false,
-    });
-  });
-
-  test("startup restore skips global rebuild when the native layout already matches", async () => {
+  test("manual restore of an open target uses target-only reconcile", async () => {
     const popoutWindow = {
       closed: false,
       document: { body: { classList: { contains: (name: string) => name === "is-popout-window" } } },
@@ -197,13 +168,62 @@ describe("Validation & Auto-Save Guardrails (validationAndGuardrails.test.ts)", 
     vi.spyOn(manager, "matchUnlabeledPopoutWindows").mockImplementation(() => {});
     vi.spyOn(manager, "getLivePopoutWindows").mockReturnValue([popoutWindow]);
     vi.spyOn(manager, "getLayoutNameForWindow").mockReturnValue("IRM-1");
-    vi.spyOn(manager as any, "isWindowLayoutAtSavedSnapshot").mockReturnValue(true);
-    const restoreSpy = vi.spyOn(manager, "restoreLayout").mockResolvedValue(undefined);
-    vi.spyOn(manager as any, "restoreWindowGeometry").mockImplementation(() => {});
+    const inPlaceSpy = vi.spyOn(manager as any, "restoreOpenSpaceInPlace").mockResolvedValue(undefined);
+    const workspaceRestoreSpy = vi.spyOn(manager as any, "restoreLayoutInternal");
 
-    await manager.restoreOpenSpacesOnStartup();
+    await manager.restoreLayout(layout, {
+      targetWindow: popoutWindow,
+      forceReload: true,
+      showNotifications: false,
+    });
 
-    expect(restoreSpy).not.toHaveBeenCalled();
+    expect(inPlaceSpy).toHaveBeenCalledWith(layout, popoutWindow, {
+      targetWindow: popoutWindow,
+      forceReload: true,
+      showNotifications: false,
+    });
+    expect(workspaceRestoreSpy).toHaveBeenCalledTimes(1);
+  });
+
+  test("startup reconcile reapplies each identified space via target-only path", async () => {
+    const irmWin = {
+      closed: false,
+      document: { body: { classList: { contains: (name: string) => name === "is-popout-window" } } },
+    } as unknown as Window;
+    const personalWin = {
+      closed: false,
+      document: { body: { classList: { contains: (name: string) => name === "is-popout-window" } } },
+    } as unknown as Window;
+    const layout1: WindowLayout = {
+      id: "startup-reconcile-1",
+      name: "IRM-1",
+      timestamp: Date.now(),
+      windowState: { size: { width: 800, height: 600 } },
+      workspace: { layout: { type: "leaf", id: "leaf-1", state: { type: "empty", state: {} } }, leaves: [] },
+      metadata: { fileCount: 0, tabCount: 1, splitCount: 0 },
+    };
+    const layout2: WindowLayout = {
+      id: "startup-reconcile-2",
+      name: "Personal",
+      timestamp: Date.now(),
+      windowState: { size: { width: 800, height: 600 } },
+      workspace: { layout: { type: "leaf", id: "leaf-2", state: { type: "empty", state: {} } }, leaves: [] },
+      metadata: { fileCount: 0, tabCount: 1, splitCount: 0 },
+    };
+    mockPlugin.settings.spaces = [layout1, layout2];
+
+    vi.spyOn(manager, "matchUnlabeledPopoutWindows").mockImplementation(() => {});
+    vi.spyOn(manager, "getLivePopoutWindows").mockReturnValue([irmWin, personalWin]);
+    vi.spyOn(manager, "getLayoutNameForWindow")
+      .mockImplementation((w) => (w === irmWin ? "IRM-1" : w === personalWin ? "Personal" : null));
+    const inPlaceSpy = vi.spyOn(manager as any, "restoreOpenSpaceInPlace").mockResolvedValue(undefined);
+    const globalRestoreSpy = vi.spyOn(manager, "restoreLayout").mockResolvedValue(undefined);
+
+    await manager.reconcileOpenSpacesOnStartup();
+
+    expect(inPlaceSpy).toHaveBeenCalledWith(layout1, irmWin, { showNotifications: false, skipGeometry: true });
+    expect(inPlaceSpy).toHaveBeenCalledWith(layout2, personalWin, { showNotifications: false, skipGeometry: true });
+    expect(globalRestoreSpy).not.toHaveBeenCalled();
   });
 
   test("restore focuses the existing popout window for an already-open space when focusExistingWindow is set", async () => {
@@ -615,6 +635,27 @@ describe("Validation & Auto-Save Guardrails (validationAndGuardrails.test.ts)", 
     expect(moveTo).toHaveBeenCalledWith(100, 200);
   });
 
+  test("geometry reconcile tolerates up to five pixels of native restore drift", () => {
+    const resizeTo = vi.fn();
+    const moveTo = vi.fn();
+    const popoutWindow = {
+      outerWidth: 1276,
+      outerHeight: 748,
+      screenX: 4,
+      screenY: 5,
+      resizeTo,
+      moveTo,
+    } as unknown as Window;
+
+    (manager as any).restoreWindowGeometry(popoutWindow, {
+      size: { width: 1280, height: 752 },
+      position: { x: 0, y: 0 },
+    }, true, false);
+
+    expect(resizeTo).not.toHaveBeenCalled();
+    expect(moveTo).not.toHaveBeenCalled();
+  });
+
   test("getOpenWindowForLayout should detect live popout window running target layout", () => {
     const mockWindow = {
       closed: false,
@@ -682,6 +723,50 @@ describe("Validation & Auto-Save Guardrails (validationAndGuardrails.test.ts)", 
 
     expect(manager.getOpenWindowForLayout(openLayout)).toBe(mockWindow);
     expect(manager.getOpenWindowForLayout(unrelatedLayout)).toBe(null);
+  });
+
+  test("saved panel identity prevents shared-file spaces from matching the wrong popout", () => {
+    const makeWindow = () => ({
+      closed: false,
+      document: {
+        body: { classList: { contains: () => true } },
+      },
+    }) as unknown as Window;
+    const wrongWindow = makeWindow();
+    const layout: WindowLayout = {
+      id: "panel-identity-layout",
+      name: "Professional",
+      timestamp: Date.now(),
+      windowState: { size: { width: 1280, height: 752 } },
+      workspace: {
+        layout: {},
+        leaves: [{
+          id: "saved-panel-leaf",
+          type: "folder-spaces-explorer",
+          state: { panelId: "professional-panel", folderPath: "Professional" },
+        }],
+      },
+      metadata: { fileCount: 0, tabCount: 1, splitCount: 0 },
+    };
+
+    mockPlugin.app.workspace.iterateAllLeaves = (cb: any) => {
+      cb({
+        id: "different-leaf",
+        containerEl: { ownerDocument: { defaultView: wrongWindow } },
+        getViewState: () => ({
+          type: "folder-spaces-explorer",
+          state: { panelId: "personal-panel", folderPath: "Personal" },
+        }),
+      });
+    };
+
+    expect((manager as any).findWindowForSavedLeaves(
+      layout.workspace.leaves,
+      undefined,
+      null,
+      new Set(),
+      true
+    )).toBe(null);
   });
 
   test("restoreWindowGeometry should skip resize and move when includeGeometry is false", () => {
