@@ -185,6 +185,32 @@ body.is-popout-window.window-spaces-has-left-activity:not(.window-spaces-left-ac
   justify-content: center;
 }
 
+/* 2026-08 Folder Spaces 協作需求：space 選單視覺增強（純裝飾）
+   1. per-space accent color：icon 與 title 套用該色
+   2. 左上角折角（與視窗 has-window-space-folded-corner 一致；大小約 item 高度 1/3）
+   3. active space 的 ✓ 由 title 文字提供（window-spaces-menu-active class 供樣式延伸） */
+.menu.window-spaces-space-menu .menu-item {
+  position: relative;
+}
+.menu.window-spaces-space-menu .menu-item.window-spaces-space-accent,
+.menu.window-spaces-space-menu .menu-item.window-spaces-space-accent .menu-item-icon {
+  color: var(--menu-item-accent, var(--text-muted));
+}
+.menu.window-spaces-space-menu .menu-item.has-space-menu-fold::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 8px;
+  height: 8px;
+  background: linear-gradient(
+    to bottom right,
+    var(--fold-color, var(--text-muted)) 50%,
+    transparent 50.5%
+  );
+  pointer-events: none;
+}
+
 .window-spaces-layout-actions {
   display: flex;
   flex: 0 0 auto;

@@ -3285,28 +3285,51 @@ class WindowLayoutManager {
     showSpaceMenu(targetWin, anchor, _e) {
         const menu = new obsidian.Menu();
         const spaces = this.plugin.settings.spaces.filter((s) => s.archived !== true);
+        const currentLayoutName = this.getLayoutNameForWindow(targetWin);
         spaces.forEach((space) => {
             menu.addItem((item) => {
-                var _a;
+                var _a, _b, _c;
                 // icon 與 Window Spaces switcher list 一致；emoji 放入 menu-item-icon 容器
                 // （與 lucide icon 同位置），確保文字起始位置一致。
                 const iconVal = resolveSpaceIcon(space.icon, (_a = this.plugin.settings) === null || _a === void 0 ? void 0 : _a.defaultIcon);
+                let title = space.name;
                 if (isSpaceEmoji(iconVal)) {
                     const itemAny = item;
                     if (itemAny.iconEl) {
-                        item.setTitle(space.name);
                         itemAny.iconEl.empty();
                         itemAny.iconEl.setText(iconVal);
                     }
                     else {
                         // fallback：Menu 無 iconEl 時，emoji 置於標題前（單空格）
-                        item.setTitle(`${iconVal} ${space.name}`);
+                        title = `${iconVal} ${space.name}`;
                     }
                 }
                 else {
-                    item.setTitle(space.name);
                     item.setIcon(iconVal);
                 }
+                // 視覺增強（純裝飾，不影響 restore/switch 互動）：
+                const itemDom = item.dom;
+                if (itemDom) {
+                    // 1. 目前視窗 active 的 space：title 後方打勾
+                    if (space.name === currentLayoutName) {
+                        title += " ✓";
+                        itemDom.classList.add("window-spaces-menu-active");
+                    }
+                    // 2. per-space accent color：icon 與 title 套用該色
+                    const color = (_b = space.color) === null || _b === void 0 ? void 0 : _b.trim();
+                    if (color) {
+                        itemDom.style.setProperty("--menu-item-accent", color);
+                        itemDom.classList.add("window-spaces-space-accent");
+                    }
+                    // 3. 左上角折角（與視窗 has-window-space-folded-corner 一致；有 accent 用同色）
+                    const showFold = (_c = space.showFoldedCorner) !== null && _c !== void 0 ? _c : this.plugin.settings.defaultShowFoldedCorner !== false;
+                    if (showFold) {
+                        itemDom.classList.add("has-space-menu-fold");
+                        if (color)
+                            itemDom.style.setProperty("--fold-color", color);
+                    }
+                }
+                item.setTitle(title);
                 item.onClick((evt) => {
                     // 與 switcher list 一致：無 Shift = 開新 Popout，Shift = 替換本 popout
                     const forceNewWindow = !evt.shiftKey;

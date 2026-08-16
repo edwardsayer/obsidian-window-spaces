@@ -855,25 +855,49 @@ export class WindowLayoutManager {
   private showSpaceMenu(targetWin: Window, anchor: HTMLElement, _e: MouseEvent): void {
     const menu = new Menu();
     const spaces = this.plugin.settings.spaces.filter((s: WindowLayout) => s.archived !== true);
+    const currentLayoutName = this.getLayoutNameForWindow(targetWin);
     spaces.forEach((space) => {
       menu.addItem((item) => {
         // icon 與 Window Spaces switcher list 一致；emoji 放入 menu-item-icon 容器
         // （與 lucide icon 同位置），確保文字起始位置一致。
         const iconVal = resolveSpaceIcon(space.icon, this.plugin.settings?.defaultIcon);
+        let title = space.name;
         if (isSpaceEmoji(iconVal)) {
           const itemAny = item as unknown as { iconEl?: HTMLElement };
           if (itemAny.iconEl) {
-            item.setTitle(space.name);
             itemAny.iconEl.empty();
             itemAny.iconEl.setText(iconVal);
           } else {
             // fallback：Menu 無 iconEl 時，emoji 置於標題前（單空格）
-            item.setTitle(`${iconVal} ${space.name}`);
+            title = `${iconVal} ${space.name}`;
           }
         } else {
-          item.setTitle(space.name);
           item.setIcon(iconVal);
         }
+
+        // 視覺增強（純裝飾，不影響 restore/switch 互動）：
+        const itemDom = (item as unknown as { dom?: HTMLElement }).dom;
+        if (itemDom) {
+          // 1. 目前視窗 active 的 space：title 後方打勾
+          if (space.name === currentLayoutName) {
+            title += " ✓";
+            itemDom.classList.add("window-spaces-menu-active");
+          }
+          // 2. per-space accent color：icon 與 title 套用該色
+          const color = space.color?.trim();
+          if (color) {
+            itemDom.style.setProperty("--menu-item-accent", color);
+            itemDom.classList.add("window-spaces-space-accent");
+          }
+          // 3. 左上角折角（與視窗 has-window-space-folded-corner 一致；有 accent 用同色）
+          const showFold =
+            space.showFoldedCorner ?? this.plugin.settings.defaultShowFoldedCorner !== false;
+          if (showFold) {
+            itemDom.classList.add("has-space-menu-fold");
+            if (color) itemDom.style.setProperty("--fold-color", color);
+          }
+        }
+        item.setTitle(title);
         item.onClick((evt: MouseEvent) => {
           // 與 switcher list 一致：無 Shift = 開新 Popout，Shift = 替換本 popout
           const forceNewWindow = !evt.shiftKey;
