@@ -855,7 +855,12 @@ export class WindowLayoutManager {
   private showSpaceMenu(targetWin: Window, anchor: HTMLElement, _e: MouseEvent): void {
     const menu = new Menu();
     const spaces = this.plugin.settings.spaces.filter((s: WindowLayout) => s.archived !== true);
-    const currentLayoutName = this.getLayoutNameForWindow(targetWin);
+    // 所有存活視窗的 active space 名稱（unique；多視窗可同時 active 多個 space）
+    const activeSpaceNames = new Set<string>();
+    this.getLivePopoutWindows().forEach((win) => {
+      const layoutName = this.getLayoutNameForWindow(win);
+      if (layoutName) activeSpaceNames.add(layoutName);
+    });
     spaces.forEach((space) => {
       menu.addItem((item) => {
         // icon 與 Window Spaces switcher list 一致；emoji 放入 menu-item-icon 容器
@@ -878,9 +883,8 @@ export class WindowLayoutManager {
         // 視覺增強（純裝飾，不影響 restore/switch 互動）：
         const itemDom = (item as unknown as { dom?: HTMLElement }).dom;
         if (itemDom) {
-          // 1. 目前視窗 active 的 space：title 後方打勾
-          if (space.name === currentLayoutName) {
-            title += " ✓";
+          // 1. 該 space 在任一存活視窗 active：右側打勾（右對齊由 CSS ::after 提供）
+          if (activeSpaceNames.has(space.name)) {
             itemDom.classList.add("window-spaces-menu-active");
           }
           // 2. per-space accent color：icon 與 title 套用該色

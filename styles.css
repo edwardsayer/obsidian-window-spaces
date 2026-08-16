@@ -211,6 +211,14 @@ body.is-popout-window.window-spaces-has-left-activity:not(.window-spaces-left-ac
   pointer-events: none;
 }
 
+/* active space 打勾：右對齊（menu item 為 flex，::after margin-left:auto 推至最右） */
+.menu.window-spaces-space-menu .menu-item.window-spaces-menu-active::after {
+  content: "✓";
+  margin-left: auto;
+  padding-left: 8px;
+  color: var(--text-normal);
+}
+
 .window-spaces-layout-actions {
   display: flex;
   flex: 0 0 auto;
