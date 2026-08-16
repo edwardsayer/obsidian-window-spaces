@@ -889,9 +889,10 @@ export class WindowLayoutManager {
             itemDom.style.setProperty("--menu-item-accent", color);
             itemDom.classList.add("window-spaces-space-accent");
           }
-          // 3. 左上角折角（與視窗 has-window-space-folded-corner 一致；有 accent 用同色）
+          // 3. 左上角折角（與 switcher / 視窗一致：需有 accent color 才顯示；有 color 用同色）
           const showFold =
-            space.showFoldedCorner ?? this.plugin.settings.defaultShowFoldedCorner !== false;
+            !!color &&
+            (space.showFoldedCorner ?? this.plugin.settings.defaultShowFoldedCorner !== false);
           if (showFold) {
             itemDom.classList.add("has-space-menu-fold");
             if (color) itemDom.style.setProperty("--fold-color", color);
