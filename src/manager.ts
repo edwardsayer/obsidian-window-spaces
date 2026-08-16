@@ -36,6 +36,7 @@ export class WindowLayoutManager {
   private layoutLabels = new Map<Window, LayoutLabelElements>();
   private activeRestorePromise: Promise<void> | null = null;
   private isMatchingUnlabeled = false;
+  private startupRestorePromise: Promise<void> | null = null;
   public isRestoringLayout = false;
   private renderAttemptedLeaves = new WeakSet<WorkspaceLeaf>();
   private deferredViewLoads = new WeakMap<WorkspaceLeaf, Promise<void>>();
@@ -108,6 +109,119 @@ export class WindowLayoutManager {
       }
     });
     this.matchUnlabeledPopoutWindows();
+  }
+
+  /**
+   * Obsidian 會在啟動時先還原 native workspace layout，包含上次仍存活的
+   * Popout；這些視窗只會恢復「上次關閉時的 layout」，不會自動套用 Window
+   * Spaces 儲存的 snapshot。layout-ready 後重新套用目前已辨識的 spaces，
+   * 讓保留開啟的 Popout 也遵守 Window Spaces 的儲存內容。
+   */
+  async restoreOpenSpacesOnStartup(): Promise<void> {
+    if (this.startupRestorePromise) return this.startupRestorePromise;
+
+    const restorePromise = (async () => {
+      this.matchUnlabeledPopoutWindows();
+
+      // Restore sequentially because restoreLayout may rebuild all floating
+      // windows through Obsidian's global changeLayout. Resolve the target by
+      // its space name before every restore so a previous rebuild cannot leave
+      // us holding a stale Window object.
+      const spaceNames = new Set<string>();
+      this.getLivePopoutWindows().forEach((targetWin) => {
+        const layoutName = this.getLayoutNameForWindow(targetWin);
+        if (layoutName) spaceNames.add(layoutName);
+      });
+
+      for (const spaceName of spaceNames) {
+        const layout = (this.plugin.settings.spaces || []).find(
+          (space: WindowLayout) => space.name === spaceName
+        );
+        if (!layout) continue;
+
+        const targetWin = this.getLivePopoutWindows().find(
+          (win) => this.getLayoutNameForWindow(win) === spaceName
+        );
+        if (!targetWin || targetWin.closed) continue;
+
+        try {
+          if (this.isWindowLayoutAtSavedSnapshot(targetWin, layout)) {
+            this.restoreWindowGeometry(targetWin, layout.windowState, layout.includeGeometry, false);
+            if (layout.hidden) {
+              this.applyHiddenStateAfterRestore(targetWin, layout.hidden);
+            }
+            continue;
+          }
+
+          await this.restoreLayout(layout, {
+            targetWindow: targetWin,
+            forceReload: true,
+            showNotifications: false,
+          });
+        } catch (error) {
+          console.warn(`[Window Spaces] Failed to restore startup space "${spaceName}":`, error);
+        }
+      }
+    })();
+
+    this.startupRestorePromise = restorePromise;
+    try {
+      await restorePromise;
+    } finally {
+      if (this.startupRestorePromise === restorePromise) {
+        this.startupRestorePromise = null;
+      }
+    }
+  }
+
+  /**
+   * 比對 native startup layout 與 Window Spaces snapshot 的實際內容。
+   * Obsidian 每次重建 WorkspaceWindow 都可能重新產生 wrapper id，因此只
+   * 比對 view type/state、split direction/dimension 與 tabs 的 active index，
+   * 忽略 window/item/leaf id 與顯示用 icon/title。
+   */
+  private isWindowLayoutAtSavedSnapshot(targetWin: Window, layout: WindowLayout): boolean {
+    try {
+      const savedRoot = layout.workspace?.layout;
+      if (!savedRoot) return false;
+
+      const floatingWindows = this.getFloatingWindows(
+        (this.app.workspace as unknown as ExtendedWorkspace).getLayout()
+      );
+      const targetIndex = this.findFloatingWindowIndexForWindow(targetWin, floatingWindows);
+      if (targetIndex < 0 || !floatingWindows[targetIndex]) return false;
+
+      return JSON.stringify(this.normalizeStartupLayoutNode(savedRoot)) ===
+        JSON.stringify(this.normalizeStartupLayoutNode(floatingWindows[targetIndex]));
+    } catch {
+      return false;
+    }
+  }
+
+  private normalizeStartupLayoutNode(node: any): unknown {
+    if (!node || typeof node !== "object") return null;
+
+    const normalized: Record<string, unknown> = {
+      type: typeof node.type === "string" ? node.type : "",
+    };
+
+    if (node.type === "leaf") {
+      const state = node.state && typeof node.state === "object" ? node.state : {};
+      normalized.pinned = node.pinned === true || state.pinned === true;
+      normalized.viewType = typeof state.type === "string" ? state.type : null;
+      normalized.state = state.state && typeof state.state === "object" ? state.state : {};
+      return normalized;
+    }
+
+    if (typeof node.direction === "string") normalized.direction = node.direction;
+    if (typeof node.currentTab === "number") normalized.currentTab = node.currentTab;
+    if (typeof node.dimension === "number" && Number.isFinite(node.dimension)) {
+      normalized.dimension = Math.round(node.dimension * 1_000_000) / 1_000_000;
+    }
+    if (Array.isArray(node.children)) {
+      normalized.children = node.children.map((child: any) => this.normalizeStartupLayoutNode(child));
+    }
+    return normalized;
   }
 
   /** Popout 關閉時移除對應的 layout label 與追蹤狀態。 */

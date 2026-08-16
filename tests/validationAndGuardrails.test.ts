@@ -150,6 +150,62 @@ describe("Validation & Auto-Save Guardrails (validationAndGuardrails.test.ts)", 
     expect(mockPlugin.app.workspace.setActiveLeaf).toHaveBeenCalledWith(centerLeaf, { focus: true });
   });
 
+  test("startup restore reapplies the saved space to an already-open popout", async () => {
+    const popoutWindow = {
+      closed: false,
+      document: { body: { classList: { contains: (name: string) => name === "is-popout-window" } } },
+    } as unknown as Window;
+    const layout: WindowLayout = {
+      id: "startup-irm-1",
+      name: "IRM-1",
+      timestamp: Date.now(),
+      windowState: { size: { width: 800, height: 600 } },
+      workspace: { layout: { type: "leaf", id: "leaf-1", state: { type: "empty", state: {} } }, leaves: [] },
+      metadata: { fileCount: 0, tabCount: 1, splitCount: 0 },
+    };
+    mockPlugin.settings.spaces = [layout];
+
+    vi.spyOn(manager, "matchUnlabeledPopoutWindows").mockImplementation(() => {});
+    vi.spyOn(manager, "getLivePopoutWindows").mockReturnValue([popoutWindow]);
+    vi.spyOn(manager, "getLayoutNameForWindow").mockReturnValue("IRM-1");
+    const restoreSpy = vi.spyOn(manager, "restoreLayout").mockResolvedValue(undefined);
+
+    await manager.restoreOpenSpacesOnStartup();
+
+    expect(restoreSpy).toHaveBeenCalledWith(layout, {
+      targetWindow: popoutWindow,
+      forceReload: true,
+      showNotifications: false,
+    });
+  });
+
+  test("startup restore skips global rebuild when the native layout already matches", async () => {
+    const popoutWindow = {
+      closed: false,
+      document: { body: { classList: { contains: (name: string) => name === "is-popout-window" } } },
+    } as unknown as Window;
+    const layout: WindowLayout = {
+      id: "startup-matching-space",
+      name: "IRM-1",
+      timestamp: Date.now(),
+      windowState: { size: { width: 800, height: 600 } },
+      workspace: { layout: { type: "leaf", id: "leaf-1", state: { type: "empty", state: {} } }, leaves: [] },
+      metadata: { fileCount: 0, tabCount: 1, splitCount: 0 },
+    };
+    mockPlugin.settings.spaces = [layout];
+
+    vi.spyOn(manager, "matchUnlabeledPopoutWindows").mockImplementation(() => {});
+    vi.spyOn(manager, "getLivePopoutWindows").mockReturnValue([popoutWindow]);
+    vi.spyOn(manager, "getLayoutNameForWindow").mockReturnValue("IRM-1");
+    vi.spyOn(manager as any, "isWindowLayoutAtSavedSnapshot").mockReturnValue(true);
+    const restoreSpy = vi.spyOn(manager, "restoreLayout").mockResolvedValue(undefined);
+    vi.spyOn(manager as any, "restoreWindowGeometry").mockImplementation(() => {});
+
+    await manager.restoreOpenSpacesOnStartup();
+
+    expect(restoreSpy).not.toHaveBeenCalled();
+  });
+
   test("restore focuses the existing popout window for an already-open space when focusExistingWindow is set", async () => {
     const popoutBody = {
       classList: { contains: (className: string) => className === "is-popout-window" },

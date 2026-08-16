@@ -879,7 +879,6 @@ export class PopoutActivityBarManager {
 
   private setColumnActive(bars: WindowBars, win: Window, side: PopoutSide): void {
     const columnEl = this.engine.getColumnElement(win, side);
-    const hasColumn = !!columnEl;
     const hidden = !!columnEl && this.engine.isColumnHidden(win, side);
     const active = !!columnEl && !hidden;
     bars.columnButtons[side].classList.toggle("is-active", active);

@@ -2582,6 +2582,7 @@ class WindowLayoutManager {
         this.layoutLabels = new Map();
         this.activeRestorePromise = null;
         this.isMatchingUnlabeled = false;
+        this.startupRestorePromise = null;
         this.isRestoringLayout = false;
         this.renderAttemptedLeaves = new WeakSet();
         this.deferredViewLoads = new WeakMap();
@@ -2651,6 +2652,113 @@ class WindowLayoutManager {
             }
         });
         this.matchUnlabeledPopoutWindows();
+    }
+    /**
+     * Obsidian 會在啟動時先還原 native workspace layout，包含上次仍存活的
+     * Popout；這些視窗只會恢復「上次關閉時的 layout」，不會自動套用 Window
+     * Spaces 儲存的 snapshot。layout-ready 後重新套用目前已辨識的 spaces，
+     * 讓保留開啟的 Popout 也遵守 Window Spaces 的儲存內容。
+     */
+    restoreOpenSpacesOnStartup() {
+        return __awaiter(this, void 0, void 0, function* () {
+            if (this.startupRestorePromise)
+                return this.startupRestorePromise;
+            const restorePromise = (() => __awaiter(this, void 0, void 0, function* () {
+                this.matchUnlabeledPopoutWindows();
+                // Restore sequentially because restoreLayout may rebuild all floating
+                // windows through Obsidian's global changeLayout. Resolve the target by
+                // its space name before every restore so a previous rebuild cannot leave
+                // us holding a stale Window object.
+                const spaceNames = new Set();
+                this.getLivePopoutWindows().forEach((targetWin) => {
+                    const layoutName = this.getLayoutNameForWindow(targetWin);
+                    if (layoutName)
+                        spaceNames.add(layoutName);
+                });
+                for (const spaceName of spaceNames) {
+                    const layout = (this.plugin.settings.spaces || []).find((space) => space.name === spaceName);
+                    if (!layout)
+                        continue;
+                    const targetWin = this.getLivePopoutWindows().find((win) => this.getLayoutNameForWindow(win) === spaceName);
+                    if (!targetWin || targetWin.closed)
+                        continue;
+                    try {
+                        if (this.isWindowLayoutAtSavedSnapshot(targetWin, layout)) {
+                            this.restoreWindowGeometry(targetWin, layout.windowState, layout.includeGeometry, false);
+                            if (layout.hidden) {
+                                this.applyHiddenStateAfterRestore(targetWin, layout.hidden);
+                            }
+                            continue;
+                        }
+                        yield this.restoreLayout(layout, {
+                            targetWindow: targetWin,
+                            forceReload: true,
+                            showNotifications: false,
+                        });
+                    }
+                    catch (error) {
+                        console.warn(`[Window Spaces] Failed to restore startup space "${spaceName}":`, error);
+                    }
+                }
+            }))();
+            this.startupRestorePromise = restorePromise;
+            try {
+                yield restorePromise;
+            }
+            finally {
+                if (this.startupRestorePromise === restorePromise) {
+                    this.startupRestorePromise = null;
+                }
+            }
+        });
+    }
+    /**
+     * 比對 native startup layout 與 Window Spaces snapshot 的實際內容。
+     * Obsidian 每次重建 WorkspaceWindow 都可能重新產生 wrapper id，因此只
+     * 比對 view type/state、split direction/dimension 與 tabs 的 active index，
+     * 忽略 window/item/leaf id 與顯示用 icon/title。
+     */
+    isWindowLayoutAtSavedSnapshot(targetWin, layout) {
+        var _a;
+        try {
+            const savedRoot = (_a = layout.workspace) === null || _a === void 0 ? void 0 : _a.layout;
+            if (!savedRoot)
+                return false;
+            const floatingWindows = this.getFloatingWindows(this.app.workspace.getLayout());
+            const targetIndex = this.findFloatingWindowIndexForWindow(targetWin, floatingWindows);
+            if (targetIndex < 0 || !floatingWindows[targetIndex])
+                return false;
+            return JSON.stringify(this.normalizeStartupLayoutNode(savedRoot)) ===
+                JSON.stringify(this.normalizeStartupLayoutNode(floatingWindows[targetIndex]));
+        }
+        catch (_b) {
+            return false;
+        }
+    }
+    normalizeStartupLayoutNode(node) {
+        if (!node || typeof node !== "object")
+            return null;
+        const normalized = {
+            type: typeof node.type === "string" ? node.type : "",
+        };
+        if (node.type === "leaf") {
+            const state = node.state && typeof node.state === "object" ? node.state : {};
+            normalized.pinned = node.pinned === true || state.pinned === true;
+            normalized.viewType = typeof state.type === "string" ? state.type : null;
+            normalized.state = state.state && typeof state.state === "object" ? state.state : {};
+            return normalized;
+        }
+        if (typeof node.direction === "string")
+            normalized.direction = node.direction;
+        if (typeof node.currentTab === "number")
+            normalized.currentTab = node.currentTab;
+        if (typeof node.dimension === "number" && Number.isFinite(node.dimension)) {
+            normalized.dimension = Math.round(node.dimension * 1000000) / 1000000;
+        }
+        if (Array.isArray(node.children)) {
+            normalized.children = node.children.map((child) => this.normalizeStartupLayoutNode(child));
+        }
+        return normalized;
     }
     /** Popout 關閉時移除對應的 layout label 與追蹤狀態。 */
     unregisterPopoutWindow(targetWin) {
@@ -9649,6 +9757,12 @@ class WindowSpacesPlugin extends obsidian.Plugin {
             this.setupEventListeners();
             // 為既有 Popout 注入 Activity Bar
             this.activityBars.refreshAll();
+            // Native Obsidian restores retained Popout windows before the plugin can
+            // apply a saved Window Space. Wait for the workspace to finish restoring,
+            // then reapply every already-open, identified space without a notification.
+            this.app.workspace.onLayoutReady(() => {
+                void this.manager.restoreOpenSpacesOnStartup();
+            });
             // 添加狀態欄指示器（可選）
             if (this.settings.showStatusBarIndicator === true) {
                 this.addStatusBarIndicator();

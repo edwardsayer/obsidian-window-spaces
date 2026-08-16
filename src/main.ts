@@ -130,6 +130,13 @@ export default class WindowSpacesPlugin extends Plugin {
     // 為既有 Popout 注入 Activity Bar
     this.activityBars.refreshAll();
 
+    // Native Obsidian restores retained Popout windows before the plugin can
+    // apply a saved Window Space. Wait for the workspace to finish restoring,
+    // then reapply every already-open, identified space without a notification.
+    this.app.workspace.onLayoutReady(() => {
+      void this.manager.restoreOpenSpacesOnStartup();
+    });
+
     // 添加狀態欄指示器（可選）
     if (this.settings.showStatusBarIndicator === true) {
       this.addStatusBarIndicator();

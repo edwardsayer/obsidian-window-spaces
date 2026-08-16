@@ -1226,6 +1226,20 @@ body.is-popout-window.window-spaces-has-right-activity
   margin-right: calc(-1 * var(--window-spaces-activity-bar-width, 44px));
 }
 
+/* Popout 視窗右上角系統按鈕（最小化、最大化、關閉）：
+   確保按鈕容器及內部所有子節點（svg, rect, path 等）皆具備明確的 no-drag 與 pointer-events，
+   防止底層 workspace-tab-header-container 的 -webkit-app-region: drag 穿透導致 mouseover 與 click 失效。 */
+body.is-popout-window .titlebar-button-container.mod-right,
+body.is-popout-window .titlebar-button-container.mod-right *,
+body.is-popout-window .titlebar-button,
+body.is-popout-window .titlebar-button * {
+  -webkit-app-region: no-drag !important;
+  pointer-events: auto !important;
+}
+body.is-popout-window .titlebar-button-container.mod-right {
+  z-index: var(--layer-popover, 100) !important;
+}
+
 /* 讓 popout 內容避開左右固定列 */
 body.is-popout-window.window-spaces-has-left-activity .workspace-split.mod-root {
   margin-left: var(--window-spaces-activity-bar-width, 44px);
@@ -1726,14 +1740,6 @@ body.is-popout-window .workspace-tab-header-spacer {
 .window-spaces-sidebar-column .workspace-leaf-content,
 .window-spaces-sidebar-column .workspace-tab-header-container-inner {
   overflow-x: hidden !important;
-}
-
-/* Popout 右側欄：隱藏 `.mod-right-split` 欄位層級自帶的左側 col-resize handle。
-   避免使用者在 Popout 右側欄分隔線靠右側處拖曳時，觸發 mod-right-split 錯誤的 flex 縮放
-   （導致右邊框脫離 Activity Bar 並露出底層黑色背景）。隱藏後由左側相鄰欄位（中央編輯區）
-   的右側 handle 統一進行平滑縮放。 */
-.window-spaces-sidebar-column.mod-right-split > .workspace-leaf-resize-handle {
-  display: none !important;
 }
 
 
