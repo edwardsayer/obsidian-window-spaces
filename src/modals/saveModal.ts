@@ -223,6 +223,7 @@ export class SaveLayoutModal extends Modal {
     let iconInputEl!: HTMLInputElement;
     const iconSetting = this.createSettingIn(identityGroup, (setting) => {
       setting.setName(t("saveModal.iconLabel"));
+      setting.setDesc(t("saveModal.iconDesc"));
       setting.addText((text) => {
         iconInputEl = text.inputEl;
         text.setPlaceholder(t("saveModal.iconPlaceholder"));

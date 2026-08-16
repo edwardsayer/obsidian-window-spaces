@@ -58,6 +58,11 @@ const DEFAULT_SETTINGS: WindowSettings = {
     left: true,
     right: true,
   },
+  popoutAccents: {
+    enabled: true,
+    splitter: true,
+    activityBar: true,
+  },
   workspaceInterceptorEnabled: true,
 };
 

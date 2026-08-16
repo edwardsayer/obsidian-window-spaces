@@ -1727,4 +1727,107 @@ describe("2-column layout sidebar inference (legacy / non-standard spaces)", () 
     expect(rightCol.classList.contains("mod-right-split")).toBe(true);
     expect(centerCol.classList.contains("mod-sidedock")).toBe(false);
   });
+
+  test("updateDragHandleIcon applies popout accent classes according to settings and color", () => {
+    const app = { workspace: { iterateAllLeaves: vi.fn() } } as any;
+    const engine = new PopoutLayoutEngine(app);
+    const spaceWithColor = {
+      id: "colored-space",
+      name: "Colored",
+      color: "#10b981",
+      workspace: { layout: {} },
+    };
+    const settings = {
+      defaultIcon: "square",
+      defaultShowFoldedCorner: true,
+      popoutAccents: {
+        enabled: true,
+        splitter: true,
+        activityBar: true,
+      },
+      spaces: [spaceWithColor],
+    } as any;
+    const manager = new PopoutActivityBarManager({ app, settings } as any, engine);
+
+    const createMockEl = (tag = "div") => {
+      const el = document.createElement(tag) as any;
+      el.empty = () => {
+        el.innerHTML = "";
+      };
+      el.createDiv = (opts?: any) => {
+        const child = createMockEl("div");
+        if (typeof opts === "string") child.className = opts;
+        else if (opts?.cls) child.className = opts.cls;
+        el.appendChild(child);
+        return child;
+      };
+      el.createSpan = (opts?: any) => {
+        const child = createMockEl("span");
+        if (typeof opts === "string") child.className = opts;
+        else if (opts?.cls) child.className = opts.cls;
+        if (opts?.text) child.textContent = opts.text;
+        el.appendChild(child);
+        return child;
+      };
+      return el;
+    };
+
+    const testDoc = document.implementation.createHTMLDocument("Test Popout");
+    const testWin = {
+      document: testDoc,
+      _windowSpacesLayoutId: "colored-space",
+    } as unknown as Window;
+
+    const leftBar = createMockEl("div");
+    leftBar.className = "window-spaces-activity-bar window-spaces-activity-left";
+    const dragEl = createMockEl("div");
+    dragEl.className = "window-spaces-activity-drag";
+    leftBar.appendChild(dragEl);
+    const spaceIdentity = createMockEl("div");
+    spaceIdentity.className = "window-spaces-space-identity";
+
+    const bars = {
+      left: leftBar,
+      right: createMockEl("div"),
+      spaceIdentity,
+      buttons: { left: document.createElement("button"), right: document.createElement("button") },
+    };
+
+    (manager as any).updateDragHandleIcon(bars, testWin);
+
+    const body = testWin.document.body;
+    expect(body.classList.contains("has-window-space-color")).toBe(true);
+    expect(body.classList.contains("has-space-accents-tab")).toBe(true);
+    expect(body.classList.contains("has-space-accents-splitter")).toBe(true);
+    expect(body.classList.contains("has-space-accents-panel")).toBe(true);
+    expect(body.classList.contains("has-space-accents-activity-bar")).toBe(true);
+
+    // Disable popout accents master toggle
+    settings.popoutAccents.enabled = false;
+    (manager as any).updateDragHandleIcon(bars, testWin);
+    expect(body.classList.contains("has-space-accents-tab")).toBe(false);
+    expect(body.classList.contains("has-space-accents-splitter")).toBe(false);
+    expect(body.classList.contains("has-space-accents-panel")).toBe(false);
+    expect(body.classList.contains("has-space-accents-activity-bar")).toBe(false);
+
+    // Re-enable master toggle, disable activityBar
+    settings.popoutAccents.enabled = true;
+    settings.popoutAccents.activityBar = false;
+    (manager as any).updateDragHandleIcon(bars, testWin);
+    // tab / panel accents are always-on when the master toggle is on
+    expect(body.classList.contains("has-space-accents-tab")).toBe(true);
+    expect(body.classList.contains("has-space-accents-splitter")).toBe(true);
+    expect(body.classList.contains("has-space-accents-panel")).toBe(true);
+    expect(body.classList.contains("has-space-accents-activity-bar")).toBe(false);
+
+    // Cleanup removes all classes
+    (manager as any).barsByWindow.set(testWin, bars);
+    (manager as any).injectedWindows.add(testWin);
+    manager.cleanupWindow(testWin);
+    expect(body.classList.contains("has-space-accents-tab")).toBe(false);
+    expect(body.classList.contains("has-space-accents-splitter")).toBe(false);
+    expect(body.classList.contains("has-space-accents-panel")).toBe(false);
+    expect(body.classList.contains("has-space-accents-activity-bar")).toBe(false);
+    expect(body.classList.contains("has-window-space-color")).toBe(false);
+  });
 });

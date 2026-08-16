@@ -925,6 +925,52 @@ describe("Validation & Auto-Save Guardrails (validationAndGuardrails.test.ts)", 
     expect(manager.getLayoutNameForWindow(pop2.win)).toBeNull();
   });
 
+  test("matchUnlabeledPopoutWindows does not match a newly opened popout that merely shares one file (no strong feature hit)", () => {
+    // 情境：Folder Spaces「open in new window」開的新 popout（leaf id / panelId 全新），
+    // 點開一個與 saved space 相同的檔案 → 不應被誤匹配為 saved Space。
+    const attributes = new Map<string, string>();
+    const body = {
+      classList: { contains: (cls: string) => cls === "is-popout-window" },
+      getAttribute: (attr: string) => attributes.get(attr) || null,
+      setAttribute: (attr: string, val: string) => attributes.set(attr, val),
+      querySelectorAll: () => [],
+      createDiv: () => document.createElement("div"),
+    };
+    const win: any = { outerWidth: 1000, outerHeight: 800, setTimeout: (cb: () => void) => { cb(); return 0; } };
+    const doc: any = { body, defaultView: win };
+    win.document = doc;
+    const leafEl = { ownerDocument: doc };
+
+    // 新開的 popout：leaf id 全新、無 panelId（folder space 尚無，或 panelId 不同）
+    const popLeaf = {
+      containerEl: leafEl,
+      id: "leaf-fresh-" + Date.now(),
+      getViewState: () => ({ type: "markdown", state: { file: "projectA/note1.md" } }),
+    };
+    mockPlugin.app.workspace.iterateAllLeaves = (cb: (leaf: any) => void) => cb(popLeaf);
+
+    mockPlugin.settings.spaces = [
+      {
+        id: "space-alpha",
+        name: "Alpha Workspace",
+        timestamp: 1000,
+        windowState: { size: { width: 1000, height: 800 } },
+        workspace: {
+          layout: {},
+          leaves: [
+            { id: "leaf-p1", type: "markdown", state: { file: "projectA/note1.md" } },
+          ],
+        },
+        metadata: { fileCount: 1, tabCount: 1, splitCount: 0 },
+      },
+    ];
+
+    manager.matchUnlabeledPopoutWindows();
+
+    expect(manager.getLayoutNameForWindow(win)).toBeNull();
+    expect(body.getAttribute("data-layout-name")).toBeNull();
+  });
+
   test("restore skips setting the popout leaf active when the user is already in the main window", async () => {
     const setActiveLeaf = vi.fn();
     const targetWin = {

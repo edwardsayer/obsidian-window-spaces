@@ -117,8 +117,9 @@ const en = {
         cancelButton: "Cancel",
         emptyNameError: "Space name cannot be empty",
         duplicateNameError: "A space with this name already exists",
-        iconLabel: "Icon / Emoji",
-        iconPlaceholder: "e.g. 🚀 or star",
+        iconLabel: "Space Logo",
+        iconPlaceholder: "e.g. 🚀 or star (icon or emoji)",
+        iconDesc: "Supports both icons and emoji",
         colorLabel: "Window Frame Color",
         colorPresetLabel: "Color Swatches",
         clearColor: "Clear Color",
@@ -202,12 +203,12 @@ const en = {
     settings: {
         title: "Window Spaces Settings",
         description: "Manage your Window Spaces and configure auto-save options.",
-        autoSaveSection: "General & Auto-Save Settings",
+        generalSection: "Window Spaces General Settings",
         autoSaveDescription: "Automatically save Window Spaces at regular intervals.",
         autoSaveEnabled: "Enable auto-save",
         showNotifications: "Show notifications",
         showNotificationsDesc: "Display notice toasts on saving or restoring spaces",
-        layoutDisplaySection: "Popout space display",
+        popoutDefaultsSection: "New Popout Defaults",
         showLayoutStatusBar: "Show space status bar",
         showLayoutStatusBarDesc: "Display the current space name and a Save button in a status-style bar at the bottom-left of every Popout window",
         showWindowLayoutsRibbonIcon: "Show 'Window Spaces' ribbon icon",
@@ -228,12 +229,12 @@ const en = {
         addView: "Add view",
         removeView: "Remove",
         viewTypePlaceholder: "View type (e.g. file-explorer)",
-        pickIcon: "Choose icon",
+        pickIcon: "Choose logo",
         restoreDefaultButtons: "Restore default buttons",
         restoreDefaultIcon: "Restore default icon",
         accentSection: "Window Accent & Icons",
-        defaultIcon: "Default Popout Icon",
-        defaultIconDesc: "Icon to use when a Space does not specify a custom icon",
+        defaultIcon: "Default Space Logo",
+        defaultIconDesc: "Default icon or emoji used for space logo",
         defaultBorderInset: "Default frame inset thickness",
         defaultBorderInsetDesc: "Set to 0 to hide the Popout frame border",
         defaultFoldedCorner: "Show default folded corner",
@@ -242,6 +243,18 @@ const en = {
         defaultActivityBarVisibilityDesc: "Controls whether the entire Activity Bar is shown",
         dragToReorder: "Drag to reorder",
         keepOneActivityBarView: "Keep at least one Activity Bar view button when another view is available",
+        popoutAccentsTitle: "Popout Space Theme Accents",
+        popoutAccentsDesc: "Inject Space theme colors into Popout windows. Can be disabled if it conflicts with third-party themes.",
+        popoutAccentsEnable: "Enable Space theme visual accents",
+        popoutAccentsEnableDesc: "Apply tab header tint & border, splitter highlight, pane border, and Activity Bar atmosphere tint",
+        popoutAccentsSplitter: "Splitters & resize handle highlights",
+        popoutAccentsSplitterDesc: "Tint splitters with space color and highlight on hover or drag",
+        popoutAccentsActivityBar: "Activity Bar atmosphere tint",
+        popoutAccentsActivityBarDesc: "Inject a gentle space theme background tint into left and right Activity Bars",
+        manageSpaces: "Manage spaces...",
+        showInSystemExplorer: "Show in system explorer",
+        copyPath: "Copy path",
+        pathCopied: "Path copied to clipboard",
     },
     notifications: {
         layoutSaved: "Space saved successfully",
@@ -338,8 +351,9 @@ const zhTW = {
         cancelButton: "取消",
         emptyNameError: "空間名稱不能為空",
         duplicateNameError: "此名稱的空間已經存在",
-        iconLabel: "圖示 / Emoji",
-        iconPlaceholder: "例如：🚀 或 star",
+        iconLabel: "空間 Logo",
+        iconPlaceholder: "例如：🚀 或 star（icon 或 emoji）",
+        iconDesc: "支援使用 icon 或 emoji",
         colorLabel: "視窗邊框顏色",
         colorPresetLabel: "快捷調色盤",
         clearColor: "清除顏色",
@@ -423,12 +437,12 @@ const zhTW = {
     settings: {
         title: "Window Spaces 設定",
         description: "管理您的 Window Spaces 並設定自動儲存選項。",
-        autoSaveSection: "一般與自動儲存設定",
+        generalSection: "Window Spaces 一般設定",
         autoSaveDescription: "定期自動儲存 Window Spaces。",
         autoSaveEnabled: "啟用自動儲存",
         showNotifications: "顯示通知",
         showNotificationsDesc: "在儲存或恢復空間時顯示通知快訊",
-        layoutDisplaySection: "Popout 空間顯示",
+        popoutDefaultsSection: "新 Popout 預設設定",
         showLayoutStatusBar: "顯示空間狀態列",
         showLayoutStatusBarDesc: "在每個 Popout 視窗左下方以狀態列樣式顯示目前空間名稱與儲存按鈕",
         showWindowLayoutsRibbonIcon: "顯示「Window Spaces」側邊欄圖示",
@@ -449,12 +463,12 @@ const zhTW = {
         addView: "新增 View",
         removeView: "移除",
         viewTypePlaceholder: "View type（例如 file-explorer）",
-        pickIcon: "選擇圖示",
+        pickIcon: "選擇 Logo",
         restoreDefaultButtons: "還原預設按鈕",
         restoreDefaultIcon: "還原預設圖示",
         accentSection: "視窗外觀與圖示",
-        defaultIcon: "預設 Popout 圖示",
-        defaultIconDesc: "當 Space 未指定自訂 Icon 時使用的預設圖示",
+        defaultIcon: "預設空間 Logo",
+        defaultIconDesc: "空間 Logo 使用的預設 icon 或 emoji",
         defaultBorderInset: "預設邊框 inset 厚度",
         defaultBorderInsetDesc: "設定為 0 時不顯示 Popout 視窗邊框",
         defaultFoldedCorner: "預設顯示左上角折頁裝飾",
@@ -463,6 +477,18 @@ const zhTW = {
         defaultActivityBarVisibilityDesc: "控制是否顯示整個 Activity Bar",
         dragToReorder: "拖曳排序",
         keepOneActivityBarView: "仍有其他可用 View 時，Activity Bar 至少要保留一個按鈕",
+        popoutAccentsTitle: "Popout 空間主題裝飾增強",
+        popoutAccentsDesc: "為 Popout 視窗注入空間主題色。若與第三方主題樣式衝突，可隨時關閉。",
+        popoutAccentsEnable: "啟用空間主題裝飾增強",
+        popoutAccentsEnableDesc: "在 Popout 視窗中套用分頁標籤底色與邊框、窗格分隔線高亮、窗格邊框與活動列氛圍色",
+        popoutAccentsSplitter: "窗格調整分隔線與高亮",
+        popoutAccentsSplitterDesc: "窗格分割條帶有主題色微光，懸浮與拖曳時顯示高亮與光暈",
+        popoutAccentsActivityBar: "Activity Bar 氛圍底色",
+        popoutAccentsActivityBarDesc: "在左右兩側 Activity Bar 注入柔和的空間主題底色",
+        manageSpaces: "管理空間...",
+        showInSystemExplorer: "在系統資料夾中顯示",
+        copyPath: "複製路徑",
+        pathCopied: "路徑已複製到剪貼簿",
     },
     notifications: {
         layoutSaved: "空間儲存成功",
@@ -559,8 +585,9 @@ const zhCN = {
         cancelButton: "取消",
         emptyNameError: "空间名称不能为空",
         duplicateNameError: "此名称的空间已存在",
-        iconLabel: "图标 / Emoji",
-        iconPlaceholder: "例如：🚀 或 star",
+        iconLabel: "空间 Logo",
+        iconPlaceholder: "例如：🚀 或 star（icon 或 emoji）",
+        iconDesc: "支持使用 icon 或 emoji",
         colorLabel: "窗口边框颜色",
         colorPresetLabel: "快捷调色盘",
         clearColor: "清除颜色",
@@ -644,12 +671,12 @@ const zhCN = {
     settings: {
         title: "Window Spaces 设置",
         description: "管理您的 Window Spaces 并配置自动保存选项。",
-        autoSaveSection: "常规与自动保存设置",
+        generalSection: "Window Spaces 常规设置",
         autoSaveDescription: "定期自动保存 Window Spaces。",
         autoSaveEnabled: "启用自动保存",
         showNotifications: "显示通知",
         showNotificationsDesc: "在保存或恢复空间时显示通知消息",
-        layoutDisplaySection: "Popout 空间显示",
+        popoutDefaultsSection: "新 Popout 默认设置",
         showLayoutStatusBar: "显示空间状态栏",
         showLayoutStatusBarDesc: "在每个 Popout 窗口左下方以状态栏样式显示当前空间名称与保存按钮",
         showWindowLayoutsRibbonIcon: "显示“Window Spaces”侧边栏图标",
@@ -670,12 +697,12 @@ const zhCN = {
         addView: "添加 View",
         removeView: "移除",
         viewTypePlaceholder: "View type（例如 file-explorer）",
-        pickIcon: "选择图标",
+        pickIcon: "选择 Logo",
         restoreDefaultButtons: "还原默认按钮",
         restoreDefaultIcon: "还原默认图标",
         accentSection: "窗口外观与图标",
-        defaultIcon: "默认 Popout 图标",
-        defaultIconDesc: "当 Space 未指定自定义 Icon 时使用的默认图标",
+        defaultIcon: "默认空间 Logo",
+        defaultIconDesc: "空间 Logo 使用的默认 icon 或 emoji",
         defaultBorderInset: "默认边框 inset 厚度",
         defaultBorderInsetDesc: "设置为 0 时不显示 Popout 窗口边框",
         defaultFoldedCorner: "默认显示左上角折页装饰",
@@ -684,6 +711,18 @@ const zhCN = {
         defaultActivityBarVisibilityDesc: "控制是否显示整个 Activity Bar",
         dragToReorder: "拖放排序",
         keepOneActivityBarView: "仍有其他可用 View 时，Activity Bar 至少要保留一个按钮",
+        popoutAccentsTitle: "Popout 空间主题装饰增强",
+        popoutAccentsDesc: "为 Popout 窗口注入空间主题色。若与第三方主题样式冲突，可随时关闭。",
+        popoutAccentsEnable: "启用空间主题装饰增强",
+        popoutAccentsEnableDesc: "在 Popout 窗口中应用标签页底色与边框、窗格分隔线高亮、窗格边框与活动栏氛围色",
+        popoutAccentsSplitter: "窗格调整分隔线与高亮",
+        popoutAccentsSplitterDesc: "窗格分割条带有主题色微光，悬停与拖拽时显示高亮与光晕",
+        popoutAccentsActivityBar: "Activity Bar 氛围底色",
+        popoutAccentsActivityBarDesc: "在左右两侧 Activity Bar 注入柔和的空间主题底色",
+        manageSpaces: "管理空间...",
+        showInSystemExplorer: "在系统文件夹中显示",
+        copyPath: "复制路径",
+        pathCopied: "路径已复制到剪贴板",
     },
     notifications: {
         layoutSaved: "空间保存成功",
@@ -913,6 +952,15 @@ function t(key) {
  */
 function tWithParams(key, params) {
     return getI18n().tWithParams(key, params);
+}
+
+/** The neutral icon used when a Space has no custom icon or emoji. */
+const DEFAULT_SPACE_ICON = "square";
+function resolveSpaceIcon(icon, configuredDefaultIcon) {
+    return (icon === null || icon === void 0 ? void 0 : icon.trim()) || (configuredDefaultIcon === null || configuredDefaultIcon === void 0 ? void 0 : configuredDefaultIcon.trim()) || DEFAULT_SPACE_ICON;
+}
+function isSpaceEmoji(value) {
+    return /\p{Extended_Pictographic}/u.test(value) || !/^[a-zA-Z0-9-]+$/.test(value);
 }
 
 /**
@@ -1296,15 +1344,6 @@ function enumerateAvailableViews(app) {
         }
     }
     return { left, right };
-}
-
-/** The neutral icon used when a Space has no custom icon or emoji. */
-const DEFAULT_SPACE_ICON = "square";
-function resolveSpaceIcon(icon, configuredDefaultIcon) {
-    return (icon === null || icon === void 0 ? void 0 : icon.trim()) || (configuredDefaultIcon === null || configuredDefaultIcon === void 0 ? void 0 : configuredDefaultIcon.trim()) || DEFAULT_SPACE_ICON;
-}
-function isSpaceEmoji(value) {
-    return /\p{Extended_Pictographic}/u.test(value) || !/^[a-zA-Z0-9-]+$/.test(value);
 }
 
 /**
@@ -2904,6 +2943,7 @@ class WindowLayoutManager {
                     .filter((pid) => !!pid));
                 let bestSpace = null;
                 let bestScore = 0;
+                let bestStrongHit = false;
                 for (const space of availableSpaces) {
                     if (claimedLayoutNames.has(space.name))
                         continue;
@@ -2922,6 +2962,11 @@ class WindowLayoutManager {
                     })
                         .filter((pid) => !!pid));
                     let score = 0;
+                    // 強特徵命中：leafIdMarker / leaf id / panelId（重啟恢復或同 session 的識別）。
+                    // 純檔案路徑匹配是弱特徵（新開的 popout 可能恰好開了相同檔案），
+                    // 需提高門檻，避免 Folder Spaces「open in new window」開的新 popout
+                    // 點檔後被誤匹配為 saved Space。
+                    let strongHit = false;
                     // (0) 視窗識別記號（leafIdMarker）比對：上次識別/restore 時回寫的
                     // live leaf id 集合，重啟後視窗 leaf id 穩定 → 直接命中，最高權重。
                     if (Array.isArray(space.leafIdMarker) && space.leafIdMarker.length > 0) {
@@ -2931,11 +2976,15 @@ class WindowLayoutManager {
                                 markerHit++;
                         }
                         score += markerHit * 200;
+                        if (markerHit > 0)
+                            strongHit = true;
                     }
                     // (a) Leaf ID 匹配 (+100/leaf)
                     for (const id of winLeafIds) {
-                        if (savedLeafIds.has(id))
+                        if (savedLeafIds.has(id)) {
                             score += 100;
+                            strongHit = true;
+                        }
                     }
                     // (b) 檔案路徑匹配 (+10/file)
                     let matchingFilesCount = 0;
@@ -2947,11 +2996,17 @@ class WindowLayoutManager {
                     // (e) view state 特徵比對：folder-spaces-explorer 等 view 的 panelId
                     // 跨 session 穩定，補足無檔案 space 的辨識（leaf id 重啟後可能重建）。
                     for (const pid of winPanelIds) {
-                        if (savedPanelIds.has(pid))
+                        if (savedPanelIds.has(pid)) {
                             score += 100;
+                            strongHit = true;
+                        }
                     }
                     // (c) 檔案完全吻合（Popout 中所有檔案與 space 中所有檔案一致）時大幅加分 (+50)
-                    if (winFiles.size > 0 && winFiles.size === savedFiles.size && matchingFilesCount === winFiles.size) {
+                    // 限「至少 2 個檔案」：單一檔案 space 的吻合僅靠檔案路徑（+10），
+                    // 不足以證明是同一 space（新開 popout 開 1 個相同檔案即會誤判）。
+                    if (winFiles.size >= 2 &&
+                        winFiles.size === savedFiles.size &&
+                        matchingFilesCount === winFiles.size) {
                         score += 50;
                     }
                     // (d) 視窗幾何尺寸與位置相似度 (已有內容匹配時才作為加分項 +5)
@@ -2966,10 +3021,14 @@ class WindowLayoutManager {
                     if (score > bestScore) {
                         bestScore = score;
                         bestSpace = space;
+                        bestStrongHit = strongHit;
                     }
                 }
-                // 嚴格門檻：必須至少有一項 Leaf / 檔案內容 match (score >= 10)
-                if (bestSpace && bestScore >= 10) {
+                // 嚴格門檻：有強特徵命中（leafIdMarker / leaf id / panelId）時，
+                // 只要有一項內容 match（>= 10）即可；否則（僅檔案路徑匹配）需要
+                // 多檔案吻合（>= 30），避免「新開 popout 開了一個與 saved space
+                // 相同的檔案」就被誤匹配（例如 Folder Spaces open in new window 點檔後）。
+                if (bestSpace && bestScore >= (bestStrongHit ? 10 : 30)) {
                     claimedLayoutNames.add(bestSpace.name);
                     this.setLayoutLabelForWindow(win, bestSpace.name);
                     this.layoutWindows.set(bestSpace, win);
@@ -3018,17 +3077,32 @@ class WindowLayoutManager {
         return element;
     }
     updateLayoutLabelElement(element, layoutName, targetWin) {
+        // 移除舊版獨立 icon 元素（已整合進 name-wrap 的 vault-switcher 風格）
         const iconElement = element.querySelector(".window-spaces-layout-icon");
         if (iconElement) {
             iconElement.remove();
         }
-        let nameElement = element.querySelector(".window-spaces-layout-name");
+        // 仿主視窗 vault switcher：space name 前端加上下切換鈕（chevrons-up-down）
+        let nameWrap = element.querySelector(".window-spaces-layout-name-wrap");
+        if (!nameWrap) {
+            nameWrap = element.createDiv({ cls: "window-spaces-layout-name-wrap" });
+        }
+        let nameIcon = nameWrap.querySelector(".window-spaces-layout-name-icon");
+        if (!nameIcon) {
+            nameIcon = nameWrap.createDiv({ cls: "window-spaces-layout-name-icon" });
+            obsidian.setIcon(nameIcon, "chevrons-up-down");
+        }
+        let nameElement = nameWrap.querySelector(".window-spaces-layout-name");
         if (!nameElement) {
-            nameElement = element.createSpan({ cls: "window-spaces-layout-name" });
+            nameElement = nameWrap.createSpan({ cls: "window-spaces-layout-name" });
         }
         let actionsElement = element.querySelector(".window-spaces-layout-actions");
         if (!actionsElement) {
             actionsElement = element.createDiv({ cls: "window-spaces-layout-actions" });
+        }
+        // 確保 name-wrap 在 actions 之前
+        if (nameWrap.nextElementSibling !== actionsElement) {
+            element.insertBefore(nameWrap, actionsElement);
         }
         const ensureActionButton = (className, icon, label, onClick) => {
             let button = actionsElement ? actionsElement.querySelector(`.${className}`) : null;
@@ -3049,6 +3123,18 @@ class WindowLayoutManager {
             return button;
         };
         nameElement.textContent = layoutName;
+        // 仿 vault switcher 互動：左鍵開啟 space 選單，右鍵開啟 vault 風格選單
+        nameWrap.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.showSpaceMenu(targetWin, nameWrap, e);
+        };
+        nameWrap.oncontextmenu = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.showSpaceContextMenu(targetWin, e);
+        };
+        nameWrap.classList.toggle("window-spaces-layout-switcher", layoutName !== t("common.noLayout"));
         const currentLayout = this.plugin.settings.spaces.find((l) => l.name === layoutName);
         const isAutoSave = !!(currentLayout === null || currentLayout === void 0 ? void 0 : currentLayout.autoSave);
         // 移除舊版 window-spaces-layout-save 按鈕（若存在）
@@ -3086,6 +3172,110 @@ class WindowLayoutManager {
         element.setAttribute("aria-label", `${t("common.layoutLabel")}: ${layoutName}`);
         element.setAttribute("title", layoutName);
         element.dataset.layoutName = layoutName;
+    }
+    /** 仿 vault switcher 左鍵選單：列出所有非 Archived spaces，底部附 Manage spaces...。 */
+    showSpaceMenu(targetWin, anchor, _e) {
+        const menu = new obsidian.Menu();
+        const spaces = this.plugin.settings.spaces.filter((s) => s.archived !== true);
+        spaces.forEach((space) => {
+            menu.addItem((item) => {
+                var _a;
+                // icon 與 Window Spaces switcher list 一致；emoji 放入 menu-item-icon 容器
+                // （與 lucide icon 同位置），確保文字起始位置一致。
+                const iconVal = resolveSpaceIcon(space.icon, (_a = this.plugin.settings) === null || _a === void 0 ? void 0 : _a.defaultIcon);
+                if (isSpaceEmoji(iconVal)) {
+                    const itemAny = item;
+                    if (itemAny.iconEl) {
+                        item.setTitle(space.name);
+                        itemAny.iconEl.empty();
+                        itemAny.iconEl.setText(iconVal);
+                    }
+                    else {
+                        // fallback：Menu 無 iconEl 時，emoji 置於標題前（單空格）
+                        item.setTitle(`${iconVal} ${space.name}`);
+                    }
+                }
+                else {
+                    item.setTitle(space.name);
+                    item.setIcon(iconVal);
+                }
+                item.onClick((evt) => {
+                    // 與 switcher list 一致：無 Shift = 開新 Popout，Shift = 替換本 popout
+                    const forceNewWindow = !evt.shiftKey;
+                    void this.plugin.manager.restoreLayout(space, {
+                        targetWindow: targetWin,
+                        forceNewWindow,
+                        forceReload: !forceNewWindow,
+                        focusExistingWindow: true,
+                    });
+                });
+            });
+        });
+        if (spaces.length > 0)
+            menu.addSeparator();
+        menu.addItem((item) => {
+            item.setTitle(t("settings.manageSpaces"));
+            item.setIcon("layout-dashboard");
+            item.onClick(() => this.plugin.openWindowLayoutsModal(targetWin));
+        });
+        const rect = anchor.getBoundingClientRect();
+        menu.showAtPosition({ x: rect.left, y: rect.bottom }, targetWin.document);
+        this.markSpaceMenu(menu, targetWin);
+    }
+    /** 仿 vault switcher 右鍵選單：Show in system explorer / Copy path。 */
+    showSpaceContextMenu(targetWin, e) {
+        const menu = new obsidian.Menu();
+        menu.addItem((item) => {
+            item.setTitle(t("settings.showInSystemExplorer"));
+            item.setIcon("arrow-up-right");
+            item.onClick(() => {
+                var _a, _b;
+                try {
+                    (_b = (_a = this.app).showInFolder) === null || _b === void 0 ? void 0 : _b.call(_a, "");
+                }
+                catch (err) {
+                    console.warn("Failed to reveal vault in system explorer:", err);
+                }
+            });
+        });
+        menu.addItem((item) => {
+            item.setTitle(t("settings.copyPath"));
+            item.setIcon("clipboard");
+            item.onClick(() => void this.copyVaultPath(targetWin));
+        });
+        menu.showAtMouseEvent(e);
+        this.markSpaceMenu(menu, targetWin);
+    }
+    /** 標記選單，讓 CSS 統一 menu-item-icon 容器寬度（emoji 與 lucide icon 的 title 對齊）。 */
+    markSpaceMenu(menu, targetWin) {
+        var _a;
+        try {
+            const menuEl = menu.dom;
+            if (menuEl) {
+                menuEl.classList.add("window-spaces-space-menu");
+                return;
+            }
+            const menus = targetWin.document.querySelectorAll(".menu");
+            (_a = menus[menus.length - 1]) === null || _a === void 0 ? void 0 : _a.classList.add("window-spaces-space-menu");
+        }
+        catch (_b) {
+            // 標記失敗不影響選單功能
+        }
+    }
+    /** 複製 vault 根目錄路徑到剪貼簿。 */
+    copyVaultPath(targetWin) {
+        var _a, _b;
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const adapter = this.app.vault.adapter;
+                const path = (_b = (_a = adapter === null || adapter === void 0 ? void 0 : adapter.getFullPath) === null || _a === void 0 ? void 0 : _a.call(adapter, "")) !== null && _b !== void 0 ? _b : this.app.vault.getName();
+                yield targetWin.navigator.clipboard.writeText(path);
+                new obsidian.Notice(`${this.app.vault.getName()}: ${t("settings.pathCopied")}`);
+            }
+            catch (err) {
+                console.warn("Failed to copy vault path:", err);
+            }
+        });
     }
     /** 開啟 Window Spaces 設定頁面。 */
     openPluginSettings() {
@@ -3251,7 +3441,7 @@ class WindowLayoutManager {
                         this.lastValidSnapshots.set(targetWin, captured);
                     }
                 }
-                catch (_e) {
+                catch (_f) {
                     // 視窗已被摧毀時 capture 可能出錯
                 }
                 // 2. 防呆門檻：若現場 capture 為空/失敗（例如視窗正被關閉），退回使用關閉前最後一次合法的快照
@@ -3523,7 +3713,7 @@ class WindowLayoutManager {
      * 捕獲當前活動視窗的佈局
      */
     captureCurrentLayout(options = {}, targetWindow) {
-        var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
+        var _a, _b, _c, _d, _f, _g, _h, _j, _k, _l;
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 const workspace = this.app.workspace;
@@ -3618,7 +3808,7 @@ class WindowLayoutManager {
                     },
                     workspace: {
                         layout: floatingLayout,
-                        activeFile: (_f = (_e = activeLeaf === null || activeLeaf === void 0 ? void 0 : activeLeaf.view) === null || _e === void 0 ? void 0 : _e.file) === null || _f === void 0 ? void 0 : _f.path,
+                        activeFile: (_g = (_f = activeLeaf === null || activeLeaf === void 0 ? void 0 : activeLeaf.view) === null || _f === void 0 ? void 0 : _f.file) === null || _g === void 0 ? void 0 : _g.path,
                         leaves,
                     },
                     metadata: {
@@ -3627,13 +3817,13 @@ class WindowLayoutManager {
                         splitCount: 0,
                         createdAt: new Date().toISOString(),
                         obsidianVersion: this.app.version || "unknown",
-                        pluginVersion: ((_h = (_g = this.plugin) === null || _g === void 0 ? void 0 : _g.manifest) === null || _h === void 0 ? void 0 : _h.version) || "1.0.0",
+                        pluginVersion: ((_j = (_h = this.plugin) === null || _h === void 0 ? void 0 : _h.manifest) === null || _j === void 0 ? void 0 : _j.version) || "1.0.0",
                     },
                     windowInfo: {
                         firstLeafId: leaves.length > 0 ? leaves[0].id : undefined,
                     },
                 };
-                const existingLayout = (_k = (_j = this.plugin.settings) === null || _j === void 0 ? void 0 : _j.spaces) === null || _k === void 0 ? void 0 : _k.find((l) => l.name === capturedLayout.name);
+                const existingLayout = (_l = (_k = this.plugin.settings) === null || _k === void 0 ? void 0 : _k.spaces) === null || _l === void 0 ? void 0 : _l.find((l) => l.name === capturedLayout.name);
                 if (existingLayout) {
                     if (existingLayout.includeGeometry !== undefined) {
                         capturedLayout.includeGeometry = existingLayout.includeGeometry;
@@ -3658,7 +3848,7 @@ class WindowLayoutManager {
                 try {
                     capturedLayout.hidden = this.plugin.popoutLayout.captureHiddenState(currentWin);
                 }
-                catch (_l) {
+                catch (_m) {
                     capturedLayout.hidden = undefined;
                 }
                 // 儲存對話框開啟後 activeWindow 可能已經切回主視窗，
@@ -3695,7 +3885,7 @@ class WindowLayoutManager {
         });
     }
     restoreLayoutInternal(layout, options = {}) {
-        var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m;
+        var _a, _b, _c, _d, _f, _g, _h, _j, _k, _l, _m, _o;
         return __awaiter(this, void 0, void 0, function* () {
             this.isRestoringLayout = true;
             try {
@@ -3789,7 +3979,7 @@ class WindowLayoutManager {
                                     : undefined,
                             }
                             : undefined;
-                        const popoutLeaf = (_e = extWs.openPopoutLeaf) === null || _e === void 0 ? void 0 : _e.call(extWs, popoutInitData);
+                        const popoutLeaf = (_f = extWs.openPopoutLeaf) === null || _f === void 0 ? void 0 : _f.call(extWs, popoutInitData);
                         // 輪詢等待全新的 Live Popout Window 在 Electron 中被正式掛載建立（最多等待 2 秒）
                         let newlyCreatedWin = null;
                         for (let attempt = 0; attempt < 40; attempt++) {
@@ -3800,7 +3990,7 @@ class WindowLayoutManager {
                                 break;
                         }
                         const extPopoutLeaf = popoutLeaf;
-                        targetWin = newlyCreatedWin || ((_g = (_f = extPopoutLeaf === null || extPopoutLeaf === void 0 ? void 0 : extPopoutLeaf.containerEl) === null || _f === void 0 ? void 0 : _f.ownerDocument) === null || _g === void 0 ? void 0 : _g.defaultView) || null;
+                        targetWin = newlyCreatedWin || ((_h = (_g = extPopoutLeaf === null || extPopoutLeaf === void 0 ? void 0 : extPopoutLeaf.containerEl) === null || _g === void 0 ? void 0 : _g.ownerDocument) === null || _h === void 0 ? void 0 : _h.defaultView) || null;
                         if (targetWin) {
                             // 【幾何前置】新視窗一誕生立即進行座標移動與尺寸縮放，消弭兩階段鋸齒 jump
                             this.restoreWindowGeometry(targetWin, layout.windowState, layout.includeGeometry, true);
@@ -3823,7 +4013,7 @@ class WindowLayoutManager {
                 // 關閉所有 floating window、detach 主視窗與全部 popout 的 DOM 後重建，
                 // 代價極高）。巢狀 split 或取代既有視窗等複雜情境才 fallback 到 changeLayout。
                 let builtLeaves = null;
-                if (targetIndex >= 0 && ((_h = layout.workspace) === null || _h === void 0 ? void 0 : _h.layout)) {
+                if (targetIndex >= 0 && ((_j = layout.workspace) === null || _j === void 0 ? void 0 : _j.layout)) {
                     const rootNode = this.extractLayoutRootNode(layout.workspace.layout);
                     if (isNewlyCreatedWindow && targetWin && this.isSimpleLayoutStructure(rootNode)) {
                         builtLeaves = yield this.buildSimpleWindowStructure(targetWin, rootNode);
@@ -3840,7 +4030,7 @@ class WindowLayoutManager {
                                     this.plugin.popoutLayout.hideColumn(targetWin, "right");
                                 }
                             }
-                            catch (_o) {
+                            catch (_p) {
                                 // Ignore DOM not ready error during early apply
                             }
                         }
@@ -3898,13 +4088,13 @@ class WindowLayoutManager {
                 yield new Promise((resolve) => window.setTimeout(resolve, 150));
                 let missingFiles = [];
                 if (options.validateFiles !== false && savedLeaves.length > 0) {
-                    missingFiles = yield this.restoreFileStatesForWindow(targetWin, savedLeaves, (_j = layout.workspace) === null || _j === void 0 ? void 0 : _j.activeFile);
+                    missingFiles = yield this.restoreFileStatesForWindow(targetWin, savedLeaves, (_k = layout.workspace) === null || _k === void 0 ? void 0 : _k.activeFile);
                 }
                 // leaf 層級建立情境：saved leaf 與 live leaf 的 id 不同，需以「先序
                 // 順序」對應套用 pinned，並把 hidden leaf id 轉換成 live id。
                 if (builtLeaves && builtLeaves.length > 0) {
                     this.applyPinnedStateToBuiltLeaves(builtLeaves, savedLeaves);
-                    if (((_l = (_k = layout.hidden) === null || _k === void 0 ? void 0 : _k.hiddenLeafIds) === null || _l === void 0 ? void 0 : _l.length) && targetWin) {
+                    if (((_m = (_l = layout.hidden) === null || _l === void 0 ? void 0 : _l.hiddenLeafIds) === null || _m === void 0 ? void 0 : _m.length) && targetWin) {
                         const hiddenIds = new Set(layout.hidden.hiddenLeafIds);
                         layout.hidden.hiddenLeafIds = builtLeaves
                             .filter((_, i) => { var _a; return hiddenIds.has((_a = savedLeaves[i]) === null || _a === void 0 ? void 0 : _a.id); })
@@ -3923,7 +4113,7 @@ class WindowLayoutManager {
                 // 5. 調整視窗尺寸與座標，並聚焦視窗
                 if (targetWin) {
                     this.layoutWindows.set(layout, targetWin);
-                    (_m = this.plugin.activityBars) === null || _m === void 0 ? void 0 : _m.renderWindow(targetWin);
+                    (_o = this.plugin.activityBars) === null || _o === void 0 ? void 0 : _o.renderWindow(targetWin);
                     // 幾何已在 changeLayout 後立即套用；此處僅以差異驗證（force=false）
                     // 校正檔案開啟期間可能出現的微幅偏移，避免無謂地移動已就位的視窗。
                     this.restoreWindowGeometry(targetWin, layout.windowState, layout.includeGeometry, false);
@@ -3945,7 +4135,7 @@ class WindowLayoutManager {
                             try {
                                 this.app.workspace.setActiveLeaf(winLeaves[0], { focus: true });
                             }
-                            catch (_p) {
+                            catch (_q) {
                                 // Ignore focus error
                             }
                         }
@@ -5674,11 +5864,11 @@ class WindowSpacesSettingTab extends obsidian.PluginSettingTab {
         return setting;
     }
     display() {
-        var _a, _b, _c;
+        var _a, _b, _c, _d;
         const { containerEl } = this;
         containerEl.empty();
-        // ===== 一般設定（單一 panel） =====
-        new obsidian.Setting(containerEl).setName(t("settings.autoSaveSection")).setHeading();
+        // ===== Window Spaces 一般設定（單一 panel） =====
+        new obsidian.Setting(containerEl).setName(t("settings.generalSection")).setHeading();
         const generalGroup = (_a = this.createGroup(containerEl)) !== null && _a !== void 0 ? _a : containerEl;
         this.createSettingIn(generalGroup, (s) => {
             s.setName(t("settings.showNotifications")).setDesc(t("settings.showNotificationsDesc"));
@@ -5691,6 +5881,101 @@ class WindowSpacesSettingTab extends obsidian.PluginSettingTab {
             });
         });
         this.createSettingIn(generalGroup, (s) => {
+            // 主視窗 ribbon 圖示（一般設定，非 per-space）
+            s.setName(t("settings.showWindowLayoutsRibbonIcon")).setDesc(t("settings.showWindowLayoutsRibbonIconDesc"));
+            s.addToggle((toggle) => {
+                toggle.setValue(this.plugin.settings.showWindowLayoutsRibbonIcon !== false);
+                toggle.onChange((value) => __awaiter(this, void 0, void 0, function* () {
+                    this.plugin.settings.showWindowLayoutsRibbonIcon = value;
+                    yield this.plugin.saveSettings();
+                    this.plugin.refreshRibbonIcons();
+                }));
+            });
+        });
+        this.createSettingIn(generalGroup, (s) => {
+            // Popout 底部 space status bar（一般設定，無 per-space override）
+            s.setName(t("settings.showLayoutStatusBar")).setDesc(t("settings.showLayoutStatusBarDesc"));
+            s.addToggle((toggle) => {
+                toggle.setValue(this.plugin.settings.showLayoutStatusBar === true);
+                toggle.onChange((value) => __awaiter(this, void 0, void 0, function* () {
+                    this.plugin.settings.showLayoutStatusBar = value;
+                    yield this.plugin.saveSettings();
+                    this.plugin.manager.refreshLayoutLabels();
+                }));
+            });
+        });
+        // Space 主題視覺裝飾增強（一般設定，無 per-space override）
+        this.createSettingIn(generalGroup, (s) => {
+            s.setName(t("settings.popoutAccentsEnable")).setDesc(t("settings.popoutAccentsEnableDesc"));
+            s.addToggle((toggle) => {
+                var _a;
+                toggle.setValue(((_a = this.plugin.settings.popoutAccents) === null || _a === void 0 ? void 0 : _a.enabled) !== false);
+                toggle.onChange((value) => __awaiter(this, void 0, void 0, function* () {
+                    if (!this.plugin.settings.popoutAccents) {
+                        this.plugin.settings.popoutAccents = { enabled: value, splitter: true, activityBar: true };
+                    }
+                    else {
+                        this.plugin.settings.popoutAccents.enabled = value;
+                    }
+                    yield this.plugin.saveSettings();
+                    this.plugin.activityBars.refreshAll();
+                    this.display();
+                }));
+            });
+        });
+        if (((_b = this.plugin.settings.popoutAccents) === null || _b === void 0 ? void 0 : _b.enabled) !== false) {
+            this.createSettingIn(generalGroup, (s) => {
+                s.setName(t("settings.popoutAccentsSplitter")).setDesc(t("settings.popoutAccentsSplitterDesc"));
+                s.addToggle((toggle) => {
+                    var _a;
+                    toggle.setValue(((_a = this.plugin.settings.popoutAccents) === null || _a === void 0 ? void 0 : _a.splitter) !== false);
+                    toggle.onChange((value) => __awaiter(this, void 0, void 0, function* () {
+                        if (!this.plugin.settings.popoutAccents) {
+                            this.plugin.settings.popoutAccents = { enabled: true, splitter: value, activityBar: true };
+                        }
+                        else {
+                            this.plugin.settings.popoutAccents.splitter = value;
+                        }
+                        yield this.plugin.saveSettings();
+                        this.plugin.activityBars.refreshAll();
+                    }));
+                });
+            });
+            this.createSettingIn(generalGroup, (s) => {
+                s.setName(t("settings.popoutAccentsActivityBar")).setDesc(t("settings.popoutAccentsActivityBarDesc"));
+                s.addToggle((toggle) => {
+                    var _a;
+                    toggle.setValue(((_a = this.plugin.settings.popoutAccents) === null || _a === void 0 ? void 0 : _a.activityBar) !== false);
+                    toggle.onChange((value) => __awaiter(this, void 0, void 0, function* () {
+                        if (!this.plugin.settings.popoutAccents) {
+                            this.plugin.settings.popoutAccents = { enabled: true, splitter: true, activityBar: value };
+                        }
+                        else {
+                            this.plugin.settings.popoutAccents.activityBar = value;
+                        }
+                        yield this.plugin.saveSettings();
+                        this.plugin.activityBars.refreshAll();
+                    }));
+                });
+            });
+        }
+        this.createSettingIn(generalGroup, (s) => {
+            // Workspace API 攔截器（一般設定，非 per-space）
+            s.setName(t("settings.enableInterceptor")).setDesc(t("settings.enableInterceptorDesc"));
+            s.addToggle((toggle) => {
+                toggle.setValue(this.plugin.settings.workspaceInterceptorEnabled !== false);
+                toggle.onChange((value) => __awaiter(this, void 0, void 0, function* () {
+                    this.plugin.settings.workspaceInterceptorEnabled = value;
+                    this.plugin.workspaceInterceptor.enabled = value;
+                    yield this.plugin.saveSettings();
+                }));
+            });
+        });
+        // ===== 新 Popout 預設設定（per space 可 override） =====
+        new obsidian.Setting(containerEl).setName(t("settings.popoutDefaultsSection")).setHeading();
+        const defaultsGroup = (_c = this.createGroup(containerEl)) !== null && _c !== void 0 ? _c : containerEl;
+        this.createSettingIn(defaultsGroup, (s) => {
+            // 全局自動儲存預設（per space 可用 auto-save toggle override）
             s.setName(t("settings.autoSaveEnabled")).setDesc(t("settings.autoSaveDescription"));
             s.addToggle((toggle) => {
                 toggle.setValue(this.plugin.settings.autoSave === true);
@@ -5706,32 +5991,7 @@ class WindowSpacesSettingTab extends obsidian.PluginSettingTab {
                 }));
             });
         });
-        // ===== Popout 空間顯示（單一 panel） =====
-        new obsidian.Setting(containerEl).setName(t("settings.layoutDisplaySection")).setHeading();
-        const displayGroup = (_b = this.createGroup(containerEl)) !== null && _b !== void 0 ? _b : containerEl;
-        this.createSettingIn(displayGroup, (s) => {
-            s.setName(t("settings.showLayoutStatusBar")).setDesc(t("settings.showLayoutStatusBarDesc"));
-            s.addToggle((toggle) => {
-                toggle.setValue(this.plugin.settings.showLayoutStatusBar === true);
-                toggle.onChange((value) => __awaiter(this, void 0, void 0, function* () {
-                    this.plugin.settings.showLayoutStatusBar = value;
-                    yield this.plugin.saveSettings();
-                    this.plugin.manager.refreshLayoutLabels();
-                }));
-            });
-        });
-        this.createSettingIn(displayGroup, (s) => {
-            s.setName(t("settings.showWindowLayoutsRibbonIcon")).setDesc(t("settings.showWindowLayoutsRibbonIconDesc"));
-            s.addToggle((toggle) => {
-                toggle.setValue(this.plugin.settings.showWindowLayoutsRibbonIcon !== false);
-                toggle.onChange((value) => __awaiter(this, void 0, void 0, function* () {
-                    this.plugin.settings.showWindowLayoutsRibbonIcon = value;
-                    yield this.plugin.saveSettings();
-                    this.plugin.refreshRibbonIcons();
-                }));
-            });
-        });
-        this.createSettingIn(displayGroup, (s) => {
+        this.createSettingIn(defaultsGroup, (s) => {
             s.setName(t("settings.defaultIcon")).setDesc(t("settings.defaultIconDesc"));
             s.controlEl.addClass("window-space-icon-setting-control");
             let currentIcon = this.plugin.settings.defaultIcon || DEFAULT_SPACE_ICON;
@@ -5780,7 +6040,7 @@ class WindowSpacesSettingTab extends obsidian.PluginSettingTab {
             };
             updatePreview();
         });
-        this.createSettingIn(displayGroup, (s) => {
+        this.createSettingIn(defaultsGroup, (s) => {
             s.setName(t("settings.defaultBorderInset")).setDesc(t("settings.defaultBorderInsetDesc"));
             s.addSlider((slider) => {
                 slider
@@ -5794,7 +6054,7 @@ class WindowSpacesSettingTab extends obsidian.PluginSettingTab {
                 }));
             });
         });
-        this.createSettingIn(displayGroup, (s) => {
+        this.createSettingIn(defaultsGroup, (s) => {
             s.setName(t("settings.defaultFoldedCorner")).setDesc(t("settings.defaultFoldedCornerDesc"));
             s.addToggle((toggle) => {
                 toggle.setValue(this.plugin.settings.defaultShowFoldedCorner !== false);
@@ -5805,22 +6065,11 @@ class WindowSpacesSettingTab extends obsidian.PluginSettingTab {
                 }));
             });
         });
-        this.createSettingIn(displayGroup, (s) => {
-            s.setName(t("settings.enableInterceptor")).setDesc(t("settings.enableInterceptorDesc"));
-            s.addToggle((toggle) => {
-                toggle.setValue(this.plugin.settings.workspaceInterceptorEnabled !== false);
-                toggle.onChange((value) => __awaiter(this, void 0, void 0, function* () {
-                    this.plugin.settings.workspaceInterceptorEnabled = value;
-                    this.plugin.workspaceInterceptor.enabled = value;
-                    yield this.plugin.saveSettings();
-                }));
-            });
-        });
         this.renderActivityBarSide(containerEl, "left", t("settings.leftBar"));
         this.renderActivityBarSide(containerEl, "right", t("settings.rightBar"));
         // ===== 危險操作（單一 panel） =====
         new obsidian.Setting(containerEl).setName(t("settings.resetSettings")).setHeading();
-        const dangerGroup = (_c = this.createGroup(containerEl)) !== null && _c !== void 0 ? _c : containerEl;
+        const dangerGroup = (_d = this.createGroup(containerEl)) !== null && _d !== void 0 ? _d : containerEl;
         this.createSettingIn(dangerGroup, (s) => {
             s.setName(t("settings.resetSettings")).setDesc(t("settings.resetSettingsDescription"));
             s.addButton((button) => {
@@ -6312,6 +6561,7 @@ class SaveLayoutModal extends obsidian.Modal {
         let iconInputEl;
         const iconSetting = this.createSettingIn(identityGroup, (setting) => {
             setting.setName(t("saveModal.iconLabel"));
+            setting.setDesc(t("saveModal.iconDesc"));
             setting.addText((text) => {
                 iconInputEl = text.inputEl;
                 text.setPlaceholder(t("saveModal.iconPlaceholder"));
@@ -8283,6 +8533,10 @@ class PopoutActivityBarManager {
         body === null || body === void 0 ? void 0 : body.classList.remove("has-window-space-color");
         body === null || body === void 0 ? void 0 : body.classList.remove("has-window-space-border");
         body === null || body === void 0 ? void 0 : body.classList.remove("has-window-space-folded-corner");
+        body === null || body === void 0 ? void 0 : body.classList.remove("has-space-accents-tab");
+        body === null || body === void 0 ? void 0 : body.classList.remove("has-space-accents-splitter");
+        body === null || body === void 0 ? void 0 : body.classList.remove("has-space-accents-panel");
+        body === null || body === void 0 ? void 0 : body.classList.remove("has-space-accents-activity-bar");
     }
     /** 清理所有已注入的 Popout。 */
     cleanupAll() {
@@ -8329,7 +8583,7 @@ class PopoutActivityBarManager {
         return null;
     }
     updateDragHandleIcon(bars, win) {
-        var _a, _b, _c;
+        var _a, _b, _c, _d, _e;
         const drag = bars.left.querySelector(".window-spaces-activity-drag");
         if (!drag)
             return;
@@ -8339,12 +8593,12 @@ class PopoutActivityBarManager {
         const icon = resolveSpaceIcon(layout === null || layout === void 0 ? void 0 : layout.icon, this.settings.defaultIcon);
         const color = (_a = layout === null || layout === void 0 ? void 0 : layout.color) === null || _a === void 0 ? void 0 : _a.trim();
         const hasCustomColor = Boolean(color);
-        const hasCustomBorderInset = typeof (layout === null || layout === void 0 ? void 0 : layout.borderInset) === "number" && Number.isFinite(layout.borderInset);
-        const borderInset = hasCustomBorderInset
-            ? Math.max(0, Math.min(5, layout === null || layout === void 0 ? void 0 : layout.borderInset))
-            : 0;
-        const showFoldedCorner = hasCustomColor && ((_b = layout === null || layout === void 0 ? void 0 : layout.showFoldedCorner) !== null && _b !== void 0 ? _b : this.settings.defaultShowFoldedCorner !== false);
-        const body = (_c = win.document) === null || _c === void 0 ? void 0 : _c.body;
+        const rawBorderInset = typeof (layout === null || layout === void 0 ? void 0 : layout.borderInset) === "number" && Number.isFinite(layout.borderInset)
+            ? layout.borderInset
+            : ((_b = this.settings.defaultBorderInset) !== null && _b !== void 0 ? _b : 1);
+        const borderInset = Math.max(0, Math.min(5, rawBorderInset));
+        const showFoldedCorner = hasCustomColor && ((_c = layout === null || layout === void 0 ? void 0 : layout.showFoldedCorner) !== null && _c !== void 0 ? _c : this.settings.defaultShowFoldedCorner !== false);
+        const body = (_d = win.document) === null || _d === void 0 ? void 0 : _d.body;
         if (body) {
             if (hasCustomColor) {
                 body.style.setProperty("--window-space-color", color);
@@ -8354,14 +8608,26 @@ class PopoutActivityBarManager {
                 body.style.removeProperty("--window-space-color");
                 body.classList.remove("has-window-space-color");
             }
-            if (hasCustomColor && hasCustomBorderInset) {
+            if (hasCustomColor && borderInset > 0) {
                 body.style.setProperty("--window-space-border-inset", `${borderInset}px`);
             }
             else {
                 body.style.removeProperty("--window-space-border-inset");
             }
-            body.classList.toggle("has-window-space-border", hasCustomColor && hasCustomBorderInset && borderInset > 0);
+            body.classList.toggle("has-window-space-border", hasCustomColor && borderInset > 0);
             body.classList.toggle("has-window-space-folded-corner", showFoldedCorner);
+            const accents = (_e = this.settings.popoutAccents) !== null && _e !== void 0 ? _e : {
+                enabled: true,
+                splitter: true,
+                activityBar: true,
+            };
+            const accentsActive = hasCustomColor && accents.enabled !== false;
+            // tab 裝飾（soft tint / tab 分隔線 / container border）與 panel border 為常態 accent，
+            // 只需 enabled；splitter 與 activity bar 有各自獨立選項。
+            body.classList.toggle("has-space-accents-tab", accentsActive);
+            body.classList.toggle("has-space-accents-splitter", accentsActive && accents.splitter !== false);
+            body.classList.toggle("has-space-accents-panel", accentsActive);
+            body.classList.toggle("has-space-accents-activity-bar", accentsActive && accents.activityBar !== false);
         }
         const isEmoji = isSpaceEmoji(icon);
         if (isEmoji) {
@@ -8653,14 +8919,13 @@ class PopoutActivityBarManager {
     }
     setColumnActive(bars, win, side) {
         const columnEl = this.engine.getColumnElement(win, side);
-        const hasColumn = !!columnEl;
         const hidden = !!columnEl && this.engine.isColumnHidden(win, side);
         const active = !!columnEl && !hidden;
         bars.columnButtons[side].classList.toggle("is-active", active);
-        // 該側沒有物理側欄欄位（如 legacy 單欄/雙欄結構）時停用 toggle 按鈕，
-        // 避免「可點擊卻無反應」的假失效狀態；view 按鈕仍可主動開啟側欄。
-        bars.columnButtons[side].classList.toggle("is-disabled", !hasColumn);
-        bars.columnButtons[side].disabled = !hasColumn;
+        // 2026-02 反饋：toggle 永不休用。該側沒有物理側欄欄位時，點擊改為開啟活動列
+        // 第一個 view 按鈕對應的 view；若無任何 view 按鈕則開啟系統預設 New Tab。
+        bars.columnButtons[side].classList.remove("is-disabled");
+        bars.columnButtons[side].disabled = false;
         // 依開合狀態切換 toggle 圖示（模仿主視窗）
         this.applySidebarToggleIcon(bars.columnButtons[side], side, hidden);
     }
@@ -8906,8 +9171,12 @@ class PopoutActivityBarManager {
     toggleColumn(win, side) {
         return __awaiter(this, void 0, void 0, function* () {
             const columnEl = this.engine.getColumnElement(win, side);
-            if (!columnEl)
+            if (!columnEl) {
+                // 2026-02 反饋：無側欄欄位時改為顯示活動列第一個 view 按鈕對應的 view；
+                // 若無 view 按鈕則開啟系統預設 New Tab。
+                yield this.openFallbackViewForSide(win, side);
                 return;
+            }
             if (this.engine.isColumnHidden(win, side)) {
                 this.engine.showColumn(win, side);
                 // 使用者主動展開（可能只是要看空的 New Tab 提醒）→ 短時間內不自動藏起
@@ -8931,6 +9200,26 @@ class PopoutActivityBarManager {
             // Refresh the toggle button's open/collapsed SVG state and each view
             // button's active state after the column visibility changed.
             this.updateActiveStates(win);
+        });
+    }
+    /** 側欄無物理欄位時：開啟活動列第一個 view 按鈕對應的 view；若無 view 按鈕則開啟 New Tab。 */
+    openFallbackViewForSide(win, side) {
+        var _a, _b, _c;
+        return __awaiter(this, void 0, void 0, function* () {
+            const layout = this.getLayoutForWindow(win);
+            const items = (_c = (_b = (_a = layout === null || layout === void 0 ? void 0 : layout.activityBars) === null || _a === void 0 ? void 0 : _a[side]) === null || _b === void 0 ? void 0 : _b.items) !== null && _c !== void 0 ? _c : [];
+            if (items.length > 0) {
+                yield this.toggleView(win, items[0]);
+                return;
+            }
+            try {
+                const leaf = this.app.workspace.getLeaf(true);
+                yield leaf.setViewState({ type: "empty", active: true, state: {} });
+                this.app.workspace.setActiveLeaf(leaf, { focus: true });
+            }
+            catch (e) {
+                console.warn("Failed to open default New Tab:", e);
+            }
         });
     }
     /**
@@ -9300,6 +9589,11 @@ const DEFAULT_SETTINGS = {
     activityBarDefaults: {
         left: true,
         right: true,
+    },
+    popoutAccents: {
+        enabled: true,
+        splitter: true,
+        activityBar: true,
     },
     workspaceInterceptorEnabled: true,
 };

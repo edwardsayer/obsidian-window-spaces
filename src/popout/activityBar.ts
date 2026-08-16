@@ -466,6 +466,10 @@ export class PopoutActivityBarManager {
     body?.classList.remove("has-window-space-color");
     body?.classList.remove("has-window-space-border");
     body?.classList.remove("has-window-space-folded-corner");
+    body?.classList.remove("has-space-accents-tab");
+    body?.classList.remove("has-space-accents-splitter");
+    body?.classList.remove("has-space-accents-panel");
+    body?.classList.remove("has-space-accents-activity-bar");
   }
 
   /** 清理所有已注入的 Popout。 */
@@ -526,10 +530,10 @@ export class PopoutActivityBarManager {
     const icon = resolveSpaceIcon(layout?.icon, this.settings.defaultIcon);
     const color = layout?.color?.trim();
     const hasCustomColor = Boolean(color);
-    const hasCustomBorderInset = typeof layout?.borderInset === "number" && Number.isFinite(layout.borderInset);
-    const borderInset = hasCustomBorderInset
-      ? Math.max(0, Math.min(5, layout?.borderInset as number))
-      : 0;
+    const rawBorderInset = typeof layout?.borderInset === "number" && Number.isFinite(layout.borderInset)
+      ? layout.borderInset
+      : (this.settings.defaultBorderInset ?? 1);
+    const borderInset = Math.max(0, Math.min(5, rawBorderInset));
     const showFoldedCorner = hasCustomColor && (layout?.showFoldedCorner ?? this.settings.defaultShowFoldedCorner !== false);
 
     const body = win.document?.body;
@@ -541,13 +545,26 @@ export class PopoutActivityBarManager {
         body.style.removeProperty("--window-space-color");
         body.classList.remove("has-window-space-color");
       }
-      if (hasCustomColor && hasCustomBorderInset) {
+      if (hasCustomColor && borderInset > 0) {
         body.style.setProperty("--window-space-border-inset", `${borderInset}px`);
       } else {
         body.style.removeProperty("--window-space-border-inset");
       }
-      body.classList.toggle("has-window-space-border", hasCustomColor && hasCustomBorderInset && borderInset > 0);
+      body.classList.toggle("has-window-space-border", hasCustomColor && borderInset > 0);
       body.classList.toggle("has-window-space-folded-corner", showFoldedCorner);
+
+      const accents = this.settings.popoutAccents ?? {
+        enabled: true,
+        splitter: true,
+        activityBar: true,
+      };
+      const accentsActive = hasCustomColor && accents.enabled !== false;
+      // tab 裝飾（soft tint / tab 分隔線 / container border）與 panel border 為常態 accent，
+      // 只需 enabled；splitter 與 activity bar 有各自獨立選項。
+      body.classList.toggle("has-space-accents-tab", accentsActive);
+      body.classList.toggle("has-space-accents-splitter", accentsActive && accents.splitter !== false);
+      body.classList.toggle("has-space-accents-panel", accentsActive);
+      body.classList.toggle("has-space-accents-activity-bar", accentsActive && accents.activityBar !== false);
     }
 
     const isEmoji = isSpaceEmoji(icon);
@@ -866,10 +883,10 @@ export class PopoutActivityBarManager {
     const hidden = !!columnEl && this.engine.isColumnHidden(win, side);
     const active = !!columnEl && !hidden;
     bars.columnButtons[side].classList.toggle("is-active", active);
-    // 該側沒有物理側欄欄位（如 legacy 單欄/雙欄結構）時停用 toggle 按鈕，
-    // 避免「可點擊卻無反應」的假失效狀態；view 按鈕仍可主動開啟側欄。
-    bars.columnButtons[side].classList.toggle("is-disabled", !hasColumn);
-    bars.columnButtons[side].disabled = !hasColumn;
+    // 2026-02 反饋：toggle 永不休用。該側沒有物理側欄欄位時，點擊改為開啟活動列
+    // 第一個 view 按鈕對應的 view；若無任何 view 按鈕則開啟系統預設 New Tab。
+    bars.columnButtons[side].classList.remove("is-disabled");
+    bars.columnButtons[side].disabled = false;
     // 依開合狀態切換 toggle 圖示（模仿主視窗）
     this.applySidebarToggleIcon(bars.columnButtons[side], side, hidden);
   }
@@ -1117,7 +1134,12 @@ export class PopoutActivityBarManager {
 
   private async toggleColumn(win: Window, side: PopoutSide): Promise<void> {
     const columnEl = this.engine.getColumnElement(win, side);
-    if (!columnEl) return;
+    if (!columnEl) {
+      // 2026-02 反饋：無側欄欄位時改為顯示活動列第一個 view 按鈕對應的 view；
+      // 若無 view 按鈕則開啟系統預設 New Tab。
+      await this.openFallbackViewForSide(win, side);
+      return;
+    }
 
     if (this.engine.isColumnHidden(win, side)) {
       this.engine.showColumn(win, side);
@@ -1141,6 +1163,23 @@ export class PopoutActivityBarManager {
     // Refresh the toggle button's open/collapsed SVG state and each view
     // button's active state after the column visibility changed.
     this.updateActiveStates(win);
+  }
+
+  /** 側欄無物理欄位時：開啟活動列第一個 view 按鈕對應的 view；若無 view 按鈕則開啟 New Tab。 */
+  private async openFallbackViewForSide(win: Window, side: PopoutSide): Promise<void> {
+    const layout = this.getLayoutForWindow(win);
+    const items = layout?.activityBars?.[side]?.items ?? [];
+    if (items.length > 0) {
+      await this.toggleView(win, items[0]);
+      return;
+    }
+    try {
+      const leaf = this.app.workspace.getLeaf(true);
+      await leaf.setViewState({ type: "empty", active: true, state: {} });
+      this.app.workspace.setActiveLeaf(leaf, { focus: true });
+    } catch (e) {
+      console.warn("Failed to open default New Tab:", e);
+    }
   }
 
   /**

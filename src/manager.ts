@@ -1,4 +1,4 @@
-import { App, WorkspaceLeaf, Notice, TFile, setIcon, WorkspaceWindowInitData } from "obsidian";
+import { App, WorkspaceLeaf, Notice, Menu, TFile, setIcon, WorkspaceWindowInitData } from "obsidian";
 import {
   WindowLayout,
   WindowState,
@@ -12,6 +12,7 @@ import {
   PopoutHiddenState,
 } from "./types";
 import { t, tWithParams, getI18n } from "./i18n";
+import { resolveSpaceIcon, isSpaceEmoji } from "./spaceVisuals";
 import { WindowLayoutsModal } from "./modals/restoreModal";
 import WindowSpacesPlugin from "./main";
 
@@ -427,6 +428,7 @@ export class WindowLayoutManager {
 
         let bestSpace: WindowLayout | null = null;
         let bestScore = 0;
+        let bestStrongHit = false;
 
         for (const space of availableSpaces) {
           if (claimedLayoutNames.has(space.name)) continue;
@@ -450,6 +452,11 @@ export class WindowLayoutManager {
           );
 
           let score = 0;
+          // 強特徵命中：leafIdMarker / leaf id / panelId（重啟恢復或同 session 的識別）。
+          // 純檔案路徑匹配是弱特徵（新開的 popout 可能恰好開了相同檔案），
+          // 需提高門檻，避免 Folder Spaces「open in new window」開的新 popout
+          // 點檔後被誤匹配為 saved Space。
+          let strongHit = false;
 
           // (0) 視窗識別記號（leafIdMarker）比對：上次識別/restore 時回寫的
           // live leaf id 集合，重啟後視窗 leaf id 穩定 → 直接命中，最高權重。
@@ -459,11 +466,15 @@ export class WindowLayoutManager {
               if (space.leafIdMarker.includes(id)) markerHit++;
             }
             score += markerHit * 200;
+            if (markerHit > 0) strongHit = true;
           }
 
           // (a) Leaf ID 匹配 (+100/leaf)
           for (const id of winLeafIds) {
-            if (savedLeafIds.has(id)) score += 100;
+            if (savedLeafIds.has(id)) {
+              score += 100;
+              strongHit = true;
+            }
           }
 
           // (b) 檔案路徑匹配 (+10/file)
@@ -476,11 +487,20 @@ export class WindowLayoutManager {
           // (e) view state 特徵比對：folder-spaces-explorer 等 view 的 panelId
           // 跨 session 穩定，補足無檔案 space 的辨識（leaf id 重啟後可能重建）。
           for (const pid of winPanelIds) {
-            if (savedPanelIds.has(pid)) score += 100;
+            if (savedPanelIds.has(pid)) {
+              score += 100;
+              strongHit = true;
+            }
           }
 
           // (c) 檔案完全吻合（Popout 中所有檔案與 space 中所有檔案一致）時大幅加分 (+50)
-          if (winFiles.size > 0 && winFiles.size === savedFiles.size && matchingFilesCount === winFiles.size) {
+          // 限「至少 2 個檔案」：單一檔案 space 的吻合僅靠檔案路徑（+10），
+          // 不足以證明是同一 space（新開 popout 開 1 個相同檔案即會誤判）。
+          if (
+            winFiles.size >= 2 &&
+            winFiles.size === savedFiles.size &&
+            matchingFilesCount === winFiles.size
+          ) {
             score += 50;
           }
 
@@ -497,11 +517,15 @@ export class WindowLayoutManager {
           if (score > bestScore) {
             bestScore = score;
             bestSpace = space;
+            bestStrongHit = strongHit;
           }
         }
 
-        // 嚴格門檻：必須至少有一項 Leaf / 檔案內容 match (score >= 10)
-        if (bestSpace && bestScore >= 10) {
+        // 嚴格門檻：有強特徵命中（leafIdMarker / leaf id / panelId）時，
+        // 只要有一項內容 match（>= 10）即可；否則（僅檔案路徑匹配）需要
+        // 多檔案吻合（>= 30），避免「新開 popout 開了一個與 saved space
+        // 相同的檔案」就被誤匹配（例如 Folder Spaces open in new window 點檔後）。
+        if (bestSpace && bestScore >= (bestStrongHit ? 10 : 30)) {
           claimedLayoutNames.add(bestSpace.name);
           this.setLayoutLabelForWindow(win, bestSpace.name);
           this.layoutWindows.set(bestSpace, win);
@@ -571,19 +595,34 @@ export class WindowLayoutManager {
     layoutName: string,
     targetWin: Window
   ): void {
+    // 移除舊版獨立 icon 元素（已整合進 name-wrap 的 vault-switcher 風格）
     const iconElement = element.querySelector<HTMLElement>(".window-spaces-layout-icon");
     if (iconElement) {
       iconElement.remove();
     }
 
-    let nameElement = element.querySelector<HTMLElement>(".window-spaces-layout-name");
+    // 仿主視窗 vault switcher：space name 前端加上下切換鈕（chevrons-up-down）
+    let nameWrap = element.querySelector<HTMLElement>(".window-spaces-layout-name-wrap");
+    if (!nameWrap) {
+      nameWrap = element.createDiv({ cls: "window-spaces-layout-name-wrap" });
+    }
+    let nameIcon = nameWrap.querySelector<HTMLElement>(".window-spaces-layout-name-icon");
+    if (!nameIcon) {
+      nameIcon = nameWrap.createDiv({ cls: "window-spaces-layout-name-icon" });
+      setIcon(nameIcon, "chevrons-up-down");
+    }
+    let nameElement = nameWrap.querySelector<HTMLElement>(".window-spaces-layout-name");
     if (!nameElement) {
-      nameElement = element.createSpan({ cls: "window-spaces-layout-name" });
+      nameElement = nameWrap.createSpan({ cls: "window-spaces-layout-name" });
     }
 
     let actionsElement = element.querySelector<HTMLElement>(".window-spaces-layout-actions");
     if (!actionsElement) {
       actionsElement = element.createDiv({ cls: "window-spaces-layout-actions" });
+    }
+    // 確保 name-wrap 在 actions 之前
+    if (nameWrap.nextElementSibling !== actionsElement) {
+      element.insertBefore(nameWrap, actionsElement);
     }
 
     const ensureActionButton = (
@@ -611,6 +650,22 @@ export class WindowLayoutManager {
     };
 
     nameElement.textContent = layoutName;
+
+    // 仿 vault switcher 互動：左鍵開啟 space 選單，右鍵開啟 vault 風格選單
+    nameWrap.onclick = (e: MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.showSpaceMenu(targetWin, nameWrap, e);
+    };
+    nameWrap.oncontextmenu = (e: MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.showSpaceContextMenu(targetWin, e);
+    };
+    nameWrap.classList.toggle(
+      "window-spaces-layout-switcher",
+      layoutName !== t("common.noLayout")
+    );
 
     const currentLayout = this.plugin.settings.spaces.find((l: WindowLayout) => l.name === layoutName);
     const isAutoSave = !!currentLayout?.autoSave;
@@ -680,6 +735,102 @@ export class WindowLayoutManager {
     element.setAttribute("aria-label", `${t("common.layoutLabel")}: ${layoutName}`);
     element.setAttribute("title", layoutName);
     element.dataset.layoutName = layoutName;
+  }
+
+  /** 仿 vault switcher 左鍵選單：列出所有非 Archived spaces，底部附 Manage spaces...。 */
+  private showSpaceMenu(targetWin: Window, anchor: HTMLElement, _e: MouseEvent): void {
+    const menu = new Menu();
+    const spaces = this.plugin.settings.spaces.filter((s: WindowLayout) => s.archived !== true);
+    spaces.forEach((space) => {
+      menu.addItem((item) => {
+        // icon 與 Window Spaces switcher list 一致；emoji 放入 menu-item-icon 容器
+        // （與 lucide icon 同位置），確保文字起始位置一致。
+        const iconVal = resolveSpaceIcon(space.icon, this.plugin.settings?.defaultIcon);
+        if (isSpaceEmoji(iconVal)) {
+          const itemAny = item as unknown as { iconEl?: HTMLElement };
+          if (itemAny.iconEl) {
+            item.setTitle(space.name);
+            itemAny.iconEl.empty();
+            itemAny.iconEl.setText(iconVal);
+          } else {
+            // fallback：Menu 無 iconEl 時，emoji 置於標題前（單空格）
+            item.setTitle(`${iconVal} ${space.name}`);
+          }
+        } else {
+          item.setTitle(space.name);
+          item.setIcon(iconVal);
+        }
+        item.onClick((evt: MouseEvent) => {
+          // 與 switcher list 一致：無 Shift = 開新 Popout，Shift = 替換本 popout
+          const forceNewWindow = !evt.shiftKey;
+          void this.plugin.manager.restoreLayout(space, {
+            targetWindow: targetWin,
+            forceNewWindow,
+            forceReload: !forceNewWindow,
+            focusExistingWindow: true,
+          });
+        });
+      });
+    });
+    if (spaces.length > 0) menu.addSeparator();
+    menu.addItem((item) => {
+      item.setTitle(t("settings.manageSpaces"));
+      item.setIcon("layout-dashboard");
+      item.onClick(() => this.plugin.openWindowLayoutsModal(targetWin));
+    });
+    const rect = anchor.getBoundingClientRect();
+    menu.showAtPosition({ x: rect.left, y: rect.bottom }, targetWin.document);
+    this.markSpaceMenu(menu, targetWin);
+  }
+
+  /** 仿 vault switcher 右鍵選單：Show in system explorer / Copy path。 */
+  private showSpaceContextMenu(targetWin: Window, e: MouseEvent): void {
+    const menu = new Menu();
+    menu.addItem((item) => {
+      item.setTitle(t("settings.showInSystemExplorer"));
+      item.setIcon("arrow-up-right");
+      item.onClick(() => {
+        try {
+          (this.app as unknown as { showInFolder?: (path: string) => void }).showInFolder?.("");
+        } catch (err) {
+          console.warn("Failed to reveal vault in system explorer:", err);
+        }
+      });
+    });
+    menu.addItem((item) => {
+      item.setTitle(t("settings.copyPath"));
+      item.setIcon("clipboard");
+      item.onClick(() => void this.copyVaultPath(targetWin));
+    });
+    menu.showAtMouseEvent(e);
+    this.markSpaceMenu(menu, targetWin);
+  }
+
+  /** 標記選單，讓 CSS 統一 menu-item-icon 容器寬度（emoji 與 lucide icon 的 title 對齊）。 */
+  private markSpaceMenu(menu: Menu, targetWin: Window): void {
+    try {
+      const menuEl = (menu as unknown as { dom?: HTMLElement }).dom;
+      if (menuEl) {
+        menuEl.classList.add("window-spaces-space-menu");
+        return;
+      }
+      const menus = targetWin.document.querySelectorAll<HTMLElement>(".menu");
+      menus[menus.length - 1]?.classList.add("window-spaces-space-menu");
+    } catch {
+      // 標記失敗不影響選單功能
+    }
+  }
+
+  /** 複製 vault 根目錄路徑到剪貼簿。 */
+  private async copyVaultPath(targetWin: Window): Promise<void> {
+    try {
+      const adapter = this.app.vault.adapter as { getFullPath?: (path: string) => string };
+      const path = adapter?.getFullPath?.("") ?? this.app.vault.getName();
+      await targetWin.navigator.clipboard.writeText(path);
+      new Notice(`${this.app.vault.getName()}: ${t("settings.pathCopied")}`);
+    } catch (err) {
+      console.warn("Failed to copy vault path:", err);
+    }
   }
 
   /** 開啟 Window Spaces 設定頁面。 */

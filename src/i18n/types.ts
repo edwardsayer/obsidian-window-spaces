@@ -61,6 +61,7 @@ export interface TranslationStrings {
     duplicateNameError: string;
     iconLabel: string;
     iconPlaceholder: string;
+    iconDesc: string;
     colorLabel: string;
     colorPresetLabel: string;
     clearColor: string;
@@ -150,12 +151,12 @@ export interface TranslationStrings {
   settings: {
     title: string;
     description: string;
-    autoSaveSection: string;
+    generalSection: string;
     autoSaveDescription: string;
     autoSaveEnabled: string;
     showNotifications: string;
     showNotificationsDesc: string;
-    layoutDisplaySection: string;
+    popoutDefaultsSection: string;
     showLayoutStatusBar: string;
     showLayoutStatusBarDesc: string;
     showWindowLayoutsRibbonIcon: string;
@@ -190,6 +191,18 @@ export interface TranslationStrings {
     defaultActivityBarVisibilityDesc: string;
     dragToReorder: string;
     keepOneActivityBarView: string;
+    popoutAccentsTitle: string;
+    popoutAccentsDesc: string;
+    popoutAccentsEnable: string;
+    popoutAccentsEnableDesc: string;
+    popoutAccentsSplitter: string;
+    popoutAccentsSplitterDesc: string;
+    popoutAccentsActivityBar: string;
+    popoutAccentsActivityBarDesc: string;
+    manageSpaces: string;
+    showInSystemExplorer: string;
+    copyPath: string;
+    pathCopied: string;
   };
 
   // 通知

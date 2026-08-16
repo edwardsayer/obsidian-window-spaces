@@ -111,8 +111,8 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
-    // ===== 一般設定（單一 panel） =====
-    new Setting(containerEl).setName(t("settings.autoSaveSection")).setHeading();
+    // ===== Window Spaces 一般設定（單一 panel） =====
+    new Setting(containerEl).setName(t("settings.generalSection")).setHeading();
     const generalGroup = this.createGroup(containerEl) ?? containerEl;
 
     this.createSettingIn(generalGroup, (s) => {
@@ -127,6 +127,102 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
     });
 
     this.createSettingIn(generalGroup, (s) => {
+      // 主視窗 ribbon 圖示（一般設定，非 per-space）
+      s.setName(t("settings.showWindowLayoutsRibbonIcon")).setDesc(t("settings.showWindowLayoutsRibbonIconDesc"));
+      s.addToggle((toggle) => {
+        toggle.setValue(this.plugin.settings.showWindowLayoutsRibbonIcon !== false);
+        toggle.onChange(async (value) => {
+          this.plugin.settings.showWindowLayoutsRibbonIcon = value;
+          await this.plugin.saveSettings();
+          this.plugin.refreshRibbonIcons();
+        });
+      });
+    });
+
+    this.createSettingIn(generalGroup, (s) => {
+      // Popout 底部 space status bar（一般設定，無 per-space override）
+      s.setName(t("settings.showLayoutStatusBar")).setDesc(t("settings.showLayoutStatusBarDesc"));
+      s.addToggle((toggle) => {
+        toggle.setValue(this.plugin.settings.showLayoutStatusBar === true);
+        toggle.onChange(async (value) => {
+          this.plugin.settings.showLayoutStatusBar = value;
+          await this.plugin.saveSettings();
+          this.plugin.manager.refreshLayoutLabels();
+        });
+      });
+    });
+
+    // Space 主題視覺裝飾增強（一般設定，無 per-space override）
+    this.createSettingIn(generalGroup, (s) => {
+      s.setName(t("settings.popoutAccentsEnable")).setDesc(t("settings.popoutAccentsEnableDesc"));
+      s.addToggle((toggle) => {
+        toggle.setValue(this.plugin.settings.popoutAccents?.enabled !== false);
+        toggle.onChange(async (value) => {
+          if (!this.plugin.settings.popoutAccents) {
+            this.plugin.settings.popoutAccents = { enabled: value, splitter: true, activityBar: true };
+          } else {
+            this.plugin.settings.popoutAccents.enabled = value;
+          }
+          await this.plugin.saveSettings();
+          this.plugin.activityBars.refreshAll();
+          this.display();
+        });
+      });
+    });
+
+    if (this.plugin.settings.popoutAccents?.enabled !== false) {
+      this.createSettingIn(generalGroup, (s) => {
+        s.setName(t("settings.popoutAccentsSplitter")).setDesc(t("settings.popoutAccentsSplitterDesc"));
+        s.addToggle((toggle) => {
+          toggle.setValue(this.plugin.settings.popoutAccents?.splitter !== false);
+          toggle.onChange(async (value) => {
+            if (!this.plugin.settings.popoutAccents) {
+              this.plugin.settings.popoutAccents = { enabled: true, splitter: value, activityBar: true };
+            } else {
+              this.plugin.settings.popoutAccents.splitter = value;
+            }
+            await this.plugin.saveSettings();
+            this.plugin.activityBars.refreshAll();
+          });
+        });
+      });
+
+      this.createSettingIn(generalGroup, (s) => {
+        s.setName(t("settings.popoutAccentsActivityBar")).setDesc(t("settings.popoutAccentsActivityBarDesc"));
+        s.addToggle((toggle) => {
+          toggle.setValue(this.plugin.settings.popoutAccents?.activityBar !== false);
+          toggle.onChange(async (value) => {
+            if (!this.plugin.settings.popoutAccents) {
+              this.plugin.settings.popoutAccents = { enabled: true, splitter: true, activityBar: value };
+            } else {
+              this.plugin.settings.popoutAccents.activityBar = value;
+            }
+            await this.plugin.saveSettings();
+            this.plugin.activityBars.refreshAll();
+          });
+        });
+      });
+    }
+
+    this.createSettingIn(generalGroup, (s) => {
+      // Workspace API 攔截器（一般設定，非 per-space）
+      s.setName(t("settings.enableInterceptor")).setDesc(t("settings.enableInterceptorDesc"));
+      s.addToggle((toggle) => {
+        toggle.setValue(this.plugin.settings.workspaceInterceptorEnabled !== false);
+        toggle.onChange(async (value) => {
+          this.plugin.settings.workspaceInterceptorEnabled = value;
+          this.plugin.workspaceInterceptor.enabled = value;
+          await this.plugin.saveSettings();
+        });
+      });
+    });
+
+    // ===== 新 Popout 預設設定（per space 可 override） =====
+    new Setting(containerEl).setName(t("settings.popoutDefaultsSection")).setHeading();
+    const defaultsGroup = this.createGroup(containerEl) ?? containerEl;
+
+    this.createSettingIn(defaultsGroup, (s) => {
+      // 全局自動儲存預設（per space 可用 auto-save toggle override）
       s.setName(t("settings.autoSaveEnabled")).setDesc(t("settings.autoSaveDescription"));
       s.addToggle((toggle) => {
         toggle.setValue(this.plugin.settings.autoSave === true);
@@ -143,35 +239,7 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
       });
     });
 
-    // ===== Popout 空間顯示（單一 panel） =====
-    new Setting(containerEl).setName(t("settings.layoutDisplaySection")).setHeading();
-    const displayGroup = this.createGroup(containerEl) ?? containerEl;
-
-    this.createSettingIn(displayGroup, (s) => {
-      s.setName(t("settings.showLayoutStatusBar")).setDesc(t("settings.showLayoutStatusBarDesc"));
-      s.addToggle((toggle) => {
-        toggle.setValue(this.plugin.settings.showLayoutStatusBar === true);
-        toggle.onChange(async (value) => {
-          this.plugin.settings.showLayoutStatusBar = value;
-          await this.plugin.saveSettings();
-          this.plugin.manager.refreshLayoutLabels();
-        });
-      });
-    });
-
-    this.createSettingIn(displayGroup, (s) => {
-      s.setName(t("settings.showWindowLayoutsRibbonIcon")).setDesc(t("settings.showWindowLayoutsRibbonIconDesc"));
-      s.addToggle((toggle) => {
-        toggle.setValue(this.plugin.settings.showWindowLayoutsRibbonIcon !== false);
-        toggle.onChange(async (value) => {
-          this.plugin.settings.showWindowLayoutsRibbonIcon = value;
-          await this.plugin.saveSettings();
-          this.plugin.refreshRibbonIcons();
-        });
-      });
-    });
-
-    this.createSettingIn(displayGroup, (s) => {
+    this.createSettingIn(defaultsGroup, (s) => {
       s.setName(t("settings.defaultIcon")).setDesc(t("settings.defaultIconDesc"));
       s.controlEl.addClass("window-space-icon-setting-control");
 
@@ -224,7 +292,7 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
       updatePreview();
     });
 
-    this.createSettingIn(displayGroup, (s) => {
+    this.createSettingIn(defaultsGroup, (s) => {
       s.setName(t("settings.defaultBorderInset")).setDesc(t("settings.defaultBorderInsetDesc"));
       s.addSlider((slider) => {
         slider
@@ -239,7 +307,7 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
       });
     });
 
-    this.createSettingIn(displayGroup, (s) => {
+    this.createSettingIn(defaultsGroup, (s) => {
       s.setName(t("settings.defaultFoldedCorner")).setDesc(t("settings.defaultFoldedCornerDesc"));
       s.addToggle((toggle) => {
         toggle.setValue(this.plugin.settings.defaultShowFoldedCorner !== false);
@@ -247,18 +315,6 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
           this.plugin.settings.defaultShowFoldedCorner = value;
           await this.plugin.saveSettings();
           this.plugin.activityBars.refreshAll();
-        });
-      });
-    });
-
-    this.createSettingIn(displayGroup, (s) => {
-      s.setName(t("settings.enableInterceptor")).setDesc(t("settings.enableInterceptorDesc"));
-      s.addToggle((toggle) => {
-        toggle.setValue(this.plugin.settings.workspaceInterceptorEnabled !== false);
-        toggle.onChange(async (value) => {
-          this.plugin.settings.workspaceInterceptorEnabled = value;
-          this.plugin.workspaceInterceptor.enabled = value;
-          await this.plugin.saveSettings();
         });
       });
     });

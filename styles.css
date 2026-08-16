@@ -131,10 +131,58 @@
   text-align: left;
 }
 
+/* 當 Popout 視窗的左側 Activity Bar 展開且未隱藏時，Toolbar 自動向右避讓。
+   +1px 是讓 sidebar 的 rose-mix border-left（44-44.89）完整露出、與 activity bar
+   的 border-right 連續；left activity bar 隱藏時此規則不命中，回到基礎 left: 0。 */
+body.is-popout-window.window-spaces-has-left-activity:not(.window-spaces-left-activity-hidden)
+  .window-spaces-layout-status {
+  left: calc(var(--window-spaces-activity-bar-width, 44px) + 1px);
+  border-left: none;
+  border-top-left-radius: 0;
+}
+
 .window-spaces-layout-name {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* 仿主視窗 vault switcher：space name 可點擊區域（含上下切換鈕） */
+.window-spaces-layout-name-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px;
+  margin-left: -6px;
+  border-radius: var(--radius-s, 4px);
+  cursor: pointer;
+  min-width: 0;
+  flex: 0 1 auto;
+  user-select: none;
+}
+.window-spaces-layout-name-wrap:hover {
+  background-color: var(--background-modifier-hover);
+}
+.window-spaces-layout-name-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  color: var(--text-muted);
+}
+.window-spaces-layout-name-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* toolbar space 選單：固定 icon 容器寬度，讓 emoji 與 lucide icon 的 title 起始位置對齊
+   （Obsidian 預設容器隨內容寬度（svg 16px / emoji ~17.9px），導致 title 位移） */
+.menu.window-spaces-space-menu .menu-item-icon {
+  width: 18px;
+  flex: 0 0 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .window-spaces-layout-actions {
@@ -1157,11 +1205,15 @@ button.mod-destructive:hover,
   left: 0;
   top: 0;
   border-right: 1px solid var(--background-modifier-border);
+  /* Drag 區接管 titlebar 全高：移除頂部 padding，讓 drag 區從視窗頂開始 */
+  padding: 0 0 8px 0;
 }
 .window-spaces-activity-right {
   right: 0;
-  top: var(--titlebar-height, 40px);
+  top: var(--header-height, 40px);
   border-left: 1px solid var(--background-modifier-border);
+  border-top: 1px solid var(--background-modifier-border);
+  padding-top: 6px;
 }
 
 /* 右側 Activity Bar 顯示時，最右邊 column 的 tab header 以負 margin 延伸至視窗右緣：
@@ -1186,7 +1238,8 @@ body.is-popout-window.window-spaces-has-right-activity .workspace-split.mod-root
 .window-spaces-activity-drag {
   flex: 0 0 auto;
   width: 100%;
-  height: var(--titlebar-height, 40px);
+  /* +1px 讓 border-bottom 與 tab header border（40.0-40.89）對齊 */
+  height: calc(var(--header-height, 40px) + 1px);
   -webkit-app-region: drag;
   cursor: default;
   display: flex;
@@ -1194,6 +1247,12 @@ body.is-popout-window.window-spaces-has-right-activity .workspace-split.mod-root
   justify-content: center;
   font-size: 16px;
   user-select: none;
+  border-bottom: 1px solid var(--background-modifier-border);
+  box-sizing: border-box;
+}
+.window-spaces-activity-left .window-spaces-activity-drag + .window-spaces-activity-btn,
+.window-spaces-activity-left .window-spaces-activity-btn:first-of-type {
+  margin-top: 6px;
 }
 .window-spaces-activity-drag svg {
   width: 16px;
@@ -1211,7 +1270,7 @@ body.is-popout-window.window-spaces-has-right-activity .workspace-split.mod-root
   top: 0;
   left: 0;
   width: var(--window-spaces-activity-bar-width, 44px);
-  height: var(--titlebar-height, 40px);
+  height: var(--header-height, 40px);
   z-index: 102;
   display: inline-flex;
   align-items: center;
@@ -1227,22 +1286,24 @@ body.is-popout-window.window-spaces-has-right-activity .workspace-split.mod-root
 }
 .window-spaces-space-identity .window-spaces-space-icon {
   position: absolute;
-  top: 2px;
-  left: 4px;
+  /* 對齊：左起點 = activity bar icon 左起點（13.6px）、上起點 = tab header icon 上起點（11.4px）；
+     大小 16x16 與 activity bar icon 一致；此位置同時接近 logo area（44x40）置中 */
+  top: 11.4px;
+  left: 13.6px;
   z-index: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 16px;
+  height: 16px;
   line-height: 1;
-  font-size: 18px;
+  font-size: 16px;
   pointer-events: auto;
   -webkit-app-region: drag;
 }
 .window-spaces-space-identity .window-spaces-space-icon svg {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   color: var(--window-space-color, var(--text-muted));
 }
 
@@ -1253,7 +1314,7 @@ body.is-popout-window.window-spaces-has-left-activity:not(.window-spaces-left-ac
   .window-spaces-space-identity {
   left: 0;
   width: var(--window-spaces-activity-bar-width, 44px);
-  height: var(--titlebar-height, 40px);
+  height: var(--header-height, 40px);
   top: 0;
   pointer-events: none;
   -webkit-app-region: no-drag;
@@ -1261,10 +1322,11 @@ body.is-popout-window.window-spaces-has-left-activity:not(.window-spaces-left-ac
 
 body.is-popout-window.window-spaces-has-left-activity:not(.window-spaces-left-activity-hidden)
   .window-spaces-space-identity .window-spaces-space-icon {
-  top: 2px;
-  left: 4px;
-  width: 36px;
-  height: 36px;
+  /* 與基礎規則一致：對齊 activity bar icon 左起點與 tab header icon 上起點 */
+  top: 11.4px;
+  left: 13.6px;
+  width: 16px;
+  height: 16px;
   pointer-events: none;
   -webkit-app-region: no-drag;
 }
@@ -1275,8 +1337,12 @@ body.is-popout-window.window-spaces-has-left-activity:not(.window-spaces-left-ac
 .window-spaces-space-identity.window-spaces-space-identity-drag-region {
   left: 0 !important;
   width: var(--window-spaces-activity-bar-width, 44px) !important;
-  height: var(--titlebar-height, 40px) !important;
+  height: var(--header-height, 40px) !important;
   top: 0 !important;
+  background-color: var(--background-secondary) !important;
+  border-right: 1px solid var(--background-modifier-border) !important;
+  border-bottom: 1px solid var(--background-modifier-border) !important;
+  border-bottom-right-radius: 6px;
   pointer-events: auto !important;
   -webkit-app-region: drag !important;
 }
@@ -1287,16 +1353,18 @@ body.is-popout-window.window-spaces-has-left-activity:not(.window-spaces-left-ac
   -webkit-app-region: drag !important;
 }
 
-/* The Popout accent belongs to the whole window outer edge. Keep it as the
-   bottom layer so the independent Space icon/emoji remains unobstructed. */
+/* The Popout accent belongs to the whole window outer edge. Keep it as a
+   bottom layer for the frame, but the folded corner must stay above the
+   Space identity (z 102) so it stays visible even when the left Activity Bar
+   is hidden and identity becomes an opaque drag-region. */
 body.is-popout-window.has-window-space-folded-corner::before {
   content: "";
   position: fixed;
   inset: 0 auto auto 0;
   width: 18px;
   height: 18px;
-  /* Above the colored Activity Bar background, below the Space identity. */
-  z-index: 100;
+  /* Above the colored Activity Bar background and the Space identity (102). */
+  z-index: 103;
   background: linear-gradient(
     to bottom right,
     var(--window-space-color) 50%,
@@ -1314,14 +1382,11 @@ body.is-popout-window.has-window-space-folded-corner::before {
   padding-left: 0 !important;
 }
 
-/* Popout 視窗 4 邊全方向自訂主題顏色邊框 (使用 fixed ::after 頂層 inset box-shadow 覆蓋，動態適應各 OS/主題之視窗圓角) */
+/* Popout 視窗 4 邊全方向自訂主題顏色邊框 (使用 fixed ::after 頂層 inset 覆蓋，動態適應各 OS/主題之視窗圓角) */
 body.is-popout-window.has-window-space-border::after {
   content: "";
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
+  inset: 0 !important;
   box-sizing: border-box !important;
   border: var(--window-space-border-inset, 1px) solid var(--window-space-color) !important;
   pointer-events: none !important;
@@ -1333,8 +1398,178 @@ body.is-popout-window.has-window-space-border::after {
   box-shadow: none !important;
 }
 
+/* 當視窗最大化或全螢幕時，Obsidian 原生取消視窗圓角，邊框同步取消圓角與折角 */
+body.is-popout-window.is-maximized.has-window-space-border::after,
+body.is-popout-window.is-fullscreen.has-window-space-border::after {
+  border-radius: 0 !important;
+}
+body.is-popout-window.is-maximized.has-window-space-folded-corner::before,
+body.is-popout-window.is-fullscreen.has-window-space-folded-corner::before {
+  display: none !important;
+}
+
 body.is-popout-window.has-window-space-border .window-spaces-activity-left {
   border-left: none;
+}
+
+/* ==========================================================================
+   Popout Space Theme Accents (Tab Header, Splitter, Panel Focus, Activity Bar)
+   Controlled by global settings & scoped under body.has-space-accents-*
+   ========================================================================== */
+
+/* 1. Tab Header: Active Tab 頂部細線、柔和底色與分頁欄底線 */
+body.is-popout-window.has-window-space-color.has-space-accents-tab {
+  --tab-background-active: color-mix(
+    in srgb,
+    var(--window-space-color) 12%,
+    var(--background-primary)
+  );
+  --tab-outline-color: color-mix(
+    in srgb,
+    var(--window-space-color) 35%,
+    var(--background-modifier-border)
+  );
+}
+
+body.is-popout-window.has-window-space-color.has-space-accents-tab
+  .workspace-tab-header.is-active
+  .workspace-tab-header-inner::before {
+  /* 2026-02 反饋：最前面的 tab 不需要特別的 top border highlight，禁用色條 */
+  display: none !important;
+}
+
+body.is-popout-window.has-window-space-color.has-space-accents-tab
+  .workspace-tab-header-container {
+  border-bottom: 1px solid var(--tab-outline-color) !important;
+}
+
+/* 2026-02 反饋：Obsidian 的 container-inner 有 margin-bottom: -1px 且背景不透明，
+   會向下延伸蓋住 container 的 accent border-bottom（non-active tab 與 "+" 鍵左下方
+   的 border 因此消失）。背景透明後露出完整 border；active tab 維持自身 box-shadow。 */
+body.is-popout-window.has-window-space-color.has-space-accents-tab
+  .workspace-tab-header-container-inner {
+  background-color: transparent !important;
+  background: transparent !important;
+}
+
+/* tab 之間的 1px 垂直分隔線（inner::after）套用 accent 色 */
+body.is-popout-window.has-window-space-color.has-space-accents-tab
+  .workspace-tab-header-inner::after {
+  background-color: var(--tab-outline-color) !important;
+}
+
+/* tab 的 pin 圖示（pip button）套用 accent color */
+body.is-popout-window.has-window-space-color
+  .workspace-tab-header-status-icon.mod-pinned {
+  color: var(--window-space-color) !important;
+}
+
+/* 2. Splitters: 窗格調整分隔線常態微光與 Hover / 拖曳高亮 */
+body.is-popout-window.has-window-space-color.has-space-accents-splitter
+  .workspace-leaf-resize-handle {
+  /* 2026-02 反饋：30% mix 在 sidebar 的 secondary 背景上對比不足，右側 handle 看起來
+     像 panel border 而非可拉曳的 splitter；調亮至 40% 讓左右一致明顯。 */
+  background-color: color-mix(
+    in srgb,
+    var(--window-space-color) 40%,
+    var(--background-modifier-border)
+  ) !important;
+  transition: background-color 0.15s ease, box-shadow 0.15s ease !important;
+}
+
+body.is-popout-window.has-window-space-color.has-space-accents-splitter
+  .workspace-leaf-resize-handle:hover,
+body.is-popout-window.has-window-space-color.has-space-accents-splitter
+  .workspace-leaf-resize-handle:active {
+  background-color: var(--window-space-color) !important;
+  /* 2026-02 反饋：Obsidian 的 hover 會把 handle border 改成 --divider-color-hover（粉紅），
+     與高亮色不一致；改為與背景相同的 space color，消除右側 hover 的粉紅線。 */
+  border-color: var(--window-space-color) !important;
+  box-shadow: 0 0 8px
+    color-mix(in srgb, var(--window-space-color) 70%, transparent) !important;
+}
+
+/* 3. Panel Border & Focus Outline: 窗格邊框與焦點指示 */
+body.is-popout-window.has-window-space-color.has-space-accents-panel
+  .workspace-tabs {
+  border: 1px solid
+    color-mix(
+      in srgb,
+      var(--window-space-color) 35%,
+      var(--background-modifier-border)
+    ) !important;
+}
+
+body.is-popout-window.has-window-space-color.has-space-accents-panel
+  .workspace-tabs:focus-within {
+  /* 2026-02 反饋：active content window 不需要在 border 特別高亮，移除 focus outline */
+  outline: none !important;
+  outline-offset: -1px !important;
+}
+
+/* 4. Activity Bars: 左右活動列、左上角空間識別區與左下角 Toolbar 注入柔和空間底色 */
+body.is-popout-window.has-window-space-color.has-space-accents-activity-bar
+  .window-spaces-activity-left,
+body.is-popout-window.has-window-space-color.has-space-accents-activity-bar
+  .window-spaces-activity-right,
+body.is-popout-window.has-window-space-color.has-space-accents-activity-bar
+  .window-spaces-space-identity.window-spaces-space-identity-drag-region,
+body.is-popout-window.has-window-space-color.has-space-accents-activity-bar
+  .window-spaces-layout-status {
+  background-color: color-mix(
+    in srgb,
+    var(--window-space-color) 12%,
+    var(--background-secondary)
+  ) !important;
+}
+
+/* 2026-02 反饋：activity bar 的 border（含 drag 區 border-bottom）統一 35% rose，
+   與 tab header 的 accent border 同色，解決灰 border 在 rose-tint 背景上對比度不足 */
+body.is-popout-window.has-window-space-color.has-space-accents-activity-bar
+  .window-spaces-activity-bar,
+body.is-popout-window.has-window-space-color.has-space-accents-activity-bar
+  .window-spaces-activity-drag {
+  border-color: color-mix(
+    in srgb,
+    var(--window-space-color) 35%,
+    var(--background-modifier-border)
+  ) !important;
+}
+
+/* 左下角 toolbar 的 border-top / border-right（含右上角圓角）套用相同 accent 色 */
+body.is-popout-window.has-window-space-color.has-space-accents-activity-bar
+  .window-spaces-layout-status {
+  border-top-color: color-mix(
+    in srgb,
+    var(--window-space-color) 35%,
+    var(--background-modifier-border)
+  ) !important;
+  border-right-color: color-mix(
+    in srgb,
+    var(--window-space-color) 35%,
+    var(--background-modifier-border)
+  ) !important;
+}
+
+/* 2026-02 反饋：activity bar 的「上方 border」（drag 區 border-bottom / 右側 top border）
+   顏色須與「其他方向」的視覺邊界一致。當 panel accent 作用時，activity bar 的垂直
+   邊界由相鄰 sidebar 的亮線主導；因此上方 border 也套用相同亮色，避免上方灰線與
+   垂直亮線不一致（Activity Bar tint 本身仍由 has-space-accents-activity-bar 控制）。 */
+body.is-popout-window.has-window-space-color.has-space-accents-panel
+  .window-spaces-activity-left .window-spaces-activity-drag {
+  border-bottom-color: color-mix(
+    in srgb,
+    var(--window-space-color) 35%,
+    var(--background-modifier-border)
+  ) !important;
+}
+body.is-popout-window.has-window-space-color.has-space-accents-panel
+  .window-spaces-activity-right {
+  border-top-color: color-mix(
+    in srgb,
+    var(--window-space-color) 35%,
+    var(--background-modifier-border)
+  ) !important;
 }
 
 .window-spaces-activity-hidden {
@@ -1362,7 +1597,6 @@ body.is-popout-window .workspace-tabs:not(.mod-sidedock) {
 }
 
 body.is-popout-window .window-spaces-activity-bar,
-body.is-popout-window .window-spaces-activity-drag,
 body.is-popout-window .workspace-tabs .workspace-tab-header-container,
 body.is-popout-window .workspace-tabs:not(.mod-sidedock) .workspace-tab-header-container,
 body.is-popout-window .workspace-tab-header-container-inner,
@@ -1370,6 +1604,11 @@ body.is-popout-window .workspace-tab-header-tab-list,
 body.is-popout-window .workspace-tab-header-spacer {
   background-color: var(--background-secondary) !important;
   background: var(--background-secondary) !important;
+}
+
+/* Activity Bar 頂部的拖曳區域使用透明底色，自然呈現 Activity Bar 的底色 */
+.window-spaces-activity-drag {
+  background: transparent !important;
 }
 
 .window-spaces-activity-btn {

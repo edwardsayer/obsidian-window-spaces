@@ -169,8 +169,16 @@ export interface WindowSettings {
     left: boolean;
     right: boolean;
   };
+  /** Popout window theme accent decorations (tab header, splitter, panel focus, activity bar). */
+  popoutAccents?: PopoutAccentSettings;
   // Workspace API 攔截器（Monkey Patch）開關，預設開啟
   workspaceInterceptorEnabled?: boolean;
+}
+
+export interface PopoutAccentSettings {
+  enabled: boolean;
+  splitter: boolean;
+  activityBar: boolean;
 }
 
 /**
