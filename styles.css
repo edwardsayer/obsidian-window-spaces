@@ -1547,7 +1547,7 @@ body.is-popout-window .workspace-split.mod-root > :last-child > .workspace-leaf-
   display: none !important;
 }
 
-body.is-popout-window .workspace-split.mod-root > *:has(+ .window-spaces-column-hidden) > .workspace-leaf-resize-handle {
+body.is-popout-window .workspace-split.mod-root > .window-spaces-has-hidden-next > .workspace-leaf-resize-handle {
   display: none !important;
 }
 

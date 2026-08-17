@@ -1217,6 +1217,75 @@ describe("PopoutActivityBarManager toggle behavior", () => {
     document.body.removeChild(rootEl);
   });
 
+  test("syncSidebarColumnClasses marks previous column when next column is hidden (no :has)", () => {
+    const rootEl = document.createElement("div");
+    rootEl.classList.add("workspace-split", "mod-root");
+
+    const leftColEl = document.createElement("div");
+    leftColEl.classList.add("workspace-tabs");
+    const leftLeafEl = document.createElement("div");
+    leftColEl.appendChild(leftLeafEl);
+    rootEl.appendChild(leftColEl);
+
+    const centerColEl = document.createElement("div");
+    centerColEl.classList.add("workspace-tabs");
+    const centerLeafEl = document.createElement("div");
+    centerColEl.appendChild(centerLeafEl);
+    rootEl.appendChild(centerColEl);
+
+    // 右側欄為收合狀態（hidden class 由 engine.hideColumn 寫入）
+    const rightColEl = document.createElement("div");
+    rightColEl.classList.add("workspace-tabs", "window-spaces-column-hidden");
+    const rightLeafEl = document.createElement("div");
+    rightColEl.appendChild(rightLeafEl);
+    rootEl.appendChild(rightColEl);
+    document.body.appendChild(rootEl);
+
+    const leftLeaf = { containerEl: leftLeafEl, view: { containerEl: leftLeafEl } } as any;
+    const centerLeaf = { containerEl: centerLeafEl, view: { containerEl: centerLeafEl } } as any;
+    const rightLeaf = { containerEl: rightLeafEl, view: { containerEl: rightLeafEl } } as any;
+
+    const workspace = {
+      iterateAllLeaves: (cb: (leaf: any) => void) => {
+        cb(leftLeaf);
+        cb(centerLeaf);
+        cb(rightLeaf);
+      },
+      revealLeaf: vi.fn().mockResolvedValue(undefined),
+      setActiveLeaf: vi.fn(),
+    } as any;
+    const app = { workspace } as any;
+    const engine = new PopoutLayoutEngine(app);
+    const manager = new PopoutActivityBarManager(
+      {
+        app,
+        settings: { showActivityBars: true, activityBars: { left: [], right: [] } },
+      } as any,
+      engine
+    );
+    const bars = {
+      left: document.createElement("div"),
+      right: document.createElement("div"),
+      viewButtons: new Map(),
+      columnButtons: {
+        left: document.createElement("button"),
+        right: document.createElement("button"),
+      },
+    } as any;
+    (manager as any).barsByWindow.set(window, bars);
+
+    (manager as any).syncSidebarColumnClasses(window);
+
+    // 中央欄的下一欄（右側欄）hidden → 中央欄被標記
+    expect(centerColEl.classList.contains("window-spaces-has-hidden-next")).toBe(true);
+    // 左欄的下一欄（中央欄）非 hidden → 不標記
+    expect(leftColEl.classList.contains("window-spaces-has-hidden-next")).toBe(false);
+    // 最後一欄永遠不標記（無下一欄）
+    expect(rightColEl.classList.contains("window-spaces-has-hidden-next")).toBe(false);
+
+    document.body.removeChild(rootEl);
+  });
+
   test("deferred sync re-applies sidebar classes after Obsidian rebuilds a tab group", async () => {
     const rootEl = document.createElement("div");
     rootEl.classList.add("workspace-split", "mod-root");

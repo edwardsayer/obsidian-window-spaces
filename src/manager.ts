@@ -326,6 +326,8 @@ export class WindowLayoutManager {
    * Obsidian 每次重建 WorkspaceWindow 都可能重新產生 wrapper id，因此只
    * 比對 view type/state、split direction/dimension 與 tabs 的 active index，
    * 忽略 window/item/leaf id 與顯示用 icon/title。
+   * INTERNAL API: Workspace.getLayout()（d.ts @public 但官方文件未記載；
+   * 序列化格式依內部實作，read-only，低風險）。
    */
   private isWindowLayoutAtSavedSnapshot(targetWin: Window, layout: WindowLayout): boolean {
     try {
@@ -439,6 +441,8 @@ export class WindowLayoutManager {
     }
 
     // 2. 針對 WorkspaceWindow 實例上的 setTitle API 劫持（若存在）
+    // INTERNAL API: Workspace.floatingSplit（d.ts 未宣告）+ WorkspaceWindow.setTitle
+    // 實例劫持（Monkey Patch：保存 _originalSetTitle，unhook 時精準還原）。
     const extApp = this.app as unknown as { workspace: ExtendedWorkspace };
     const floatingSplit = extApp.workspace?.floatingSplit;
     const workspaceWindow = floatingSplit?.children?.find(
@@ -1144,6 +1148,9 @@ export class WindowLayoutManager {
    * resulting top-level items to one existing WorkspaceWindow only. This is
    * intentionally an internal API use: it is the only supported way in this
    * plugin to reproduce nested split rendering without clearing all windows.
+   * INTERNAL API: Workspace.deserializeLayout / Workspace.floatingSplit /
+   * WorkspaceItem.insertChild / WorkspaceItem.removeChild（d.ts 未宣告）。
+   * 全部以 typeof 偵測，失敗回傳 null → 保留 native 結構並 warn。
    */
   private async buildWindowStructureWithDeserializer(
     targetWin: Window,
@@ -1688,6 +1695,8 @@ export class WindowLayoutManager {
     try {
       const workspace = this.app.workspace as unknown as ExtendedWorkspace;
       const fullLayout = workspace.getLayout();
+      // INTERNAL API: Workspace.getLayout()（d.ts @public 但官方文件未記載；
+      // read-only 序列化讀取，低風險）。
       const activeLeaf = this.getActiveLeafForCurrentWindow(targetWindow);
       const currentWin = targetWindow || (typeof activeWindow !== "undefined" ? activeWindow : window);
 
@@ -1924,6 +1933,8 @@ export class WindowLayoutManager {
       const savedLeaves = this.getSavedViewStates(layout);
       const savedLeafId = layout.windowInfo?.firstLeafId || savedLeaves[0]?.id;
       const workspace = this.app.workspace as unknown as ExtendedWorkspace;
+      // INTERNAL API: Workspace.getLayout()（d.ts @public 但官方文件未記載；
+      // read-only 序列化讀取，低風險）— restore 流程中的 layout 快照基底。
       let currentLayout: Record<string, unknown> = workspace.getLayout();
       let floatingWindows = this.getFloatingWindows(currentLayout);
 
@@ -1979,6 +1990,8 @@ export class WindowLayoutManager {
           // 若不帶，Obsidian 會以預設幾何（Electron 預設 1025x801@螢幕中央）
           // 建立，之後 restoreWindowGeometry 再校正會產生「先錯誤位置、
           // 約 1 秒後才跳正」的兩階段跳動。
+          // INTERNAL API: Workspace.openPopoutLeaf(data)（d.ts @public 但官方
+          // 文件未記載）；已以 optional chain 偵測，無此 API 時進入既有錯誤路徑。
           const popoutInitData: WorkspaceWindowInitData | undefined =
             layout.includeGeometry !== false && layout.windowState
               ? {
@@ -2078,6 +2091,9 @@ export class WindowLayoutManager {
             floatingObj[targetIndex] = restoredWindow;
           }
           await workspace.changeLayout(currentLayout);
+          // INTERNAL API: Workspace.changeLayout（d.ts @public 但官方文件未記載；
+          // 依 asar-findings #1 會 clearLayout 關閉所有 popout）。這裡是 target-only
+          // rebuild 失敗/不適用時的最後 fallback（非首選），故不需額外偵測。
           // changeLayout 會關閉並重建所有 floating window（含其他 Popout），
           // 需立即恢復其他視窗的 label 與幾何（多 DPI 縮小防護）。target-only
           // 路徑（未走 changeLayout）不得呼叫：其他視窗沒被重建，強制 resize
@@ -2654,6 +2670,8 @@ export class WindowLayoutManager {
    */
   private findPopoutOrdinal(targetWin: Window, floatingCount: number): number {
     const workspace = this.app.workspace as any;
+    // INTERNAL API: Workspace.floatingSplit / floating（d.ts 未宣告）；
+    // 雙 fallback：floatingSplit.children 不存在時退 floating.children，再退空陣列。
     const floatingChildren =
       workspace.floatingSplit?.children ||
       workspace.floating?.children ||
@@ -2795,6 +2813,8 @@ export class WindowLayoutManager {
         if (i > 0) {
           const parent = (last as unknown as ExtendedWorkspaceLeaf).parent;
           if (!parent) break;
+          // INTERNAL API: Workspace.createLeafInParent（d.ts @public 但官方文件
+          // 未記載；依 asar-findings #2 方向扁平化行為）。已檢查 parent 存在。
           last = workspace.createLeafInParent(
             parent as unknown as Parameters<typeof workspace.createLeafInParent>[0],
             -1
@@ -2849,6 +2869,10 @@ export class WindowLayoutManager {
     const topDirection = isContainer ? rootNode.direction || "vertical" : "vertical";
     const topUnits: any[] = isContainer ? rootNode.children || [] : [rootNode];
 
+    // INTERNAL API: Workspace.createLeafBySplit（d.ts @public 但官方文件未記載；
+    // 依 asar-findings #2 依方向扁平插入或建新 split）。以 leaf 層級重建換取
+    // 不觸發全域 changeLayout；呼叫處皆包 try-catch / 前置檢查。
+
     // 階段一：建立頂層佔位 leaf（同層級依序分割）
     const placeholders: WorkspaceLeaf[] = [];
     let anchor: WorkspaceLeaf | null = initialLeaves[0] || null;
@@ -2902,6 +2926,8 @@ export class WindowLayoutManager {
     // 同時寫入 dimension 屬性（Obsidian serialize 會保存）與 flex-grow
     // （視覺比例）。只設 CSS flex-grow 會讓「restore 後重新儲存」時
     // dimension 丟失（Obsidian serialize 讀的是物件的 dimension 屬性）。
+    // INTERNAL API: WorkspaceItem.setDimension（d.ts 未宣告）；已偵測
+    // typeof === "function"，失敗 fallback 至純 CSS flex-grow。
     const elToItem = new Map<HTMLElement, { setDimension?: (v: number) => void }>();
     try {
       (this.app.workspace as unknown as {
@@ -3456,6 +3482,9 @@ export class WindowLayoutManager {
       if (!targetLeaf && windowLeaves.length > 0) {
         try {
           const baseLeaf = windowLeaves[windowLeaves.length - 1];
+          // INTERNAL API: Workspace.createLeafBySplit（d.ts @public 但官方文件
+          // 未記載；依 asar-findings #2 方向扁平化行為）。已 try-catch 包覆，
+          // 失敗時 warn 且不中斷後續檔案開啟。
           targetLeaf = (this.app.workspace as any).createLeafBySplit(baseLeaf, "vertical");
           if (targetLeaf) windowLeaves.push(targetLeaf);
         } catch (e) {

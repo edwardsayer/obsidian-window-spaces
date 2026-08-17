@@ -794,6 +794,14 @@ export class PopoutActivityBarManager {
       el.classList.toggle("mod-sidedock", isSidebar);
       el.classList.toggle("mod-left-split", isLeftSidebar);
       el.classList.toggle("mod-right-split", isRightSidebar);
+      // 前一欄 handle 隱藏標記：下一欄是收合的側欄（window-spaces-column-hidden）
+      // 時，本欄的 right-edge handle 由 CSS 隱藏（避免重複 handle 與拖曳誤位移
+      // 右側邊框）。以 JS 標記 class 取代 :has(+ ...) 選擇器，避免 DOM invalidate。
+      const next = columns[index + 1];
+      el.classList.toggle(
+        "window-spaces-has-hidden-next",
+        !!next && next.classList.contains("window-spaces-column-hidden")
+      );
       const tabGroups = this.getSidebarTabGroups(el);
       tabGroups.forEach((tabsEl) => {
         if (tabsEl !== el) {
