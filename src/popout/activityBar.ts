@@ -261,6 +261,63 @@ export class PopoutActivityBarManager {
     });
   }
 
+  /**
+   * 若任一「顯示且 sidebar 欄位缺失」的側存在，以全新 layout 重建該視窗，
+   * 在欄位容器層級補出標準 workspace-tabs sidebar 欄位（B2：每次新增側都走
+   * 重構）。保留原 content 的 leaf view state；既有側欄欄位原封保留。
+   *
+   * @returns 是否執行了重建。
+   */
+  private async rebuildMissingSidebars(win: Window, layout: WindowLayout): Promise<boolean> {
+    if (!win || win.closed || !layout) return false;
+    const leftShow = this.isSideVisibleForWindow(win, "left");
+    const rightShow = this.isSideVisibleForWindow(win, "right");
+    const leftView = leftShow ? this.getItemsForWindowSide(win, "left")[0]?.viewType : undefined;
+    const rightView = rightShow ? this.getItemsForWindowSide(win, "right")[0]?.viewType : undefined;
+
+    // 「該側 sidebar 欄位是否已存在」不以 getColumnElement 判斷（它受 sidebar 標記
+    // 影響：disable 後欄位保留為 content 時會誤判為缺失），改看欄位容器最外欄
+    // 是否已含該側預設 view——若 disable 保留的欄位仍在，re-enable 就不重建。
+    const topCols = this.engine.getTopLevelColumnElements(win);
+    const last = topCols.length - 1;
+    const leftMissing =
+      leftShow && !(topCols[0] && this.columnContainsViewType(topCols[0], leftView));
+    const rightMissing =
+      rightShow &&
+      !(topCols[last] && this.columnContainsViewType(topCols[last], rightView));
+    if (!leftMissing && !rightMissing) return false;
+
+    const manager = (this.plugin as unknown as {
+      manager?: {
+        rebuildPopoutLayoutWithSidebars?: (
+          win: Window,
+          layout: WindowLayout,
+          left?: string,
+          right?: string
+        ) => Promise<void>;
+      };
+    }).manager;
+    if (!manager?.rebuildPopoutLayoutWithSidebars) return false;
+
+    // 對已存在（未缺）的那側不傳 view，避免 rebuild 重複新增；只為缺的側加。
+    await manager.rebuildPopoutLayoutWithSidebars(
+      win,
+      layout,
+      leftMissing ? leftView : undefined,
+      rightMissing ? rightView : undefined
+    );
+    // 重建後頂層欄位數與結構改變，重設側欄 hints（避免舊 originalCount 誤判）
+    this.resetSidebarHints(win);
+    return true;
+  }
+
+  /** 欄位元素內是否包含指定 viewType 的 leaf。 */
+  private columnContainsViewType(colEl: HTMLElement | undefined, viewType?: string): boolean {
+    if (!colEl || !viewType) return false;
+    return Array.from(colEl.querySelectorAll(".workspace-leaf [data-type]"))
+      .some((el) => el.getAttribute("data-type") === viewType);
+  }
+
   private async waitForLayoutFrame(win: Window): Promise<void> {
     const raf = win.requestAnimationFrame?.bind(win);
     if (raf) {
@@ -1395,6 +1452,13 @@ export class PopoutActivityBarManager {
       }
 
       await this.plugin.saveSettings?.();
+    }
+
+    // B2：enable 一側且該側 sidebar 欄位缺失時，以「全新含 sidebar 的 layout」
+    // 重建該 popout（保留原 content 的 view state，只在欄位容器層級補出標準
+    // sidebar tabs）——取代 createLeafBySplit 對 split 欄位建錯層級的問題。
+    if (nextVisible && layout) {
+      await this.rebuildMissingSidebars(win, layout);
     }
 
     this.renderWindow(win);

@@ -1141,6 +1141,102 @@ export class WindowLayoutManager {
    * attach them to the target WorkspaceWindow. Both paths leave other Popouts
    * untouched and never call Workspace.changeLayout().
    */
+  /**
+   * 以「全新生成的含 sidebar layout 樹」重建目標 popout（舊 space 首次開啟
+   * activity bar，或在既有結構下新增一側 sidebar 時使用）。
+   *
+   * 概念：不走 createLeafBySplit 逐欄補欄（對「欄位為 workspace-split」的
+   * 空間會在錯誤層級建欄、頂層欄位數不增），而是讀取目標視窗目前的 live
+   * layout 樹，在其欄位容器 children 之前後**直接插入標準 workspace-tabs
+   * sidebar 欄位**（全新生成、怎麼塞都行），再交由既有 target-only leaf
+   * rebuild 套用（不觸發全域 changeLayout）。原 content 欄位與 leaf view
+   * state 原封保留，僅在最左/最右新增 sidebar。
+   */
+  public async rebuildPopoutLayoutWithSidebars(
+    targetWin: Window,
+    layout: WindowLayout,
+    leftView?: string,
+    rightView?: string
+  ): Promise<void> {
+    if (!targetWin || targetWin.closed || !layout || !layout.workspace) return;
+    const liveRoot =
+      this.getLiveWindowLayoutTree(targetWin) ||
+      this.extractLayoutRootNode(layout.workspace.layout);
+    if (!liveRoot) return;
+    const newRoot = this.buildLayoutTreeWithSidebars(liveRoot, leftView, rightView);
+    if (!newRoot) return;
+    // leaves 置空：restoreOpenSpaceInPlace 的 getSavedViewStates 會從新樹
+    // （含 live leaf state）DFS 重建，確保保留目前開啟的檔案 / view。
+    const override: WindowLayout = {
+      ...layout,
+      workspace: {
+        ...layout.workspace,
+        layout: newRoot,
+        leaves: [],
+      },
+    };
+    try {
+      await this.restoreOpenSpaceInPlace(override, targetWin, {
+        showNotifications: false,
+        validateFiles: false,
+        skipGeometry: true,
+      });
+    } catch (e) {
+      console.warn("[Window Spaces] Failed to rebuild layout with sidebars:", e);
+    }
+  }
+
+  /** 讀取目標 popout 目前的 live layout 樹（含目前開啟的 view state）。 */
+  private getLiveWindowLayoutTree(win: Window): any | null {
+    try {
+      const globalLayout = (this.app.workspace as unknown as {
+        getLayout?: () => any;
+      }).getLayout?.();
+      if (!globalLayout) return null;
+      const floatingWindows = this.getFloatingWindows(globalLayout);
+      const idx = this.findFloatingWindowIndexForWindow(win, floatingWindows);
+      return idx >= 0 && floatingWindows[idx] ? floatingWindows[idx] : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * 在 layout 樹的欄位容器 children 前後插入標準 workspace-tabs sidebar 欄位。
+   * 欄位容器 = window/floating 的第一個 direct child 為 split 者（其 children 為欄位）；
+   * 若 rootNode 本身即 split，則視為欄位容器。
+   */
+  private buildLayoutTreeWithSidebars(
+    rootNode: any,
+    leftView?: string,
+    rightView?: string
+  ): any | null {
+    if (!rootNode) return null;
+    const clone = JSON.parse(JSON.stringify(rootNode));
+    const isContainer = clone?.type === "window" || clone?.type === "floating";
+    let container: any;
+    if (isContainer) {
+      container = (clone.children || []).find((c: any) => c && c.type === "split");
+    } else {
+      container = clone;
+    }
+    if (!container || container.type !== "split") return null;
+    const mkTabs = (viewType?: string) => ({
+      type: "tabs",
+      children:
+        viewType && viewType !== "empty"
+          ? [{ type: "leaf", state: { type: viewType, state: {} } }]
+          : [],
+    });
+    const prior = Array.isArray(container.children) ? container.children : [];
+    container.children = [
+      ...(leftView ? [mkTabs(leftView)] : []),
+      ...prior,
+      ...(rightView ? [mkTabs(rightView)] : []),
+    ];
+    return clone;
+  }
+
   private async rebuildTargetWindowStructure(
     targetWin: Window,
     rootNode: any

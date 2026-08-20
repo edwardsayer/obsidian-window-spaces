@@ -3179,6 +3179,81 @@ var WindowLayoutManager = class {
    * attach them to the target WorkspaceWindow. Both paths leave other Popouts
    * untouched and never call Workspace.changeLayout().
    */
+  /**
+   * 以「全新生成的含 sidebar layout 樹」重建目標 popout（舊 space 首次開啟
+   * activity bar，或在既有結構下新增一側 sidebar 時使用）。
+   *
+   * 概念：不走 createLeafBySplit 逐欄補欄（對「欄位為 workspace-split」的
+   * 空間會在錯誤層級建欄、頂層欄位數不增），而是讀取目標視窗目前的 live
+   * layout 樹，在其欄位容器 children 之前後**直接插入標準 workspace-tabs
+   * sidebar 欄位**（全新生成、怎麼塞都行），再交由既有 target-only leaf
+   * rebuild 套用（不觸發全域 changeLayout）。原 content 欄位與 leaf view
+   * state 原封保留，僅在最左/最右新增 sidebar。
+   */
+  async rebuildPopoutLayoutWithSidebars(targetWin, layout, leftView, rightView) {
+    if (!targetWin || targetWin.closed || !layout || !layout.workspace) return;
+    const liveRoot = this.getLiveWindowLayoutTree(targetWin) || this.extractLayoutRootNode(layout.workspace.layout);
+    if (!liveRoot) return;
+    const newRoot = this.buildLayoutTreeWithSidebars(liveRoot, leftView, rightView);
+    if (!newRoot) return;
+    const override = {
+      ...layout,
+      workspace: {
+        ...layout.workspace,
+        layout: newRoot,
+        leaves: []
+      }
+    };
+    try {
+      await this.restoreOpenSpaceInPlace(override, targetWin, {
+        showNotifications: false,
+        validateFiles: false,
+        skipGeometry: true
+      });
+    } catch (e) {
+      console.warn("[Window Spaces] Failed to rebuild layout with sidebars:", e);
+    }
+  }
+  /** 讀取目標 popout 目前的 live layout 樹（含目前開啟的 view state）。 */
+  getLiveWindowLayoutTree(win) {
+    try {
+      const globalLayout = this.app.workspace.getLayout?.();
+      if (!globalLayout) return null;
+      const floatingWindows = this.getFloatingWindows(globalLayout);
+      const idx = this.findFloatingWindowIndexForWindow(win, floatingWindows);
+      return idx >= 0 && floatingWindows[idx] ? floatingWindows[idx] : null;
+    } catch {
+      return null;
+    }
+  }
+  /**
+   * 在 layout 樹的欄位容器 children 前後插入標準 workspace-tabs sidebar 欄位。
+   * 欄位容器 = window/floating 的第一個 direct child 為 split 者（其 children 為欄位）；
+   * 若 rootNode 本身即 split，則視為欄位容器。
+   */
+  buildLayoutTreeWithSidebars(rootNode, leftView, rightView) {
+    if (!rootNode) return null;
+    const clone = JSON.parse(JSON.stringify(rootNode));
+    const isContainer = clone?.type === "window" || clone?.type === "floating";
+    let container;
+    if (isContainer) {
+      container = (clone.children || []).find((c) => c && c.type === "split");
+    } else {
+      container = clone;
+    }
+    if (!container || container.type !== "split") return null;
+    const mkTabs = (viewType) => ({
+      type: "tabs",
+      children: viewType && viewType !== "empty" ? [{ type: "leaf", state: { type: viewType, state: {} } }] : []
+    });
+    const prior = Array.isArray(container.children) ? container.children : [];
+    container.children = [
+      ...leftView ? [mkTabs(leftView)] : [],
+      ...prior,
+      ...rightView ? [mkTabs(rightView)] : []
+    ];
+    return clone;
+  }
   async rebuildTargetWindowStructure(targetWin, rootNode) {
     if (!targetWin || !rootNode) return null;
     if (this.isSimpleLayoutStructure(rootNode)) {
@@ -7703,6 +7778,40 @@ var PopoutActivityBarManager = class {
       });
     });
   }
+  /**
+   * 若任一「顯示且 sidebar 欄位缺失」的側存在，以全新 layout 重建該視窗，
+   * 在欄位容器層級補出標準 workspace-tabs sidebar 欄位（B2：每次新增側都走
+   * 重構）。保留原 content 的 leaf view state；既有側欄欄位原封保留。
+   *
+   * @returns 是否執行了重建。
+   */
+  async rebuildMissingSidebars(win, layout) {
+    if (!win || win.closed || !layout) return false;
+    const leftShow = this.isSideVisibleForWindow(win, "left");
+    const rightShow = this.isSideVisibleForWindow(win, "right");
+    const leftView = leftShow ? this.getItemsForWindowSide(win, "left")[0]?.viewType : void 0;
+    const rightView = rightShow ? this.getItemsForWindowSide(win, "right")[0]?.viewType : void 0;
+    const topCols = this.engine.getTopLevelColumnElements(win);
+    const last = topCols.length - 1;
+    const leftMissing = leftShow && !(topCols[0] && this.columnContainsViewType(topCols[0], leftView));
+    const rightMissing = rightShow && !(topCols[last] && this.columnContainsViewType(topCols[last], rightView));
+    if (!leftMissing && !rightMissing) return false;
+    const manager = this.plugin.manager;
+    if (!manager?.rebuildPopoutLayoutWithSidebars) return false;
+    await manager.rebuildPopoutLayoutWithSidebars(
+      win,
+      layout,
+      leftMissing ? leftView : void 0,
+      rightMissing ? rightView : void 0
+    );
+    this.resetSidebarHints(win);
+    return true;
+  }
+  /** 欄位元素內是否包含指定 viewType 的 leaf。 */
+  columnContainsViewType(colEl, viewType) {
+    if (!colEl || !viewType) return false;
+    return Array.from(colEl.querySelectorAll(".workspace-leaf [data-type]")).some((el) => el.getAttribute("data-type") === viewType);
+  }
   async waitForLayoutFrame(win) {
     const raf = win.requestAnimationFrame?.bind(win);
     if (raf) {
@@ -8580,6 +8689,9 @@ var PopoutActivityBarManager = class {
         }
       }
       await this.plugin.saveSettings?.();
+    }
+    if (nextVisible && layout) {
+      await this.rebuildMissingSidebars(win, layout);
     }
     this.renderWindow(win);
   }
