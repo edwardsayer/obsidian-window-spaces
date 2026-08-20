@@ -245,6 +245,25 @@ export class PopoutActivityBarManager {
    * 舊 content 欄當成 sidebar；後續 ensure 只補出新的側欄，原有欄位全數
    * 保留為 content。
    */
+  /**
+   * 阻擋 Obsidian 拖 tab 到 activity bar（含其與 sidebar 之間的區域）時被視為
+   * drop 而建立/移動欄位。Obsidian 的 tab 拖曳是 HTML5 drag：在 activity bar
+   * 元素上攔截 dragover/drop/dragenter 並 preventDefault + stopPropagation，
+   * 使事件不冒泡到 Obsidian 的全域 drag handler（避免在視窗邊緣建立新欄位），
+   * 同時 dropEffect = 'none' 顯示不允許。不影響活動列自身的點擊與視窗拖曳
+   * （drag handle 用 mousedown/mousemove，非 HTML5 drag）。
+   */
+  private blockActivityBarTabDrop(barEl: HTMLElement): void {
+    const block = (e: DragEvent): void => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = "none";
+    };
+    barEl.addEventListener("dragover", block);
+    barEl.addEventListener("drop", block);
+    barEl.addEventListener("dragenter", block);
+  }
+
   private clearSidebarMarks(win: Window): void {
     const markClasses = [
       "window-spaces-sidebar-column",
@@ -534,6 +553,11 @@ export class PopoutActivityBarManager {
       this.showVisibilityMenu(win, evt);
     };
     const right = body.createDiv({ cls: "window-spaces-activity-bar window-spaces-activity-right" });
+
+    // 防止 Obsidian 拖 tab 到 activity bar（及其與 sidebar 之間的邊界）時，
+    // 被視為「視窗邊緣 drop」而建立/移動欄位。
+    this.blockActivityBarTabDrop(left);
+    this.blockActivityBarTabDrop(right);
 
     this.barsByWindow.set(win, {
       left,
