@@ -2,7 +2,7 @@
 /**
  * CDP 檢查輔助：對指定 target 執行 JS，輸出結果。
  * 用法: node src/tools/cdp-inspect.js <title-substring> <js-expression>
- * 例: node src/tools/cdp-inspect.js "test-vault - Obsidian" "document.title"
+ * 例: node src/tools/cdp-inspect.js "quartz-vault - Obsidian" "document.title"
  */
 const http = require('http');
 

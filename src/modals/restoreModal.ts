@@ -1395,8 +1395,8 @@ export class WindowLayoutsModal extends Modal {
   private removeKeydownListener(): void {
     if (this.keydownListener) {
       const target = this.keydownTarget || this.panelRootEl?.ownerDocument || this.modalEl?.ownerDocument || document;
-      target.removeEventListener("keydown", this.keydownListener, true);
-      target.removeEventListener("keydown", this.keydownListener, false);
+      target.removeEventListener("keydown", this.keydownListener as EventListener, true);
+      target.removeEventListener("keydown", this.keydownListener as EventListener, false);
       this.keydownListener = undefined;
       this.keydownTarget = undefined;
     }

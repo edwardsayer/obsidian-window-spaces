@@ -64,6 +64,7 @@ export class Menu {
       setTitle: () => item,
       setIcon: () => item,
       setChecked: () => item,
+      setDisabled: () => item,
       setWarning: () => item,
       onClick: (fn: any) => { fn(); return item; }
     };

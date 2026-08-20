@@ -248,5 +248,10 @@ export interface TranslationStrings {
     cannotHideLastPane: string;
     onlyInPopout: string;
     openSettings: string;
+    leftActivityBar: string;
+    leftSidebar: string;
+    rightActivityBar: string;
+    rightSidebar: string;
   };
 }
+

@@ -4,6 +4,7 @@ import { t } from "./i18n";
 import { SettingGroupLike } from "./types";
 import {
   ICON_CHOICES,
+  applyItemIcon,
   enumerateAvailableViews,
   ensureViewIcon,
   resolveViewIcon,
@@ -72,7 +73,7 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
     this.plugin = plugin;
   }
 
-  getSettingDefinitions(): unknown[] {
+  getSettingDefinitions(): any[] {
     return [];
   }
 
@@ -534,6 +535,8 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
                 if (!icon || icon === newItem.icon) return;
                 newItem.icon = icon;
                 renderItemRows();
+                // 讓 Activity Bar 立即套用動態抓到的正確 icon（而非僅更新設定列）
+                this.plugin.activityBars.refreshAll();
                 void this.plugin.saveSettings();
               });
             }
@@ -577,6 +580,12 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
         if (existingRow) {
           existingRow.setAttr("data-drag-index", String(index));
           addRow.settingEl.before(existingRow);
+          // Add view 動態取得 icon 後（item.icon 已更新），同步到既有列的
+          // icon 按鈕，避免列上仍顯示 fallback "layout"。
+          const existingIconBtn = existingRow.querySelector<HTMLElement>(
+            ".setting-item-control .clickable-icon"
+          );
+          if (existingIconBtn) applyItemIcon(existingIconBtn, this.app, item);
           return;
         }
         const handle = this.renderSideItemRow(group, side, item, index, () => {

@@ -1,4 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
+import { Menu } from "obsidian";
+import { initI18n } from "../src/i18n";
+import { WindowLayoutManager } from "../src/manager";
 import {
   getDirectChildOf,
   getPaneContainerElement,
@@ -1965,4 +1968,215 @@ describe("2-column layout sidebar inference (legacy / non-standard spaces)", () 
     expect(body.classList.contains("has-space-accents-activity-bar")).toBe(false);
     expect(body.classList.contains("has-window-space-color")).toBe(false);
   });
+
+  test("showVisibilityMenu renders full 4-item menu on space logo and 2-item menu on toggle button", async () => {
+    initI18n({} as any);
+    let saved = false;
+    const spaceLayout: WindowLayout = {
+      id: "menu-test-space",
+      name: "Menu Space",
+      timestamp: Date.now(),
+      windowState: { size: { width: 800, height: 600 } },
+      workspace: { layout: {}, leaves: [] },
+      metadata: { fileCount: 1, tabCount: 1, splitCount: 0, createdAt: "2026-08-17", obsidianVersion: "1.13.7", pluginVersion: "1.0.7" },
+      activityBars: {
+        left: { show: true, items: [] },
+        right: { show: false, items: [] },
+      },
+    };
+
+    const settings: WindowSettings = {
+      spaces: [spaceLayout],
+      autoSave: false,
+      showNotifications: false,
+      version: "1.0.7",
+      showLayoutStatusBar: false,
+      showWindowLayoutsRibbonIcon: false,
+      activityBars: { left: [], right: [] },
+    };
+
+    let columnHidden = { left: false, right: false };
+    const mockEngine = {
+      isColumnHidden: (_w: any, side: "left" | "right") => columnHidden[side],
+      showColumn: (_w: any, side: "left" | "right") => { columnHidden[side] = false; },
+      hideColumn: (_w: any, side: "left" | "right") => { columnHidden[side] = true; },
+      getVisibleColumnCount: () => 3,
+      getColumnElement: () => document.createElement("div"),
+      getLeavesForWindow: () => [],
+      getTopLevelColumnElements: () => [],
+    } as unknown as PopoutLayoutEngine;
+
+    const manager = new PopoutActivityBarManager(
+      { app: {} as any, settings, saveSettings: async () => { saved = true; } },
+      mockEngine
+    );
+
+    const testDoc = document.implementation.createHTMLDocument("Menu Test Popout");
+    const testWin = {
+      document: testDoc,
+      _windowSpacesLayoutId: "menu-test-space",
+    } as unknown as Window;
+
+    // 1. 測試 Space Logo 右鍵選單：應包含 4 個項目
+    const capturedItems: any[] = [];
+    const mockMouseEvent = { clientX: 10, clientY: 10, preventDefault: () => {}, stopPropagation: () => {} } as unknown as MouseEvent;
+
+    const originalAddItem = (manager as any).app;
+    // We can spy on Menu.prototype.addItem
+    const itemsCreated: { title: string; checked: boolean; disabled: boolean; onClick: () => void }[] = [];
+    const origAddItem = Menu.prototype.addItem;
+    Menu.prototype.addItem = function (cb: any) {
+      const item = {
+        title: "",
+        checked: false,
+        disabled: false,
+        setTitle: (t: string) => { item.title = t; return item; },
+        setIcon: () => item,
+        setChecked: (c: boolean) => { item.checked = c; return item; },
+        setDisabled: (d: boolean) => { item.disabled = d; return item; },
+        onClick: (fn: any) => { item.onClickHandler = fn; return item; },
+        onClickHandler: () => {},
+      };
+      cb(item);
+      itemsCreated.push({
+        title: item.title,
+        checked: item.checked,
+        disabled: item.disabled,
+        onClick: item.onClickHandler,
+      });
+      return this;
+    };
+
+    try {
+      manager.showVisibilityMenu(testWin, mockMouseEvent);
+      expect(itemsCreated.length).toBe(4);
+      expect(itemsCreated[0].title).toBe("Left activity bar");
+      expect(itemsCreated[0].checked).toBe(true);
+      expect(itemsCreated[1].title).toBe("Left sidebar");
+      expect(itemsCreated[1].disabled).toBe(false);
+      expect(itemsCreated[1].checked).toBe(true);
+
+      // Right activity bar is false -> Right sidebar must be disabled & checked: true (一律顯示)
+      expect(itemsCreated[2].title).toBe("Right activity bar");
+      expect(itemsCreated[2].checked).toBe(false);
+      expect(itemsCreated[3].title).toBe("Right sidebar");
+      expect(itemsCreated[3].disabled).toBe(true);
+      expect(itemsCreated[3].checked).toBe(true);
+
+      // 2. 測試 Left toggle 按鈕右鍵選單：只包含 2 個項目
+      itemsCreated.length = 0;
+      manager.showVisibilityMenu(testWin, mockMouseEvent, "left");
+      expect(itemsCreated.length).toBe(2);
+      expect(itemsCreated[0].title).toBe("Left activity bar");
+      expect(itemsCreated[1].title).toBe("Left sidebar");
+
+      // 3. 測試 Right toggle 按鈕右鍵選單：只包含 2 個項目
+      itemsCreated.length = 0;
+      manager.showVisibilityMenu(testWin, mockMouseEvent, "right");
+      expect(itemsCreated.length).toBe(2);
+      expect(itemsCreated[0].title).toBe("Right activity bar");
+      expect(itemsCreated[1].title).toBe("Right sidebar");
+
+      // 4. 測試切換 Right activity bar 為 true
+      saved = false;
+      await manager.toggleSideActivityBar(testWin, "right");
+      expect(spaceLayout.activityBars?.right?.show).toBe(true);
+      expect(saved).toBe(true);
+
+      // 5. 測試切換 Left sidebar 為 hidden
+      saved = false;
+      await manager.toggleSideSidebar(testWin, "left");
+      expect(columnHidden.left).toBe(true);
+      expect(spaceLayout.hidden?.leftSidebar).toBe(true);
+      expect(saved).toBe(true);
+
+      // 6. 測試當 Activity Bar 關閉時，若 sidebar 原本隱藏，強制解除隱藏
+      await manager.toggleSideActivityBar(testWin, "left");
+      expect(spaceLayout.activityBars?.left?.show).toBe(false);
+      expect(columnHidden.left).toBe(false); // 強制解除隱藏
+      expect(spaceLayout.hidden?.leftSidebar).toBe(false);
+    } finally {
+      Menu.prototype.addItem = origAddItem;
+    }
+  });
+
+  test("updateLayoutLabelElement attaches right-click visibility context menu to edit-settings button", () => {
+    initI18n({} as any);
+    const createMockEl = (tag = "div") => {
+      const el = document.createElement(tag) as any;
+      el.empty = () => {
+        el.innerHTML = "";
+      };
+      el.createDiv = (opts?: any) => {
+        const child = createMockEl("div");
+        if (typeof opts === "string") child.className = opts;
+        else if (opts?.cls) child.className = opts.cls;
+        el.appendChild(child);
+        return child;
+      };
+      el.createSpan = (opts?: any) => {
+        const child = createMockEl("span");
+        if (typeof opts === "string") child.className = opts;
+        else if (opts?.cls) child.className = opts.cls;
+        if (opts?.text) child.textContent = opts.text;
+        el.appendChild(child);
+        return child;
+      };
+      el.createEl = (childTag: string, opts?: any) => {
+        const child = createMockEl(childTag);
+        if (typeof opts === "string") child.className = opts;
+        else if (opts?.cls) child.className = opts.cls;
+        if (opts?.attr) {
+          for (const [k, v] of Object.entries(opts.attr)) child.setAttribute(k, v as string);
+        }
+        el.appendChild(child);
+        return child;
+      };
+      return el;
+    };
+
+    const hostEl = createMockEl("div");
+    let visibilityMenuCalled = false;
+    let visibilityTargetWin: any = null;
+
+    const mockPlugin = {
+      app: {} as any,
+      settings: {
+        spaces: [],
+        autoSave: false,
+        showNotifications: false,
+        version: "1.0.7",
+      },
+      activityBars: {
+        showVisibilityMenu: (win: Window, _evt: MouseEvent) => {
+          visibilityMenuCalled = true;
+          visibilityTargetWin = win;
+        },
+      },
+      saveSettings: async () => {},
+    };
+
+    const manager = new WindowLayoutManager(mockPlugin as any);
+    const testDoc = document.implementation.createHTMLDocument("Edit Button Test");
+    const testWin = {
+      document: testDoc,
+      _windowSpacesLayoutId: "test-space",
+    } as unknown as Window;
+
+    manager.updateLayoutLabelElement(hostEl, "My Space", testWin);
+
+    const editBtn = hostEl.querySelector<HTMLButtonElement>(".window-spaces-layout-edit-settings");
+    expect(editBtn).not.toBeNull();
+    expect(typeof editBtn?.oncontextmenu).toBe("function");
+
+    const mockEvt = {
+      preventDefault: () => {},
+      stopPropagation: () => {},
+    } as unknown as MouseEvent;
+
+    editBtn?.oncontextmenu?.(mockEvt);
+    expect(visibilityMenuCalled).toBe(true);
+    expect(visibilityTargetWin).toBe(testWin);
+  });
 });
+

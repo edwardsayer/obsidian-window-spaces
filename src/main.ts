@@ -22,7 +22,7 @@ import {
   isPopoutWindow,
   PopoutLayoutEngine,
 } from "./shared/popoutLayout";
-import { acquirePopoutLayoutEngine, releasePopoutLayoutEngine } from "./shared/popoutLayoutRegistry";
+import { acquirePopoutLayoutEngine, releasePopoutLayoutEngine, PopoutLayoutEngineWithWindow } from "./shared/popoutLayoutRegistry";
 import {
   SHARED_API_VERSION,
   SHARED_COMPATIBLE_FROM_VERSION,
@@ -67,10 +67,10 @@ const DEFAULT_SETTINGS: WindowSettings = {
 };
 
 export default class WindowSpacesPlugin extends Plugin {
-  settings: WindowSettings;
+  declare settings: WindowSettings;
   manager: WindowLayoutManager;
   windowLayoutsRibbonEl: HTMLElement | null = null;
-  popoutLayout: PopoutLayoutEngine;
+  popoutLayout: PopoutLayoutEngineWithWindow;
   activityBars: PopoutActivityBarManager;
   workspaceInterceptor: WorkspaceInterceptor;
 

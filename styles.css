@@ -1228,7 +1228,9 @@ button.mod-destructive:hover,
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  /* 對齊主視窗 ribbon：配合 divider margin 0，使 toggle 底→首顆 view 按鈕
+     距離（4+1+4 = 9px）對齊 ribbon sidebar-toggle → 首顆 action（9px） */
+  gap: 4px;
   padding: 6px 2px 8px 2px;
   box-sizing: border-box;
   /* 對齊 sidebar 區與 editor tab area tabbar 的 non-active 底色 */
@@ -1300,7 +1302,9 @@ body.is-popout-window.window-spaces-has-right-activity .workspace-split.mod-root
 }
 .window-spaces-activity-left .window-spaces-activity-drag + .window-spaces-activity-btn,
 .window-spaces-activity-left .window-spaces-activity-btn:first-of-type {
-  margin-top: 6px;
+  /* 與 ribbon 相對齊：toggle 緊貼拖曳區（ribbon 首按鈕為貼齊頂部），
+     間距由容器 gap 控制，不額外加 margin。 */
+  margin-top: 0;
 }
 .window-spaces-activity-drag svg {
   width: 16px;
@@ -1356,16 +1360,15 @@ body.is-popout-window.window-spaces-has-right-activity .workspace-split.mod-root
 }
 
 /* When the left Activity Bar is present it owns its own drag strip. Let the
-   identity remain visible above the fold, but do not let it intercept the
-   Activity Bar toggle or view buttons. */
+   identity remain visible above the fold, while remaining interactive for context menu and dragging. */
 body.is-popout-window.window-spaces-has-left-activity:not(.window-spaces-left-activity-hidden)
   .window-spaces-space-identity {
   left: 0;
   width: var(--window-spaces-activity-bar-width, 44px);
   height: var(--header-height, 40px);
   top: 0;
-  pointer-events: none;
-  -webkit-app-region: no-drag;
+  pointer-events: auto;
+  -webkit-app-region: drag;
 }
 
 body.is-popout-window.window-spaces-has-left-activity:not(.window-spaces-left-activity-hidden)
@@ -1375,8 +1378,8 @@ body.is-popout-window.window-spaces-has-left-activity:not(.window-spaces-left-ac
   left: 13.6px;
   width: 16px;
   height: 16px;
-  pointer-events: none;
-  -webkit-app-region: no-drag;
+  pointer-events: auto;
+  -webkit-app-region: drag;
 }
 
 /* Explicit state class for the fallback drag region. The important flags keep
@@ -1390,7 +1393,7 @@ body.is-popout-window.window-spaces-has-left-activity:not(.window-spaces-left-ac
   background-color: var(--background-secondary) !important;
   border-right: 1px solid var(--background-modifier-border) !important;
   border-bottom: 1px solid var(--background-modifier-border) !important;
-  border-bottom-right-radius: 6px;
+  border-radius: 0 !important;
   pointer-events: auto !important;
   -webkit-app-region: drag !important;
 }
@@ -1422,13 +1425,9 @@ body.is-popout-window.has-window-space-folded-corner::before {
 }
 
 .workspace-tab-header-container.window-spaces-space-identity-tab-header {
-  padding-left: var(--window-spaces-activity-bar-width, 44px) !important;
+  padding-left: calc(var(--window-spaces-activity-bar-width, 44px) + var(--tab-container-padding-left, 8px)) !important;
 }
 
-.workspace-tab-header-container.window-spaces-space-identity-tab-header
-  .workspace-tab-header-container-inner {
-  padding-left: 0 !important;
-}
 
 /* Popout 視窗 4 邊全方向自訂主題顏色邊框 (使用 fixed ::after 頂層 inset 覆蓋，動態適應各 OS/主題之視窗圓角) */
 body.is-popout-window.has-window-space-border::after {
@@ -1446,14 +1445,10 @@ body.is-popout-window.has-window-space-border::after {
   box-shadow: none !important;
 }
 
-/* 當視窗最大化或全螢幕時，Obsidian 原生取消視窗圓角，邊框同步取消圓角與折角 */
+/* 當視窗最大化或全螢幕時，Obsidian 原生取消視窗圓角，邊框同步取消圓角（折角維持顯示） */
 body.is-popout-window.is-maximized.has-window-space-border::after,
 body.is-popout-window.is-fullscreen.has-window-space-border::after {
   border-radius: 0 !important;
-}
-body.is-popout-window.is-maximized.has-window-space-folded-corner::before,
-body.is-popout-window.is-fullscreen.has-window-space-folded-corner::before {
-  display: none !important;
 }
 
 body.is-popout-window.has-window-space-border .window-spaces-activity-left {
@@ -1521,7 +1516,9 @@ body.is-popout-window.has-window-space-color
   color: var(--window-space-color) !important;
 }
 
-/* 2. Splitters: 窗格調整分隔線常態微光與 Hover / 拖曳高亮 */
+/* 2. Splitters: 窗格調整分隔線 — 常態與一般 border 相同（divider 色、divider 寬、透明背景），
+   僅 Hover / 拖曳時以 space color 高亮；背景填滿整個 handle（原生尺寸為 --divider-width-hover）
+   因此 hover 時自然變粗。 */
 /* 當欄位（包含左側欄、右側欄或編輯區）為上下分割（mod-horizontal）時，其內部各 tab 之間的 handle
    必須為橫向分隔線（row-resize），覆蓋 Obsidian 原生 .mod-right-split 將其誤設為縱向 col-resize 的問題。 */
 body.is-popout-window .workspace-split.mod-horizontal > * > .workspace-leaf-resize-handle {
@@ -1553,16 +1550,8 @@ body.is-popout-window .workspace-split.mod-root > .window-spaces-has-hidden-next
 
 body.is-popout-window.has-window-space-color.has-space-accents-splitter
   .workspace-leaf-resize-handle {
-  background-color: color-mix(
-    in srgb,
-    var(--window-space-color) 40%,
-    var(--background-modifier-border)
-  ) !important;
-  border-color: color-mix(
-    in srgb,
-    var(--window-space-color) 40%,
-    var(--background-modifier-border)
-  ) !important;
+  background-color: transparent !important;
+  border-color: var(--divider-color) !important;
   transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease !important;
 }
 
@@ -1615,7 +1604,9 @@ body.is-popout-window.has-window-space-color.has-space-accents-activity-bar
 body.is-popout-window.has-window-space-color.has-space-accents-activity-bar
   .window-spaces-activity-bar,
 body.is-popout-window.has-window-space-color.has-space-accents-activity-bar
-  .window-spaces-activity-drag {
+  .window-spaces-activity-drag,
+body.is-popout-window.has-window-space-color.has-space-accents-activity-bar
+  .window-spaces-space-identity.window-spaces-space-identity-drag-region {
   border-color: color-mix(
     in srgb,
     var(--window-space-color) 35%,
@@ -1701,8 +1692,9 @@ body.is-popout-window .workspace-tab-header-spacer {
 .window-spaces-activity-btn {
   flex: 0 0 auto;
   width: 36px;
-  height: 36px;
-  padding: 6px;
+  /* 對齊 ribbon action button：icon 18px + padding 4px = 26px 高 */
+  height: 26px;
+  padding: var(--size-2-2, 4px) var(--size-2-3, 6px);
   border: none;
   border-radius: var(--radius-s, 4px);
   background: transparent;
@@ -1733,13 +1725,19 @@ body.is-popout-window .workspace-tab-header-spacer {
   color: var(--text-muted);
 }
 .window-spaces-activity-btn svg {
-  width: var(--icon-s, 16px);
-  height: var(--icon-s, 16px);
+  /* icon 尺寸對齊 ribbon（--icon-l） */
+  width: var(--icon-l, 18px);
+  height: var(--icon-l, 18px);
 }
 
 /* Popout Activity Bar Native Sidebar Toggle Button Styling */
 .window-spaces-sidebar-toggle-btn {
   position: relative;
+  /* 對齊主視窗 ribbon 首顆按鈕（sidebar-toggle-button）：高 = header - 1，
+     上下 padding 8px / 7px，icon 為 --icon-l */
+  width: 100%;
+  height: calc(var(--header-height, 40px) - 1px);
+  padding: var(--size-4-2, 8px) 0 7px 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1776,7 +1774,7 @@ body.is-popout-window .workspace-tab-header-spacer {
   width: calc(100% - 16px);
   height: 1px;
   background-color: var(--background-modifier-border);
-  margin: 4px 0;
+  margin: 0;
 }
 
 /* 側欄欄位（被判定為 sidebar 的頂層欄）：底色與邊距對齊主視窗 sidebar */

@@ -243,5 +243,10 @@ export const en: TranslationStrings = {
     cannotHideLastPane: "Cannot hide the last visible pane",
     onlyInPopout: "This command only works inside a Popout window",
     openSettings: "Open Window Spaces settings",
+    leftActivityBar: "Left activity bar",
+    leftSidebar: "Left sidebar",
+    rightActivityBar: "Right activity bar",
+    rightSidebar: "Right sidebar",
   },
 };
+

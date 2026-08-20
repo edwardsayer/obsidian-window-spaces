@@ -10,6 +10,7 @@ import {
 import { t, getI18n } from "../i18n";
 import WindowSpacesPlugin from "../main";
 import {
+  applyItemIcon,
   enumerateAvailableViews,
   ensureViewIcon,
   resolveViewIcon,
@@ -648,6 +649,11 @@ export class SaveLayoutModal extends Modal {
         if (existing) {
           existing.setAttr("data-drag-index", String(index));
           addRow.settingEl.before(existing);
+          // Add view 動態取得 icon 後同步到既有列的 icon 按鈕。
+          const existingIconBtn = existing.querySelector<HTMLElement>(
+            ".setting-item-control .clickable-icon"
+          );
+          if (existingIconBtn) applyItemIcon(existingIconBtn, this.app, item);
           return;
         }
 

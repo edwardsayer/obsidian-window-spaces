@@ -241,5 +241,10 @@ export const zhCN: TranslationStrings = {
     cannotHideLastPane: "无法隐藏最后一个可见的标签",
     onlyInPopout: "此命令只能在 Popout 窗口内使用",
     openSettings: "打开 Window Spaces 设置",
+    leftActivityBar: "Left activity bar",
+    leftSidebar: "Left sidebar",
+    rightActivityBar: "Right activity bar",
+    rightSidebar: "Right sidebar",
   },
 };
+

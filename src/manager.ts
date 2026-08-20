@@ -902,7 +902,8 @@ export class WindowLayoutManager {
       className: string,
       icon: string,
       label: string,
-      onClick: (e: MouseEvent) => void
+      onClick: (e: MouseEvent) => void,
+      onContextMenu?: (e: MouseEvent) => void
     ): HTMLButtonElement => {
       let button = actionsElement ? actionsElement.querySelector<HTMLButtonElement>(`.${className}`) : null;
       if (!button && actionsElement) {
@@ -917,6 +918,15 @@ export class WindowLayoutManager {
         event.stopPropagation();
         onClick(event);
       };
+      if (onContextMenu) {
+        button.oncontextmenu = (event: MouseEvent) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onContextMenu(event);
+        };
+      } else {
+        button.oncontextmenu = null;
+      }
       button.setAttribute("aria-label", label);
       button.title = label;
       return button;
@@ -947,6 +957,10 @@ export class WindowLayoutManager {
     const oldSaveBtn = actionsElement?.querySelector(".window-spaces-layout-save");
     if (oldSaveBtn) oldSaveBtn.remove();
 
+    // 移除舊版 window-spaces-layout-open 按鈕（若存在；該 switcher 按鈕已取消）
+    const oldOpenBtn = actionsElement?.querySelector(".window-spaces-layout-open");
+    if (oldOpenBtn) oldOpenBtn.remove();
+
     // 1. 直接儲存 Space (不開啟對話框)
     ensureActionButton(
       "window-spaces-layout-direct-save",
@@ -955,12 +969,17 @@ export class WindowLayoutManager {
       () => void this.saveLayoutDirectFromWindow(targetWin)
     );
 
-    // 2. 空間設定對話框 (Pencil icon, 開啟 Space Setting 對話框)
+    // 2. 空間設定對話框 (Pencil icon, 左鍵開啟 Space Setting 對話框，右鍵開啟與 space logo 相同的 visibility 選單)
     ensureActionButton(
       "window-spaces-layout-edit-settings",
       "pencil",
       t("saveModal.title"),
-      () => void this.saveLayoutFromWindow(targetWin)
+      () => void this.saveLayoutFromWindow(targetWin),
+      (e: MouseEvent) => {
+        if (this.plugin.activityBars && typeof this.plugin.activityBars.showVisibilityMenu === "function") {
+          this.plugin.activityBars.showVisibilityMenu(targetWin, e);
+        }
+      }
     );
 
     const autoSaveBtn = ensureActionButton(
@@ -991,13 +1010,6 @@ export class WindowLayoutManager {
     } else {
       autoSaveBtn.classList.remove("is-active");
     }
-
-    ensureActionButton(
-      "window-spaces-layout-open",
-      "layout",
-      t("commands.openLayoutsRibbon"),
-      () => this.plugin.openWindowLayoutsModal(targetWin)
-    );
 
     ensureActionButton(
       "window-spaces-layout-settings",
@@ -1062,7 +1074,7 @@ export class WindowLayoutManager {
           }
         }
         item.setTitle(title);
-        item.onClick((evt: MouseEvent) => {
+        item.onClick((evt: MouseEvent | KeyboardEvent) => {
           // 與 switcher list 一致：無 Shift = 開新 Popout，Shift = 替換本 popout
           const forceNewWindow = !evt.shiftKey;
           void this.plugin.manager.restoreLayout(space, {
@@ -2828,8 +2840,13 @@ export class WindowLayoutManager {
       // leaf 層級重建預設會把 group 的 active tab 落在建立順序的預設值，
       // 造成「第一個 column 的第一個 tab 被特別 active、原本選中的 tab
       // lost active」；其他 split 的 tab group 同理一併恢復。
-      if (node.type === "tabs" && typeof node.currentTab === "number" && groupLeaves.length > 0) {
-        const activeIndex = Math.max(0, Math.min(node.currentTab, groupLeaves.length - 1));
+      // Obsidian 序列化時會省略「active 為第一個 tab（index 0）」的
+      // currentTab（與 quartz-vault 正常案例對照），因此 currentTab 缺失時
+      // 等同 index 0（第一個 tab），必須主動啟用第一個 tab；否則 leaf 層級
+      // 重建會讓最後建立的 leaf 變成 active（tab 順序被顛倒）。
+      if (node.type === "tabs" && groupLeaves.length > 0) {
+        const currentTab = typeof node.currentTab === "number" ? node.currentTab : 0;
+        const activeIndex = Math.max(0, Math.min(currentTab, groupLeaves.length - 1));
         const groupActive = groupLeaves[activeIndex];
         if (groupActive) {
           try {

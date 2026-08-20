@@ -241,5 +241,10 @@ export const zhTW: TranslationStrings = {
     cannotHideLastPane: "無法隱藏最後一個可見的分頁",
     onlyInPopout: "此命令僅可在 Popout 視窗內使用",
     openSettings: "開啟 Window Spaces 設定",
+    leftActivityBar: "Left activity bar",
+    leftSidebar: "Left sidebar",
+    rightActivityBar: "Right activity bar",
+    rightSidebar: "Right sidebar",
   },
 };
+

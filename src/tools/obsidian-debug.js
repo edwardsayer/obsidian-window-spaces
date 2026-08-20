@@ -93,7 +93,7 @@ async function waitForEndpoint(timeoutMs) {
   if (await waitForEndpoint(8000)) {
     console.log(`✅ Obsidian 偵錯模式已啟動：http://127.0.0.1:${PORT}`);
     console.log(`   - 每個視窗（主視窗 / popout）各自是獨立 target：http://127.0.0.1:${PORT}/json`);
-    console.log('   - opencode 的 chrome-devtools MCP 已設定連線到此 port。');
+    console.log(`   - 可使用 Chrome DevTools 或本專案的 npm run probe 進行即時檢查。`);
   } else {
     console.warn('⚠️  無法確認 debug port 已開啟（可能 Obsidian 已在執行且未帶此參數）。');
     console.warn('   請完全退出 Obsidian 後，再執行 npm run obsidian:debug。');

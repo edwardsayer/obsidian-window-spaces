@@ -1,6 +1,6 @@
 # Window Spaces - Obsidian Plugin
 
-Save and restore window layouts for Obsidian popout windows. Seamlessly manage multi-window workspaces with high performance and zero DOM jitter.
+> **Declutter your main workspace. Transform heavy plugins and multifaceted notes into lightweight, isolated popout work cabins.**
 
 ---
 
@@ -10,89 +10,122 @@ Save and restore window layouts for Obsidian popout windows. Seamlessly manage m
 
 ---
 
-### 💡 Why Window Spaces? (vs. Native Workspaces)
+## 💡 The Philosophy: Free Your Main Workspace
 
-Obsidian's built-in **Workspaces** plugin is designed for **global application state**—restoring a workspace overwrites your entire Obsidian setup (closing all open windows and replacing your main layout).
+Obsidian’s vibrant plugin ecosystem and malleable layout make it the ultimate **"Everything Notebook"**. But as our vaults grow, so does the chaos:
 
-**Window Spaces** is purpose-built for **individual popout windows**:
-- 🎯 **Zero Main Window Interference**: Captures and restores layouts *only* within a target popout window without touching your main workspace or sidebars.
-- 🖥️ **Multi-Monitor Friendly**: Keep separate reference windows, Kanban boards, or research notes on secondary displays and swap their layouts independently.
-- 🚀 **Spawn New Windows on Demand**: Click normally (or press `Enter`) to restore any saved layout into a brand-new popout window instantly.
-- 🔄 **Per-Layout Auto-Save**: Enable auto-save individually on specific layouts with 5s debounce protection and window-close instant snapshot.
+- 🗂️ **The Crowded Main Window**: Canvas whiteboards, Excalidraw sketches, Dataview dashboards, graph views, and complex note splits all compete for the exact same screen real estate.
+- ⚡ **Context Switching Overhead**: Switching between project planning, deep literature research, and daily task review constantly disrupts open tabs, sidebar configurations, and pane splits.
+- 🖥️ **Underutilized Multi-Monitors**: Modern workstations have multiple displays, yet managing distinct, persistent layouts across separate windows is difficult.
 
-| Feature | 🏛️ Native Workspaces | 🪟 Window Spaces |
-| :--- | :--- | :--- |
-| **Scope** | **Global**: Overwrites main window & all sidebars | **Window-Scoped**: Affects only the target popout window |
-| **Multi-Monitor** | ❌ Destroys setups across all screens | ✅ Manages individual screens independently |
-| **Spawn New Window** | ❌ Always overwrites current layout | ✅ Click normally or press `Enter` to open in a new window |
-| **Auto-Save** | ❌ Global manual save / hard overwrite | ✅ **Per-layout 🔄 auto-save** with 5s debounce |
-| **Smart Naming** | ❌ Manual typing only | ✅ **Pinned-first smart name** (`Pinned Note & Active Note`) |
-| **Hover Preview** | ❌ No content preview | ✅ **File list tooltips** on hover before restoring |
-| **Layout Integrity** | ❌ Missing files cause tab collapses | ✅ **Native empty tabs** preserve pane shapes |
+**Window Spaces** is built as an organic, seamless extension of Obsidian. Instead of cramming everything into a single main window, Window Spaces lets you isolate distinct workflows into dedicated **Popout Work Cabins (Spaces)**.
 
-### ✨ Key Features
-- **Popout Window Preservation**: Captures splits, tabs, active file, view modes, and exact window dimensions/position.
-- **Smart Layout Naming**: Automatically generates intuitive names based on pinned files and active notes (`Pinned Note & Active Note`).
-- **Context-Aware Restoration**: Click normally (or press `Enter`) to spawn a new popout window; hold `Shift` (or press `Shift + Enter`) to restore directly into the current popout window. Restoring a Space that is already open in a popout window focuses that window instead of duplicating it.
-- **Per-Layout Auto-Save**: Toggle 🔄 auto-save on specific layouts with a 5-second debounced background update and immediate save on window close.
-- **Unified Quick-Switch & Management Modal**: Search layouts in real-time, view hover file tooltips, sort by 6 dimensions (gear menu ⚙️), rename, edit, auto-save, or delete. Opens as a popup window (with the same toolbar in its title bar), an editor-tab panel, or a sidebar panel.
-- **Safe Placement & Guardrails**: Prevents off-screen windows on monitor changes and guards against accidental 0-file layout overwrites.
-- **Popout Panel Support**: Supports Activity Bar and sidebar/panel rendering inside Popout windows without changing the main window layout.
+With **focus interception technology** and **per-window layout lifecycle management**, your heavy plugins, complex splits, and research setups effortlessly transition into independent windows—letting you focus on one task at a time with zero clutter.
 
-### 🖼️ Screenshots
+---
 
-| Multi-workspace popouts | Popout window | Sidebar panel |
+## 🖼️ Visual Showcase
+
+| 🗺️ Dedicated Popout Workbench | 🗂️ Native Sidebar Panel | 📑 Editor Tab Management |
 | :---: | :---: | :---: |
-| ![Multi-workspace popouts](screenshots/multi-workspaces.png) | ![Popout window](screenshots/popup.png) | ![Sidebar panel](screenshots/sidebar.png) |
+| ![Dedicated Popout Workbench](screenshots/multi-workspaces.png) | ![Sidebar Panel](screenshots/sidebar.png) | ![Tab Panel Mode](screenshots/tab-panel.png) |
+| *Visual Canvas + Markdown Split with Status Bar indicator* | *Unified Spaces Picker with Active indicators & Quick Search* | *Full-page Workspace Management inside Editor Tabs* |
 
-### 📥 Installation
+---
 
-#### From Community Plugins
+## ✨ Key Features
+
+### 🪟 Dedicated Popout Work Cabins (Per-Window Layouts)
+- **True Window Isolation**: Saves and restores layout splits, active files, pinned tabs, view modes, and exact window coordinates for popout windows without altering your main window.
+- **Smart Window Focusing**: Restoring a Space that is already open smoothly focuses its existing window rather than creating a duplicate.
+- **Empty-Tab Pane Protection**: Preserves your intended pane layout structures even if some files are temporarily unavailable.
+
+### 🔄 Per-Space Auto-Save
+- **Effortless Synchronization**: Toggle `🔄 Auto-save` on any Space. Modifications made during your work session are automatically saved in the background with a 5-second debounce and an instant snapshot on window close.
+
+### ⚡ Context-Aware Rapid Navigation
+- **Keyboard-First Navigation**: Press `↑` / `↓` to navigate, `Enter` to spawn in a new popout window, `Shift + Enter` to restore into the active window, and `Esc` to dismiss.
+- **Safe Focus Interception**: Keyboard events are cleanly handled when the Spaces panel is focused and never interfere with typing inside notes, search bars, or external modals.
+
+### 🎨 Native 3-in-1 Interface & Visual Customization
+- **Flexible Management Locations**: Access your Spaces seamlessly from the **Left/Right Sidebar**, as an **Editor Tab**, or via the **Quick-Popup Modal** (`Ribbon Icon` or `Hotkeys`).
+- **Visual Identity**: Personalize each Space with custom emojis or Lucide icons, color badges, tags/categories, and 6 sorting dimensions.
+- **Hover Content Preview**: Hover over any Space to instantly preview its included files, active tab, and pinned document structure.
+
+### 🔒 Privacy & Safety Guardrails
+- **100% Local & Safe**: All configurations and spaces are stored locally in your vault's plugin directory.
+- **Off-Screen Prevention**: Automatically recalculates window coordinates if an external monitor is disconnected, ensuring windows never spawn out of view.
+- **JSON Import / Export**: Easily back up or share your workspace presets across multiple devices.
+
+---
+
+## 🚀 Typical Space Workflows
+
+Each Space acts as a specialized **work cabin** tailored to your tasks:
+
+| Space Workflow | Layout Composition | Primary Use Case |
+| :--- | :--- | :--- |
+| 🗺️ **Project Map & Workbench** | Pinned Canvas/Base on the left + Project specs on the right | High-level system architecture, milestone planning, and active deliverables. |
+| 🧠 **Deep Research & Literature** | PDF reader / Literature note + Outline & Zettelkasten splits | Distraction-free academic reading, concept linking, and knowledge synthesis. |
+| ✍️ **Focus Writing & Showcase** | Clean markdown editor + Rendered preview / CSS showcase | Deep long-form writing, technical documentation, and publishing workflows. |
+| ⚙️ **Dev & System Maintenance** | Dataview queries + Configuration templates & check-lists | Task reviews, vault maintenance, release checklists, and issue triage. |
+
+---
+
+## 📥 Installation
+
+### From Obsidian Community Plugins *(Recommended)*
 1. Open Obsidian **Settings** > **Community plugins**.
-2. Search for **Window Spaces**.
-3. Click **Install** and then **Enable**.
+2. Turn off Restricted mode and click **Browse**.
+3. Search for **Window Spaces**.
+4. Click **Install**, then click **Enable**.
 
-#### Manual Installation
-1. Download `main.js`, `styles.css`, and `manifest.json` from the latest GitHub Release.
-2. Copy them to `<your-vault>/.obsidian/plugins/window-spaces/`.
-3. Reload Obsidian and enable **Window Spaces** in settings.
+### Manual Installation
+1. Download `main.js`, `manifest.json`, and `styles.css` from the latest [GitHub Release](https://github.com/edwardsayer/obsidian-window-spaces/releases).
+2. Create a folder named `window-spaces` inside your vault: `<vault>/.obsidian/plugins/window-spaces/`.
+3. Move the downloaded files into this folder.
+4. Reload Obsidian and enable **Window Spaces** under **Community plugins**.
 
-### 🚀 Usage
+---
 
-#### 1. Save Window Layout
-- Open the command palette (`Ctrl/Cmd + P`) in any popout window.
-- Run `Window Spaces: Save current Space`.
-- Enter a name or use the auto-generated smart name, then press `Enter`.
+## 🛠️ Quick Start Guide
 
-#### 2. Open Window Layouts
-- Run `Window Spaces: Open as popup window` to open the picker in a popup, `Open as tab panel` to open it in a tab, or `Open in left/right sidebar` to dock it in a sidebar. The tab and sidebar commands open in the **focused window**: run them from a popout window to open the panel inside that popout, or from the main window to open it in the main workspace.
-- Select a layout from the unified restore and management dialog.
-- Click a layout normally, or press `Enter`, to restore it in a new popout window.
-- Hold `Shift` while clicking a layout, or press `Shift + Enter`, to restore it in the current active popout window.
-- If the Space is already open in a popout window, restoring it again focuses that window instead of creating a duplicate.
-- Access dropdown options (∨) to toggle auto-save, rename, edit, or delete saved layouts, and use the panel menu to move the picker to another location.
-- See the [Use Cases & Workflows](#use-cases--workflows) section below for project, research, Canvas, Tasks, writing, meeting, and development workspace examples.
+### 1. Save Your First Space
+1. Open a new window (`Ctrl/Cmd + Shift + N` or drag any tab out to pop out).
+2. Arrange your split panes (e.g. Canvas on the left, notes on the right).
+3. Open the Command Palette (`Ctrl/Cmd + P`) and run **`Window Spaces: Save current Space`**.
+4. Give it a name (or use the smart auto-generated suggestion) and assign an icon/color.
 
-### 🚀 Use Cases & Workflows
+### 2. Restore and Manage Spaces
+- Open the Spaces panel from the **Ribbon Icon**, the left/right sidebar, or run **`Window Spaces: Open as popup window`**.
+- **`Click` or `Enter`**: Instantly launches the Space in a fresh popout window.
+- **`Shift + Click` or `Shift + Enter`**: Restores the layout directly into the current window.
+- Click the dropdown menu (`...` or right-click) to toggle **Auto-save 🔄**, rename, edit, or delete.
 
-Think of each saved Space as a reusable **work cabin** for a project, research topic, work session, or recurring process:
+---
 
-- **Basic pattern**: Pin a navigation view (Base, Canvas, or Tasks) on the left, keep the file you are working on to the right, and pin the nav view so clicking files never replaces it. Save the arrangement under a project or workflow name.
-- **Project control center** (`Project — Map & Workbench`): Pinned Base map on the left, project home, specs and meeting notes to the right.
-- **Research literature** (`Research — Literature Review`): Literature Base on the left, reading notes and open research questions to the right.
-- **Canvas visual planning** (`Planning — Canvas & Notes`): Canvas holds the big picture on the left while specs and decision notes are edited on the right.
-- **Tasks cycle management** (`Weekly Review — Tasks & Notes`, `Daily Focus`): Tasks query on the left, daily note and source documents to the right.
-- **Writing & content** (`Writing — Draft & References`): Content Base on the left, draft in the center, references and checklists to the right.
-- **Meetings & decisions** (`Meeting — Agenda & Actions`): Meeting Base and agenda on the left, running notes and follow-up Tasks to the right.
-- **Software development** (`Dev — Issue Triage`, `Dev — Implementation`, `Dev — Code Review`, `Dev — Release`): Issue Base on the left, specs and implementation notes to the right.
+## ⌨️ Shortcuts & Hotkeys
 
-Once saved, a single click (or `Enter`) restores the whole cabin into a fresh popout window, or `Shift + click` (`Shift + Enter`) applies it to the current popout.
+| Action | Shortcut / Trigger | Description |
+| :--- | :--- | :--- |
+| **Open Spaces Modal** | Configurable via Hotkeys | Quick floating modal to switch or launch Spaces |
+| **Open in New Window** | `Enter` / Single Click | Spawns the highlighted Space in a new popout window |
+| **Apply to Current Window** | `Shift + Enter` / `Shift + Click` | Overwrites the active popout window with the selected Space |
+| **Quick Navigate** | `↑` / `↓` Arrow Keys | Move selection up or down within the list |
+| **Dismiss / Close** | `Escape` | Closes the modal or search focus |
 
-### ⌨️ Keyboard Shortcuts
-- No default command shortcuts are assigned. You can assign optional shortcuts to `Window Spaces: Open as popup window` (or the tab/sidebar panel commands) in Obsidian's Hotkeys settings.
-- Within the layout list, `Enter` restores in a new popout and `Shift + Enter` restores in the current active popout.
-- Arrow-key navigation only engages while the panel itself is focused; keys typed into the command palette, a rename dialog, a dropdown menu, or another window are never intercepted.
+---
 
-### 💻 Compatibility
-- **Obsidian Version**: `v1.12.7+`
-- **Platform**: Desktop only (Windows, macOS, Linux)
+## 🤝 Ecosystem Synergy & Heavy Plugins
+
+Window Spaces works harmoniously with heavy and canvas-like community plugins. For detailed integration patterns with **Excalidraw**, **Excalibrain**, **Canvas**, **Dataview**, and **Notebook Navigator**, check out our community guide:
+
+📖 **[Full User Guide & Plugin Synergy Walkthrough](doc/user-guide.md)**
+
+---
+
+## 💻 System Compatibility
+
+- **Obsidian Version**: `v1.12.7` or newer
+- **Platform**: Desktop (Windows, macOS, Linux)
+- **License**: MIT License

@@ -25,7 +25,7 @@ npm run check
 目標路徑：
 
 ```text
-E:/vaults/test-vault/.obsidian/plugins/window-spaces/
+E:/vaults/quartz-vault/.obsidian/plugins/window-spaces/
 E:/vaults/Note/.obsidian/plugins/window-spaces/
 ```
 

@@ -55,15 +55,34 @@ function buildEnv(): MockEnv {
   };
 
   const createLeafBySplit = vi.fn((target: unknown, direction: string, before?: boolean) => {
-    // 在 root 最左/最右建立新的空欄位（模擬 Obsidian createLeafBySplit）
+    // 在 root 最左/最右建立新的空欄位（模擬 Obsidian createLeafBySplit，
+    // 依 target leaf 的欄位位置前後插入）
     const leaf = makeLeaf(`new-${leaves.length}`, "empty");
     const colEl = document.createElement("div");
     colEl.classList.add("workspace-tabs");
     colEl.appendChild(leaf.containerEl);
+    const targetLeaf = target as MockLeaf;
+    // 找出 target leaf 所在的最外層欄位（rootEl 的 direct child）
+    let targetCol: HTMLElement | null = null;
+    if (targetLeaf && targetLeaf.containerEl) {
+      let node: HTMLElement | null = targetLeaf.containerEl;
+      while (node && node.parentElement !== rootEl) {
+        node = node.parentElement;
+      }
+      targetCol = node;
+    }
     if (before) {
-      rootEl.insertBefore(colEl, rootEl.firstChild);
+      if (targetCol) {
+        rootEl.insertBefore(colEl, targetCol);
+      } else {
+        rootEl.insertBefore(colEl, rootEl.firstChild);
+      }
     } else {
-      rootEl.appendChild(colEl);
+      if (targetCol && targetCol.nextSibling) {
+        rootEl.insertBefore(colEl, targetCol.nextSibling);
+      } else {
+        rootEl.appendChild(colEl);
+      }
     }
     return leaf;
   });
@@ -354,10 +373,12 @@ describe("layout integrity guard", () => {
     teardown(env);
   });
 
-  test("skips filling when the edge column is a nested split (createLeafBySplit would build at the wrong level)", async () => {
+  test("fills a left sidebar via a tabs-column anchor when the edge column is a split column", async () => {
     const env = buildEnv();
-    // 頂層：[nested-split(左, 含 editor), tabs(右)]；原始 3 欄 → 左側欄位缺失需補欄，
-    // 但 edge 是巢狀 split → 跳過補欄
+    // 頂層：[nested-split(左, 含 editor), tabs(右)]；原始 3 欄 → 左側欄位缺失需補欄。
+    // edge 是 split 表示的欄位：不能以其內部 leaf 為 createLeafBySplit 基準（會建在 split
+    // 內部、頂層欄位數不增），而是改用欄位容器層級的 workspace-tabs 欄位 leaf 當基準，
+    // 讓 createLeafBySplit 提升到正確層級建欄（before=true 建在最左）。
     (env.manager as any).plugin.settings.activityBarDefaults = { left: true, right: false };
     env.engine.setSidebarSides(window, {
       left: true,
@@ -393,8 +414,21 @@ describe("layout integrity guard", () => {
 
     await (env.manager as any).ensureLayoutIntegrity(window);
 
-    // 最左欄位是 nested split → 不補欄（避免 createLeafBySplit 建在 split 內部）
-    expect(env.createLeafBySplit).not.toHaveBeenCalled();
+    // edge 是 split 欄位 → 以 workspace-tabs 欄位（rightCol）leaf 為 anchor 補左欄
+    expect(env.createLeafBySplit).toHaveBeenCalledTimes(1);
+    expect(env.createLeafBySplit).toHaveBeenCalledWith(expect.anything(), "vertical", true);
+    const topEls = Array.from(env.rootEl.children).filter(
+      (el): el is HTMLElement =>
+        el instanceof HTMLElement &&
+        (el.classList.contains("workspace-tabs") || el.classList.contains("workspace-split"))
+    );
+    // 補成 3 欄：以唯一 tabs 欄位（rightCol）為 anchor 建在它前面（index 1）；
+    // 因 edge 是 split、此空間無「左側 tabs」可作最左 anchor，故新欄落在
+    // nested-split 與 rightCol 之間（真實 createLeafBySplit 的行為）。
+    expect(topEls).toHaveLength(3);
+    expect(topEls[1].contains(env.leaves.find((l) => l.id.startsWith("new-"))!.containerEl)).toBe(true);
+    expect(topEls[0]).toBe(nestedSplitEl);
+    expect(topEls[2]).toBe(rightCol);
 
     teardown(env);
   });
@@ -442,9 +476,10 @@ describe("layout integrity guard", () => {
     teardown(env);
   });
 
-  test("professional-style 2-column space with both activity bars stays untouched", async () => {
+  test("professional-style [L, R] space with both bars on gains a content column (bar count + 1 rule)", async () => {
     const env = buildEnv();
-    // Professional 型：原始 2 欄、兩側 activity bar 顯示 → 兩欄皆 sidebar，不補欄
+    // Professional 型：原始 2 欄 [L, R]，兩側 activity bar 顯示 → 兩欄皆 sidebar
+    // 無 content → 依「bar 數 + 1」原則補一欄 content → [L, C, R]
     env.engine.setSidebarSides(window, {
       left: true,
       right: true,
@@ -476,14 +511,21 @@ describe("layout integrity guard", () => {
 
     await (env.manager as any).ensureLayoutIntegrity(window);
 
-    // 原始 2 欄 → 不補欄；最左/最右欄位皆為側欄（activity bar 旁）
-    expect(env.createLeafBySplit).not.toHaveBeenCalled();
+    // 補一欄 content（建在左側欄之後）→ 頂層 3 欄
+    expect(env.createLeafBySplit).toHaveBeenCalledWith(expect.anything(), "vertical", false);
+    const topEls = Array.from(env.rootEl.children).filter(
+      (el): el is HTMLElement =>
+        el instanceof HTMLElement &&
+        (el.classList.contains("workspace-tabs") || el.classList.contains("workspace-split"))
+    );
+    expect(topEls).toHaveLength(3);
+    // 最左/最右欄位仍為側欄；中間新欄為 content
     expect(env.engine.getColumnElement(window, "left")).toBe(leftCol);
     expect(env.engine.getColumnElement(window, "right")).toBe(rightCol);
-    // 即使左欄含 editor，也被標記為 sidebar（activity bar 旁優先）
     (env.manager as any).syncSidebarColumnClasses(window);
     expect(leftCol.classList.contains("window-spaces-sidebar-column")).toBe(true);
     expect(rightCol.classList.contains("window-spaces-sidebar-column")).toBe(true);
+    expect(topEls[1].classList.contains("window-spaces-sidebar-column")).toBe(false);
 
     teardown(env);
   });
@@ -554,6 +596,178 @@ describe("layout integrity guard", () => {
     expect(env.engine.isColumnHidden(window, "left")).toBe(false);
 
     engineSpy.mockRestore();
+    teardown(env);
+  });
+
+  test("fills a missing content column when a content-bearing space degrades to [L, R]", async () => {
+    const env = buildEnv();
+    // 原始含 content 的空間（originalCount 3 > bar 數 2 → 需守 content）：兩側 activity bar 顯示
+    (env.manager as any).plugin.settings.activityBarDefaults = { left: true, right: true };
+    env.engine.setSidebarSides(window, {
+      left: true,
+      right: true,
+      originalCount: 3,
+      initialLeft: true,
+      initialRight: true,
+    });
+    // 使用者把 content 欄全關 → 剩 [L, R] 兩欄皆 sidebar
+    const leftLeaf = {
+      id: "left",
+      containerEl: document.createElement("div"),
+      view: { containerEl: document.createElement("div") },
+      getViewState: () => ({ type: "search" }),
+    } as MockLeaf;
+    const rightLeaf = {
+      id: "right",
+      containerEl: document.createElement("div"),
+      view: { containerEl: document.createElement("div") },
+      getViewState: () => ({ type: "search" }),
+    } as MockLeaf;
+    env.leaves.push(leftLeaf, rightLeaf);
+    const leftCol = document.createElement("div");
+    leftCol.classList.add("workspace-tabs");
+    leftCol.appendChild(leftLeaf.containerEl);
+    const rightCol = document.createElement("div");
+    rightCol.classList.add("workspace-tabs");
+    rightCol.appendChild(rightLeaf.containerEl);
+    env.rootEl.appendChild(leftCol);
+    env.rootEl.appendChild(rightCol);
+    // 先同步標記，讓 getColumnElement 的標記優先判定認定兩側欄皆存在
+    (env.manager as any).syncSidebarColumnClasses(window);
+
+    await (env.manager as any).ensureLayoutIntegrity(window);
+
+    // 補了一欄 content（建在左側欄之後，before=false）→ 回到 [L, C, R]
+    expect(env.createLeafBySplit).toHaveBeenCalledWith(expect.anything(), "vertical", false);
+    const topEls = Array.from(env.rootEl.children).filter(
+      (el): el is HTMLElement =>
+        el instanceof HTMLElement &&
+        (el.classList.contains("workspace-tabs") || el.classList.contains("workspace-split"))
+    );
+    expect(topEls).toHaveLength(3);
+    // 新 content 欄在中間（左側欄與右側欄之間）
+    expect(topEls[1].contains(env.leaves.find((l) => l.id.startsWith("new-"))!.containerEl)).toBe(true);
+
+    teardown(env);
+  });
+
+  test("professional-style [L, R] space with both bars on gets a content column added", async () => {
+    const env = buildEnv();
+    // Professional 型：原始 2 欄 [L, R]，使用者 turn on 兩側 activity bar →
+    // 兩側欄成為 sidebar，此時無 content 欄 → 依「bar 數 + 1」原則補一欄 content
+    (env.manager as any).plugin.settings.activityBarDefaults = { left: true, right: true };
+    env.engine.setSidebarSides(window, {
+      left: true,
+      right: true,
+      originalCount: 2,
+      initialLeft: true,
+      initialRight: true,
+    });
+    const leftLeaf = {
+      id: "left",
+      containerEl: document.createElement("div"),
+      view: { containerEl: document.createElement("div") },
+      getViewState: () => ({ type: "search" }),
+    } as MockLeaf;
+    const rightLeaf = {
+      id: "right",
+      containerEl: document.createElement("div"),
+      view: { containerEl: document.createElement("div") },
+      getViewState: () => ({ type: "search" }),
+    } as MockLeaf;
+    env.leaves.push(leftLeaf, rightLeaf);
+    const leftCol = document.createElement("div");
+    leftCol.classList.add("workspace-tabs");
+    leftCol.appendChild(leftLeaf.containerEl);
+    const rightCol = document.createElement("div");
+    rightCol.classList.add("workspace-tabs");
+    rightCol.appendChild(rightLeaf.containerEl);
+    env.rootEl.appendChild(leftCol);
+    env.rootEl.appendChild(rightCol);
+    (env.manager as any).syncSidebarColumnClasses(window);
+
+    await (env.manager as any).ensureLayoutIntegrity(window);
+
+    // 補了一欄 content（建在左側欄之後）→ 頂層 3 欄 [L, C, R]
+    expect(env.createLeafBySplit).toHaveBeenCalledWith(expect.anything(), "vertical", false);
+    const topEls = Array.from(env.rootEl.children).filter(
+      (el): el is HTMLElement =>
+        el instanceof HTMLElement &&
+        (el.classList.contains("workspace-tabs") || el.classList.contains("workspace-split"))
+    );
+    expect(topEls).toHaveLength(3);
+    // 左右兩側欄仍被標記為 sidebar，中間新欄為 content
+    (env.manager as any).syncSidebarColumnClasses(window);
+    expect(topEls[0].classList.contains("window-spaces-sidebar-column")).toBe(true);
+    expect(topEls[2].classList.contains("window-spaces-sidebar-column")).toBe(true);
+    expect(topEls[1].classList.contains("window-spaces-sidebar-column")).toBe(false);
+
+    teardown(env);
+  });
+
+  test("keeps existing content column untouched when count already meets bar count + 1", async () => {
+    const env = buildEnv();
+    // 已含 content 的三欄 [L, C, R]（兩側 bar 顯示 → 需求 3 欄）→ 已達標不需補欄
+    (env.manager as any).plugin.settings.activityBarDefaults = { left: true, right: true };
+    env.engine.setSidebarSides(window, {
+      left: true,
+      right: true,
+      originalCount: 3,
+      initialLeft: true,
+      initialRight: true,
+    });
+    buildThreeColumns(env);
+
+    await (env.manager as any).ensureLayoutIntegrity(window);
+
+    expect(env.createLeafBySplit).not.toHaveBeenCalled();
+
+    teardown(env);
+  });
+
+  test("legacy space without activity bar settings treats all columns as content (no guard refill)", async () => {
+    const env = buildEnv();
+    // 舊 space（未啟用 activity bar）：bar 全隱藏 → 所有 column 都是 content area，
+    // guard 不重排結構。兩欄 [C1, C2] 即使關掉一欄（剩 1 欄）也不補任何欄。
+    (env.manager as any).plugin.settings.activityBarDefaults = { left: false, right: false };
+    env.engine.setSidebarSides(window, {
+      left: false,
+      right: false,
+      originalCount: 2,
+      initialLeft: false,
+      initialRight: false,
+    });
+    const c1Leaf = {
+      id: "c1",
+      containerEl: document.createElement("div"),
+      view: { containerEl: document.createElement("div") },
+      getViewState: () => ({ type: "markdown" }),
+    } as MockLeaf;
+    const c2Leaf = {
+      id: "c2",
+      containerEl: document.createElement("div"),
+      view: { containerEl: document.createElement("div") },
+      getViewState: () => ({ type: "markdown" }),
+    } as MockLeaf;
+    env.leaves.push(c1Leaf, c2Leaf);
+    const c1Col = document.createElement("div");
+    c1Col.classList.add("workspace-tabs");
+    c1Col.appendChild(c1Leaf.containerEl);
+    const c2Col = document.createElement("div");
+    c2Col.classList.add("workspace-tabs");
+    c2Col.appendChild(c2Leaf.containerEl);
+    env.rootEl.appendChild(c1Col);
+    env.rootEl.appendChild(c2Col);
+
+    await (env.manager as any).ensureLayoutIntegrity(window);
+
+    // 側欄與 content 都不補（bar 隱藏 → 無 sidebar 需求；2 欄 ≥ bar 數+1=1）
+    expect(env.createLeafBySplit).not.toHaveBeenCalled();
+    // 欄位不被標記為 sidebar（全部 content 語意）
+    (env.manager as any).syncSidebarColumnClasses(window);
+    expect(c1Col.classList.contains("window-spaces-sidebar-column")).toBe(false);
+    expect(c2Col.classList.contains("window-spaces-sidebar-column")).toBe(false);
+
     teardown(env);
   });
 });

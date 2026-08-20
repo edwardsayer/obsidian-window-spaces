@@ -139,4 +139,4 @@ export interface WindowSettings {
 6. [ ] **Step 6**: 修改 `src/modals/restoreModal.ts` 與 `src/views/windowLayoutsView.ts`，使列表項目呈現 Icon 與 Color Badge。
 7. [ ] **Step 7**: 於 `src/settings.ts` 加入「Window Accent & Icons」設定區塊。
 8. [ ] **Step 8**: 執行 `npm run lint` 與 `npm run test`，確保 0 Error, 0 Warning。
-9. [ ] **Step 9**: 執行 `npm run build` 並部署至本地測試 Vault (`test-vault` 與 `Note`)。
+9. [ ] **Step 9**: 執行 `npm run build` 並部署至本地測試 Vault (`quartz-vault` 與 `Note`)。
