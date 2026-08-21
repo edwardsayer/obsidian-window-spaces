@@ -2441,10 +2441,13 @@ var WindowLayoutManager = class {
     if (!this.validateLayout(layout)) {
       throw new Error(t("errors.invalidData"));
     }
-    const savedLeaves = this.getSavedViewStates(layout);
-    const rootNode = this.extractLayoutRootNode(layout.workspace?.layout);
+    const rawRoot = this.extractLayoutRootNode(layout.workspace?.layout);
+    const normalizedRoot = this.normalizeWindowLayout(rawRoot);
+    const effLayout = normalizedRoot && rawRoot !== normalizedRoot ? { ...layout, workspace: { ...layout.workspace, layout: normalizedRoot } } : layout;
+    const savedLeaves = this.getSavedViewStates(effLayout);
+    const rootNode = this.extractLayoutRootNode(effLayout.workspace?.layout);
     let builtLeaves = null;
-    const shapeMatches = this.isWindowLayoutAtSavedSnapshot(targetWin, layout);
+    const shapeMatches = this.isWindowLayoutAtSavedSnapshot(targetWin, effLayout);
     if (!shapeMatches) {
       builtLeaves = await this.rebuildTargetWindowStructure(targetWin, rootNode);
       if (!builtLeaves) {
@@ -3246,13 +3249,53 @@ var WindowLayoutManager = class {
       type: "tabs",
       children: viewType && viewType !== "empty" ? [{ type: "leaf", state: { type: viewType, state: {} } }] : []
     });
-    const prior = Array.isArray(container.children) ? container.children.map((c) => this.collapseSplitColumnIntoColumnTabs(c)) : [];
+    const prior = Array.isArray(container.children) ? container.children.map((c) => this.normalizeColumnNode(c)) : [];
     container.children = [
       ...leftView ? [mkTabs(leftView)] : [],
       ...prior,
       ...rightView ? [mkTabs(rightView)] : []
     ];
     return clone;
+  }
+  /**
+   * 遞迴 normalizer：從「欄位」層級往下，把任何層級的「水平 multi-column
+   * （split:vertical，flex-direction: row）」合併為單一 workspace-tabs；
+   * 垂直方向的 split（direction: horizontal / 多 row）保留並遞迴其子節點。
+   * 這確保側欄/欄位內不會殘留「同一側水平多 column」的異常結構。
+   */
+  /**
+   * 對整棵 layout 樹（window/floating）的「欄位容器 children（各欄位）」套用
+   * 遞迴 normalizeColumnNode：收斂水平 multi-column 欄位，回傳收斂後的新樹；
+   * 若無需收斂則回傳原 rootNode（不建立克隆）。
+   */
+  normalizeWindowLayout(rootNode) {
+    if (!rootNode) return rootNode;
+    const isContainer = rootNode?.type === "window" || rootNode?.type === "floating";
+    const containerSource = isContainer ? (rootNode.children || []).find((c) => c && c.type === "split") : rootNode;
+    if (!containerSource || containerSource.type !== "split") return rootNode;
+    const normalized = (containerSource.children || []).map(
+      (c) => this.normalizeColumnNode(c)
+    );
+    if (normalized.every((c, i) => c === (containerSource.children || [])[i])) {
+      return rootNode;
+    }
+    const clone = JSON.parse(JSON.stringify(rootNode));
+    const container = isContainer ? (clone.children || []).find((c) => c && c.type === "split") : clone;
+    if (container) container.children = normalized;
+    return clone;
+  }
+  normalizeColumnNode(col) {
+    if (!col) return col;
+    if (col.type === "split") {
+      if (col.direction === "vertical") {
+        return this.collapseSplitColumnIntoColumnTabs(col);
+      }
+      const children = (Array.isArray(col.children) ? col.children : []).map(
+        (c) => this.normalizeColumnNode(c)
+      );
+      return { ...col, children };
+    }
+    return col;
   }
   /**
    * 將「欄位＝split:vertical（水平並排多 tabs）的異常結構」收斂為單一
@@ -3864,6 +3907,12 @@ var WindowLayoutManager = class {
     try {
       if (!this.validateLayout(layout)) {
         throw new Error(t("errors.invalidData"));
+      }
+      if (layout.workspace) {
+        const normalizedRoot = this.normalizeWindowLayout(layout.workspace.layout);
+        if (normalizedRoot && normalizedRoot !== layout.workspace.layout) {
+          layout.workspace.layout = normalizedRoot;
+        }
       }
       if (!options.forceReload && (!options.forceNewWindow || options.focusExistingWindow === true)) {
         const existingWin = this.getOpenWindowForLayout(layout);

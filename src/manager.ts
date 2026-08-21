@@ -171,10 +171,20 @@ export class WindowLayoutManager {
       throw new Error(t("errors.invalidData"));
     }
 
-    const savedLeaves = this.getSavedViewStates(layout);
-    const rootNode = this.extractLayoutRootNode(layout.workspace?.layout);
+    // 收斂「欄位內部水平 multi-column」的異常結構（見 normalizeColumnNode）：
+    // 以收斂後的樹判定 shape 並 rebuild，使開啟已存多欄側欄的舊 space 時
+    // 自動收斂為 Obsidian dock 語意（同側單一 column、可多 row）。
+    const rawRoot = this.extractLayoutRootNode(layout.workspace?.layout);
+    const normalizedRoot = this.normalizeWindowLayout(rawRoot);
+    const effLayout: WindowLayout =
+      normalizedRoot && rawRoot !== normalizedRoot
+        ? { ...layout, workspace: { ...layout.workspace, layout: normalizedRoot } }
+        : layout;
+
+    const savedLeaves = this.getSavedViewStates(effLayout);
+    const rootNode = this.extractLayoutRootNode(effLayout.workspace?.layout);
     let builtLeaves: WorkspaceLeaf[] | null = null;
-    const shapeMatches = this.isWindowLayoutAtSavedSnapshot(targetWin, layout);
+    const shapeMatches = this.isWindowLayoutAtSavedSnapshot(targetWin, effLayout);
 
     if (!shapeMatches) {
       builtLeaves = await this.rebuildTargetWindowStructure(targetWin, rootNode);
@@ -1235,7 +1245,7 @@ export class WindowLayoutManager {
     // 這修復第三方 view（explorer/grid/notebook…）在側欄被水平均分成窄欄、
     // 導致 client area 寬度異常（判窗框太窄）的問題。
     const prior = Array.isArray(container.children)
-      ? container.children.map((c: any) => this.collapseSplitColumnIntoColumnTabs(c))
+      ? container.children.map((c: any) => this.normalizeColumnNode(c))
       : [];
     container.children = [
       ...(leftView ? [mkTabs(leftView)] : []),
@@ -1243,6 +1253,52 @@ export class WindowLayoutManager {
       ...(rightView ? [mkTabs(rightView)] : []),
     ];
     return clone;
+  }
+
+  /**
+   * 遞迴 normalizer：從「欄位」層級往下，把任何層級的「水平 multi-column
+   * （split:vertical，flex-direction: row）」合併為單一 workspace-tabs；
+   * 垂直方向的 split（direction: horizontal / 多 row）保留並遞迴其子節點。
+   * 這確保側欄/欄位內不會殘留「同一側水平多 column」的異常結構。
+   */
+  /**
+   * 對整棵 layout 樹（window/floating）的「欄位容器 children（各欄位）」套用
+   * 遞迴 normalizeColumnNode：收斂水平 multi-column 欄位，回傳收斂後的新樹；
+   * 若無需收斂則回傳原 rootNode（不建立克隆）。
+   */
+  private normalizeWindowLayout(rootNode: any): any {
+    if (!rootNode) return rootNode;
+    const isContainer = rootNode?.type === "window" || rootNode?.type === "floating";
+    const containerSource = isContainer
+      ? (rootNode.children || []).find((c: any) => c && c.type === "split")
+      : rootNode;
+    if (!containerSource || containerSource.type !== "split") return rootNode;
+    const normalized = (containerSource.children || []).map((c: any) =>
+      this.normalizeColumnNode(c)
+    );
+    if (normalized.every((c: any, i: number) => c === (containerSource.children || [])[i])) {
+      return rootNode;
+    }
+    const clone = JSON.parse(JSON.stringify(rootNode));
+    const container = isContainer
+      ? (clone.children || []).find((c: any) => c && c.type === "split")
+      : clone;
+    if (container) container.children = normalized;
+    return clone;
+  }
+
+  private normalizeColumnNode(col: any): any {
+    if (!col) return col;
+    if (col.type === "split") {
+      if (col.direction === "vertical") {
+        return this.collapseSplitColumnIntoColumnTabs(col);
+      }
+      const children = (Array.isArray(col.children) ? col.children : []).map(
+        (c: any) => this.normalizeColumnNode(c)
+      );
+      return { ...col, children };
+    }
+    return col;
   }
 
   /**
@@ -2028,6 +2084,16 @@ export class WindowLayoutManager {
       // 驗證佈局數據
       if (!this.validateLayout(layout)) {
         throw new Error(t("errors.invalidData"));
+      }
+
+      // 收斂「欄位內部水平 multi-column」的異常結構（見 normalizeWindowLayout）：
+      // 讓新建/重建該 space 時側欄欄位回到 Obsidian dock 語意（單一 column、
+      // 可多 row），後續所有 leaf-rebuild / savedLeaves 皆以收斂後的樹為準。
+      if (layout.workspace) {
+        const normalizedRoot = this.normalizeWindowLayout(layout.workspace.layout);
+        if (normalizedRoot && normalizedRoot !== layout.workspace.layout) {
+          layout.workspace.layout = normalizedRoot as Record<string, unknown>;
+        }
       }
 
       // 0. 若此 space 已在某個存活的 Popout 視窗中開啟，直接聚焦該視窗，
