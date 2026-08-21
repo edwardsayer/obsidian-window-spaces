@@ -1826,6 +1826,17 @@ body.is-popout-window .workspace-tab-header-spacer {
   min-width: 0;
 }
 
+/* 側欄欄位內部還會由 Obsidian 包一層「側欄 dock」的 workspace-split（帶
+   mod-left-split / mod-sidedock）。Obsidian 的 `.workspace-split.mod-left-split`
+   同樣設 `flex: 0 0 auto`，會把這層內層 split 壓扁成高度 0 → 其下所有 view
+   （尤其第三方 view）的 client area 高度為 0、內容 collapse（導致第三方 view
+   開不出、判斷窗太窄等）。此處一併覆蓋，讓側欄欄位內的所有子 split 都能
+   伸展（flex:1 1 0），修復 view 高度為 0。 */
+.window-spaces-sidebar-column .workspace-split {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
 /* 側欄頂部頁籤列容器：重置邊距，消除頂部巨大空隙 */
 .window-spaces-sidebar-column .workspace-tab-header-container {
   padding-top: 0 !important;
