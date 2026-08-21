@@ -3246,13 +3246,40 @@ var WindowLayoutManager = class {
       type: "tabs",
       children: viewType && viewType !== "empty" ? [{ type: "leaf", state: { type: viewType, state: {} } }] : []
     });
-    const prior = Array.isArray(container.children) ? container.children : [];
+    const prior = Array.isArray(container.children) ? container.children.map((c) => this.collapseSplitColumnIntoColumnTabs(c)) : [];
     container.children = [
       ...leftView ? [mkTabs(leftView)] : [],
       ...prior,
       ...rightView ? [mkTabs(rightView)] : []
     ];
     return clone;
+  }
+  /**
+   * 將「欄位＝split:vertical（水平並排多 tabs）的異常結構」收斂為單一
+   * workspace-tabs：遞迴收集所有 leaf（保留順序）、過濾 empty，若剩餘非空
+   * 則建立單一 tabs（多 tab）；否則建立含一個 empty leaf 的 tabs。
+   * 垂直方向的 split（direction: horizontal / flex-direction: column，即
+   * Obsidian 側欄允許的多 row）與一般 tabs 欄位保持不動。
+   */
+  collapseSplitColumnIntoColumnTabs(col) {
+    if (!col || col.type !== "split" || col.direction !== "vertical") return col;
+    const leaves = [];
+    const walk = (n) => {
+      if (!n) return;
+      if (n.type === "leaf") {
+        leaves.push(n);
+        return;
+      }
+      if (Array.isArray(n.children)) n.children.forEach(walk);
+    };
+    walk(col);
+    const real = leaves.filter((l) => l?.state?.type && l.state.type !== "empty");
+    return {
+      type: "tabs",
+      ...typeof col.id === "string" ? { id: col.id } : {},
+      children: real.length > 0 ? real : [{ type: "leaf", state: { type: "empty", state: {} } }],
+      ...typeof col.currentTab === "number" ? { currentTab: 0 } : {}
+    };
   }
   async rebuildTargetWindowStructure(targetWin, rootNode) {
     if (!targetWin || !rootNode) return null;

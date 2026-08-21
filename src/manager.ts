@@ -1228,13 +1228,49 @@ export class WindowLayoutManager {
           ? [{ type: "leaf", state: { type: viewType, state: {} } }]
           : [],
     });
-    const prior = Array.isArray(container.children) ? container.children : [];
+    // 收斂「欄位內部水平 multi-column」的異常結構：欄位若是 split:vertical
+    // （flex-direction: row，水平並排多個 tabs），收斂為單一 workspace-tabs
+    // （合併所有非 empty leaf 為多 tab、移除 empty），使側欄/欄位如同
+    // Obsidian 原生——同側一個 column、可多 row（垂直 split 保留不動）。
+    // 這修復第三方 view（explorer/grid/notebook…）在側欄被水平均分成窄欄、
+    // 導致 client area 寬度異常（判窗框太窄）的問題。
+    const prior = Array.isArray(container.children)
+      ? container.children.map((c: any) => this.collapseSplitColumnIntoColumnTabs(c))
+      : [];
     container.children = [
       ...(leftView ? [mkTabs(leftView)] : []),
       ...prior,
       ...(rightView ? [mkTabs(rightView)] : []),
     ];
     return clone;
+  }
+
+  /**
+   * 將「欄位＝split:vertical（水平並排多 tabs）的異常結構」收斂為單一
+   * workspace-tabs：遞迴收集所有 leaf（保留順序）、過濾 empty，若剩餘非空
+   * 則建立單一 tabs（多 tab）；否則建立含一個 empty leaf 的 tabs。
+   * 垂直方向的 split（direction: horizontal / flex-direction: column，即
+   * Obsidian 側欄允許的多 row）與一般 tabs 欄位保持不動。
+   */
+  private collapseSplitColumnIntoColumnTabs(col: any): any {
+    if (!col || col.type !== "split" || col.direction !== "vertical") return col;
+    const leaves: any[] = [];
+    const walk = (n: any): void => {
+      if (!n) return;
+      if (n.type === "leaf") {
+        leaves.push(n);
+        return;
+      }
+      if (Array.isArray(n.children)) n.children.forEach(walk);
+    };
+    walk(col);
+    const real = leaves.filter((l) => l?.state?.type && l.state.type !== "empty");
+    return {
+      type: "tabs",
+      ...(typeof col.id === "string" ? { id: col.id } : {}),
+      children: real.length > 0 ? real : [{ type: "leaf", state: { type: "empty", state: {} } }],
+      ...(typeof col.currentTab === "number" ? { currentTab: 0 } : {}),
+    };
   }
 
   private async rebuildTargetWindowStructure(
