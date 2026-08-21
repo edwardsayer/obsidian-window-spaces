@@ -5972,7 +5972,10 @@ var WindowSpacesSettingTab = class extends import_obsidian4.PluginSettingTab {
             viewType,
             side,
             label: void 0,
-            icon: resolveViewIcon(this.app, viewType)
+            // 見 saveModal.Add：不把 resolveViewIcon 的 fallback（"layout"）寫死——
+            // 社群 view（notebook-navigator 等）的實 icon 需動態偵測，寫死會蓋過
+            // 正確 icon；一律以動態（applyItemIcon）+ ensureViewIcon 補正。
+            icon: void 0
           };
           current.push(newItem);
           this.plugin.settings.activityBars = this.plugin.settings.activityBars ?? { left: [], right: [] };
@@ -5981,15 +5984,13 @@ var WindowSpacesSettingTab = class extends import_obsidian4.PluginSettingTab {
             this.plugin.activityBars.refreshAll();
             renderItemRows();
             customInput.value = "";
-            if (newItem.icon === "layout") {
-              void ensureViewIcon(this.app, viewType).then((icon) => {
-                if (!icon || icon === newItem.icon) return;
-                newItem.icon = icon;
-                renderItemRows();
-                this.plugin.activityBars.refreshAll();
-                void this.plugin.saveSettings();
-              });
-            }
+            void ensureViewIcon(this.app, viewType).then((icon) => {
+              if (!icon) return;
+              newItem.icon = icon;
+              renderItemRows();
+              this.plugin.activityBars.refreshAll();
+              void this.plugin.saveSettings();
+            });
           });
         });
       });
@@ -6576,17 +6577,15 @@ var SaveLayoutModal = class extends import_obsidian5.Modal {
         const viewType = customInput.value.trim() || selectEl.value.trim();
         if (!viewType || draft.items?.some((item) => item.viewType === viewType)) return;
         draft.items = draft.items ?? [];
-        const newItem = { viewType, side, icon: resolveViewIcon(this.app, viewType) };
+        const newItem = { viewType, side, icon: void 0 };
         draft.items.push(newItem);
         customInput.value = "";
         renderItems();
-        if (newItem.icon === "layout") {
-          void ensureViewIcon(this.app, viewType).then((icon) => {
-            if (!icon || icon === newItem.icon) return;
-            newItem.icon = icon;
-            renderItems();
-          });
-        }
+        void ensureViewIcon(this.app, viewType).then((icon) => {
+          if (!icon) return;
+          newItem.icon = icon;
+          renderItems();
+        });
       });
     });
     groupEl.addEventListener("dragover", (e) => {

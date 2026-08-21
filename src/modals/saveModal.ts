@@ -575,17 +575,20 @@ export class SaveLayoutModal extends Modal {
         const viewType = customInput.value.trim() || selectEl.value.trim();
         if (!viewType || draft.items?.some((item) => item.viewType === viewType)) return;
         draft.items = draft.items ?? [];
-        const newItem: ActivityBarItem = { viewType, side, icon: resolveViewIcon(this.app, viewType) };
+        // 不把 resolveViewIcon 的 fallback（"layout"）寫死進 item.icon——社群 view
+        // （如 notebook-navigator）的實 icon 需動態偵測；寫死 layout 會蓋過正確
+        // icon（Restore default icon 之所以有效，正是清除 item.icon 後走動態發現）。
+        // 一律先設 undefined，由 renderItems 的 applyItemIcon 動態顯示，再以
+        // ensureViewIcon 異步把正確 icon 寫回供持久化。
+        const newItem: ActivityBarItem = { viewType, side, icon: undefined };
         draft.items.push(newItem);
         customInput.value = "";
         renderItems();
-        if (newItem.icon === "layout") {
-          void ensureViewIcon(this.app, viewType).then((icon) => {
-            if (!icon || icon === newItem.icon) return;
-            newItem.icon = icon;
-            renderItems();
-          });
-        }
+        void ensureViewIcon(this.app, viewType).then((icon) => {
+          if (!icon) return;
+          newItem.icon = icon;
+          renderItems();
+        });
       });
     });
 

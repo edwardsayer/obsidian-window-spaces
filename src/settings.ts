@@ -520,7 +520,10 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
             viewType,
             side,
             label: undefined,
-            icon: resolveViewIcon(this.app, viewType),
+            // 見 saveModal.Add：不把 resolveViewIcon 的 fallback（"layout"）寫死——
+            // 社群 view（notebook-navigator 等）的實 icon 需動態偵測，寫死會蓋過
+            // 正確 icon；一律以動態（applyItemIcon）+ ensureViewIcon 補正。
+            icon: undefined,
           };
           current.push(newItem);
           this.plugin.settings.activityBars = this.plugin.settings.activityBars ?? { left: [], right: [] };
@@ -530,16 +533,14 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
             renderItemRows();
             customInput.value = "";
 
-            if (newItem.icon === "layout") {
-              void ensureViewIcon(this.app, viewType).then((icon) => {
-                if (!icon || icon === newItem.icon) return;
-                newItem.icon = icon;
-                renderItemRows();
-                // 讓 Activity Bar 立即套用動態抓到的正確 icon（而非僅更新設定列）
-                this.plugin.activityBars.refreshAll();
-                void this.plugin.saveSettings();
-              });
-            }
+            void ensureViewIcon(this.app, viewType).then((icon) => {
+              if (!icon) return;
+              newItem.icon = icon;
+              renderItemRows();
+              // 讓 Activity Bar 立即套用動態抓到的正確 icon（而非僅更新設定列）
+              this.plugin.activityBars.refreshAll();
+              void this.plugin.saveSettings();
+            });
           });
         });
       });
