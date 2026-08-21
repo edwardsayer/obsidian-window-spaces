@@ -5842,7 +5842,8 @@ var WindowSpacesSettingTab = class extends import_obsidian4.PluginSettingTab {
       s.setName(item.label || resolvedLabel);
       s.addButton((button) => {
         iconBtn = button;
-        button.setIcon(item.icon || resolveViewIcon(this.app, item.viewType)).setTooltip(t("settings.pickIcon"));
+        applyItemIcon(button.buttonEl, this.app, item);
+        button.setTooltip(t("settings.pickIcon"));
         button.onClick(() => {
           const modal = new IconPickerModal(this.app, (iconName) => {
             item.icon = iconName;
@@ -6670,7 +6671,8 @@ var SaveLayoutModal = class extends import_obsidian5.Modal {
         row.settingEl.insertBefore(gripEl, row.settingEl.firstChild);
         row.addButton((button) => {
           iconButton = button;
-          button.setIcon(item.icon || resolveViewIcon(this.app, item.viewType)).setTooltip(t("settings.pickIcon"));
+          applyItemIcon(button.buttonEl, this.app, item);
+          button.setTooltip(t("settings.pickIcon"));
           button.onClick(() => {
             new IconPickerModal(this.app, (icon) => {
               item.icon = icon;

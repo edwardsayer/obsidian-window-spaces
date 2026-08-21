@@ -373,7 +373,9 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
 
       s.addButton((button) => {
         iconBtn = button;
-        button.setIcon(item.icon || resolveViewIcon(this.app, item.viewType)).setTooltip(t("settings.pickIcon"));
+        // 動態套用 icon（見 saveModal）：避免同步 fallback("layout") 蓋過社群 view 的真實 icon。
+        applyItemIcon(button.buttonEl as HTMLElement, this.app, item);
+        button.setTooltip(t("settings.pickIcon"));
         button.onClick(() => {
           const modal = new IconPickerModal(this.app, (iconName) => {
             item.icon = iconName;

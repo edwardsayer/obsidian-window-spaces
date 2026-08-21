@@ -692,7 +692,11 @@ export class SaveLayoutModal extends Modal {
 
         row.addButton((button) => {
           iconButton = button;
-          button.setIcon(item.icon || resolveViewIcon(this.app, item.viewType)).setTooltip(t("settings.pickIcon"));
+          // 動態套用 icon：item.icon 未定時走動態發現（detect 完成自動更新按鈕），
+          // 避免同步 resolveViewIcon fallback("layout") 蓋過社群 view（如
+          // notebook-navigator）的真實 icon。
+          applyItemIcon(button.buttonEl as HTMLElement, this.app, item);
+          button.setTooltip(t("settings.pickIcon"));
           button.onClick(() => {
             new IconPickerModal(this.app, (icon) => {
               item.icon = icon;
