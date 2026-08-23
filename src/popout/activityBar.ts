@@ -139,12 +139,31 @@ export class PopoutActivityBarManager {
     if (existing) return existing;
 
     const promise = (async () => {
+      // Sidebar rebuilds invoke restoreOpenSpaceInPlace(), which renders the
+      // target window while its new tree is still being assembled. Do not let
+      // this asynchronous guard observe the transient column count and create
+      // a second copy of the sidebar; the rebuild's final render will run the
+      // normal column reconciliation against the completed tree.
+      const manager = this.plugin as unknown as {
+        manager?: { isRebuildingPopoutLayout?: boolean };
+      };
+      if (manager.manager?.isRebuildingPopoutLayout) return;
+
       const layout = this.getLayoutForWindow(win);
       if (!layout) return;
 
       const leftVisible = this.isSideVisibleForWindow(win, "left");
       const rightVisible = this.isSideVisibleForWindow(win, "right");
       const initialColumns = this.engine.getTopLevelColumnElements(win).length;
+
+      // A restored Space stores activity-bar settings separately from its
+      // content tree. For nested layouts (2x2 is a representative case),
+      // createLeafBySplit would anchor a missing sidebar inside the first
+      // content row. Reuse the target-only tree rebuild instead so the
+      // original nested content split remains one content column.
+      if (layout.activityBars && (leftVisible || rightVisible)) {
+        await this.rebuildMissingSidebars(win, layout);
+      }
 
       // 依 activity bar 可見性建立/更新 hints（不再依欄位內容推斷）
       this.ensureSidebarHints(win);
@@ -158,6 +177,7 @@ export class PopoutActivityBarManager {
       const finalColumns = this.engine.getTopLevelColumnElements(win).length;
       if (finalColumns !== initialColumns) {
         await this.waitForLayoutFrame(win);
+        if (manager.manager?.isRebuildingPopoutLayout) return;
         if (!this.hasSavedLayoutDimensions(layout.workspace?.layout)) {
           this.applyDefaultColumnSizing(win, leftVisible, rightVisible);
         }

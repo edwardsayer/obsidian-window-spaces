@@ -579,6 +579,42 @@ describe("layout integrity guard", () => {
     teardown(env);
   });
 
+  test("does not reconcile columns while a target layout rebuild is in progress", async () => {
+    const env = buildEnv();
+    const ensureHintsSpy = vi.spyOn(env.manager as any, "ensureSidebarHints");
+    vi.spyOn(env.manager as any, "getLayoutForWindow").mockReturnValue({
+      workspace: { layout: { type: "window", children: [] } },
+    });
+    (env.manager as any).plugin.manager = { isRebuildingPopoutLayout: true };
+
+    await (env.manager as any).ensureLayoutColumns(window);
+
+    expect(ensureHintsSpy).not.toHaveBeenCalled();
+    teardown(env);
+  });
+
+  test("rebuilds missing sidebars before createLeafBySplit for a restored Space", async () => {
+    const env = buildEnv();
+    vi.spyOn(env.manager as any, "getLayoutForWindow").mockReturnValue({
+      activityBars: {
+        left: { show: true },
+        right: { show: true },
+      },
+      workspace: { layout: { type: "window", children: [] } },
+    });
+    const rebuildSpy = vi
+      .spyOn(env.manager as any, "rebuildMissingSidebars")
+      .mockResolvedValue(true);
+
+    await (env.manager as any).ensureLayoutColumns(window);
+
+    expect(rebuildSpy).toHaveBeenCalledWith(
+      window,
+      expect.objectContaining({ activityBars: expect.any(Object) }),
+    );
+    teardown(env);
+  });
+
   test("toggleView shows a hidden sidebar after opening its view", async () => {
     const env = buildEnv();
     const { leftCol } = buildThreeColumns(env);

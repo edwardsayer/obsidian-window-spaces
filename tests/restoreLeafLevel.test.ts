@@ -79,6 +79,133 @@ describe("extractLayoutRootNode", () => {
   });
 });
 
+describe("buildLayoutTreeWithSidebars", () => {
+  test("adds a sidebar beside a nested 2x1 content split", () => {
+    const manager = createTestManager({});
+    const contentSplit = {
+      type: "split",
+      direction: "horizontal",
+      children: [
+        { type: "tabs", children: [{ type: "leaf", state: { type: "markdown", state: { file: "a.md" } } }] },
+        { type: "tabs", children: [{ type: "leaf", state: { type: "markdown", state: { file: "b.md" } } }] },
+      ],
+    };
+    const root = { type: "window", direction: "vertical", children: [contentSplit] };
+
+    const rebuilt = (manager as any).buildLayoutTreeWithSidebars(root, "file-explorer");
+
+    expect(rebuilt.children).toHaveLength(2);
+    expect(rebuilt.children[0]).toMatchObject({
+      type: "tabs",
+      children: [{ type: "leaf", state: { type: "file-explorer", state: {} } }],
+    });
+    expect(rebuilt.children[1]).toMatchObject({
+      type: "split",
+      direction: "horizontal",
+    });
+    expect(rebuilt.children[1].children).toHaveLength(2);
+    expect(root.children).toHaveLength(1);
+  });
+
+  test("preserves a nested 2x2 content grid while adding a sidebar", () => {
+    const manager = createTestManager({});
+    const makeTabs = (id: string) => ({
+      type: "tabs",
+      id,
+      children: [{ type: "leaf", state: { type: "empty", state: {} } }],
+    });
+    const root = {
+      type: "window",
+      direction: "vertical",
+      children: [{
+        type: "split",
+        direction: "vertical",
+        children: [{
+          type: "split",
+          direction: "horizontal",
+          children: [
+            { type: "split", direction: "vertical", children: [makeTabs("a"), makeTabs("b")] },
+            { type: "split", direction: "vertical", children: [makeTabs("c"), makeTabs("d")] },
+          ],
+        }],
+      }],
+    };
+
+    const rebuilt = (manager as any).buildLayoutTreeWithSidebars(root, "file-explorer");
+    const content = rebuilt.children[1];
+    const rows = content.children[0];
+
+    expect(content).toMatchObject({ type: "split", direction: "vertical" });
+    expect(rows).toMatchObject({ type: "split", direction: "horizontal" });
+    expect(rows.children).toHaveLength(2);
+    expect(rows.children[0].children).toHaveLength(2);
+    expect(rows.children[1].children).toHaveLength(2);
+    expect(rows.children[0].children[0].children[0].state.type).toBe("empty");
+    expect(rows.children[1].children[1].children[0].state.type).toBe("empty");
+  });
+
+  test("still collapses a sidebar-only vertical split", () => {
+    const manager = createTestManager({});
+    const split = {
+      type: "split",
+      direction: "vertical",
+      children: [
+        { type: "tabs", children: [{ type: "leaf", state: { type: "bookmarks", state: {} } }] },
+        { type: "tabs", children: [{ type: "leaf", state: { type: "search", state: {} } }] },
+      ],
+    };
+
+    const normalized = (manager as any).normalizeColumnNode(split);
+
+    expect(normalized.type).toBe("tabs");
+    expect(normalized.children).toHaveLength(2);
+  });
+
+  test("rebuilds from the live tree without disabling file restoration", async () => {
+    const manager = createTestManager({});
+    const targetWin = { closed: false } as unknown as Window;
+    const layout = {
+      id: "layout-1",
+      name: "2x1",
+      workspace: { layout: { type: "window", children: [{ type: "tabs", children: [] }] }, leaves: [] },
+    } as any;
+    const liveRoot = {
+      type: "window",
+      direction: "vertical",
+      children: [{ type: "split", direction: "horizontal", children: [{ type: "tabs", children: [] }] }],
+    };
+
+    vi.spyOn(manager as any, "getLiveWindowLayoutTree").mockReturnValue(liveRoot);
+    const rebuildingStates: boolean[] = [];
+    const restoreInPlace = vi
+      .spyOn(manager as any, "restoreOpenSpaceInPlace")
+      .mockImplementation(async () => {
+        rebuildingStates.push(manager.isRebuildingPopoutLayout);
+      });
+
+    await (manager as any).rebuildPopoutLayoutWithSidebars(targetWin, layout, "file-explorer");
+
+    expect(rebuildingStates).toEqual([true]);
+    expect(manager.isRestoringLayout).toBe(false);
+
+    expect(restoreInPlace).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspace: expect.objectContaining({
+          layout: expect.objectContaining({
+            children: expect.arrayContaining([
+              expect.objectContaining({ type: "tabs" }),
+              expect.objectContaining({ type: "split" }),
+            ]),
+          }),
+          leaves: [],
+        }),
+      }),
+      targetWin,
+      { showNotifications: false, skipGeometry: true },
+    );
+  });
+});
+
 describe("isSimpleLayoutStructure", () => {
   let manager: WindowLayoutManager;
   beforeEach(() => {

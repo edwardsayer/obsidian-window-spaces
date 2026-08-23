@@ -39,6 +39,8 @@ export class WindowLayoutManager {
   private activeRestorePromise: Promise<void> | null = null;
   private isMatchingUnlabeled = false;
   public isRestoringLayout = false;
+  /** Sidebar rebuild guard: blocks activity-bar column reconciliation during transient trees. */
+  public isRebuildingPopoutLayout = false;
   private renderAttemptedLeaves = new WeakSet<WorkspaceLeaf>();
   private deferredViewLoads = new WeakMap<WorkspaceLeaf, Promise<void>>();
 
@@ -205,7 +207,8 @@ export class WindowLayoutManager {
         targetWin,
         savedLeaves,
         layout.workspace?.activeFile,
-        true
+        true,
+        builtLeaves ?? undefined
       );
 
     if (!builtLeaves) {
@@ -1185,14 +1188,25 @@ export class WindowLayoutManager {
         leaves: [],
       },
     };
+    const wasRestoringLayout = this.isRestoringLayout;
+    const wasRebuildingPopoutLayout = this.isRebuildingPopoutLayout;
+    this.isRestoringLayout = true;
+    this.isRebuildingPopoutLayout = true;
     try {
       await this.restoreOpenSpaceInPlace(override, targetWin, {
         showNotifications: false,
-        validateFiles: false,
         skipGeometry: true,
       });
     } catch (e) {
       console.warn("[Window Spaces] Failed to rebuild layout with sidebars:", e);
+    } finally {
+      // restoreOpenSpaceInPlace() normally runs inside restoreLayoutInternal,
+      // but activity-bar upgrades call it directly. Keep the restoring guard
+      // active for the entire target rebuild so asynchronous activity-bar
+      // reconciliation cannot inspect the transient tree and add a duplicate
+      // sidebar column.
+      this.isRestoringLayout = wasRestoringLayout;
+      this.isRebuildingPopoutLayout = wasRebuildingPopoutLayout;
     }
   }
 
@@ -1213,8 +1227,9 @@ export class WindowLayoutManager {
 
   /**
    * 在 layout 樹的欄位容器 children 前後插入標準 workspace-tabs sidebar 欄位。
-   * 欄位容器 = window/floating 的第一個 direct child 為 split 者（其 children 為欄位）；
-   * 若 rootNode 本身即 split，則視為欄位容器。
+   * 欄位容器 = window/floating 包裝本身的 direct children；原有的 nested split
+   * 是 content area，必須整體保留，不能把 sidebar 插進它的 children。
+   * 若 rootNode 本身即 split，則直接在該 split 的 children 插入 sidebar。
    */
   private buildLayoutTreeWithSidebars(
     rootNode: any,
@@ -1223,14 +1238,20 @@ export class WindowLayoutManager {
   ): any | null {
     if (!rootNode) return null;
     const clone = JSON.parse(JSON.stringify(rootNode));
-    const isContainer = clone?.type === "window" || clone?.type === "floating";
-    let container: any;
-    if (isContainer) {
-      container = (clone.children || []).find((c: any) => c && c.type === "split");
-    } else {
-      container = clone;
+    let container: any = clone;
+    if (clone?.type === "floating") {
+      container =
+        (clone.children || []).find((c: any) => c && c.type === "window") ||
+        (clone.children || []).find((c: any) => c && c.type === "split") ||
+        null;
     }
-    if (!container || container.type !== "split") return null;
+    if (
+      !container ||
+      (container.type !== "window" && container.type !== "split") ||
+      !Array.isArray(container.children)
+    ) {
+      return null;
+    }
     const mkTabs = (viewType?: string) => ({
       type: "tabs",
       children:
@@ -1291,7 +1312,14 @@ export class WindowLayoutManager {
     if (!col) return col;
     if (col.type === "split") {
       if (col.direction === "vertical") {
-        return this.collapseSplitColumnIntoColumnTabs(col);
+        // A vertical split is usually a horizontally-split sidebar column,
+        // but it is also a valid content grid building block (for example the
+        // two rows of a 2x2 space). Only collapse a split when every leaf is a
+        // real sidebar view; empty/editor leaves must keep their split shape.
+        if (this.isSidebarOnlySplit(col)) {
+          return this.collapseSplitColumnIntoColumnTabs(col);
+        }
+        return col;
       }
       const children = (Array.isArray(col.children) ? col.children : []).map(
         (c: any) => this.normalizeColumnNode(c)
@@ -1299,6 +1327,39 @@ export class WindowLayoutManager {
       return { ...col, children };
     }
     return col;
+  }
+
+  /**
+   * 判斷 vertical split 是否確實是可收斂的 sidebar multi-column。
+   * Empty/editor leaf 代表 content area 的合法 split，不能因方向相同
+   * 就折疊；這是 2x2 等巢狀 content layout 的重要區分。
+   */
+  private isSidebarOnlySplit(col: any): boolean {
+    const leafTypes: string[] = [];
+    const walk = (node: any): void => {
+      if (!node) return;
+      if (node.type === "leaf") {
+        const type = node.state?.type;
+        leafTypes.push(typeof type === "string" ? type : "empty");
+        return;
+      }
+      if (Array.isArray(node.children)) node.children.forEach(walk);
+    };
+    walk(col);
+
+    if (leafTypes.length === 0 || leafTypes.every((type) => type === "empty")) return false;
+    const editorTypes = new Set([
+      "markdown",
+      "pdf",
+      "canvas",
+      "excalidraw",
+      "image",
+      "audio",
+      "video",
+      "folder-spaces-explorer",
+      "folder-spaces-panel",
+    ]);
+    return leafTypes.every((type) => type !== "empty" && !editorTypes.has(type));
   }
 
   /**
@@ -1785,6 +1846,19 @@ export class WindowLayoutManager {
     void doFocusAndReveal(true);
     targetWin.setTimeout(() => { void doFocusAndReveal(false); }, 50);
     targetWin.setTimeout(() => { void doFocusAndReveal(false); }, 200);
+  }
+
+  /**
+   * 新建 Popout 的 layout-change / Activity Bar callback 可能在第一次
+   * focus() 後才完成，並把主視窗重新置前。等第一輪 deferred view 與
+   * integrity timer 穩定後，再以同一個 active leaf 做一次明確聚焦。
+   */
+  private scheduleNewPopoutFocus(targetWin: Window): void {
+    if (!targetWin || targetWin.closed || typeof targetWin.setTimeout !== "function") return;
+    targetWin.setTimeout(() => {
+      if (targetWin.closed) return;
+      this.focusTargetWindow(targetWin, this.getActiveLeafInWindow(targetWin));
+    }, 500);
   }
 
   /**
@@ -2354,7 +2428,8 @@ export class WindowLayoutManager {
           targetWin,
           savedLeaves,
           layout.workspace?.activeFile,
-          builtLeaves !== null
+          builtLeaves !== null,
+          builtLeaves ?? undefined
         );
       }
 
@@ -2392,7 +2467,14 @@ export class WindowLayoutManager {
         // activeLeaf 指到 popout leaf，否則下一次主視窗 File Explorer 點擊
         // note 會被導向 popout（需點兩下才切換）。僅當 popout 仍持有焦點、
         // 或主視窗也未持有焦點（Obsidian 在背景）時才啟動 popout。
-        const canActivatePopout = this.isWindowFocused(targetWin) || !this.isMainWindowFocused();
+        // 新建的 Popout 是這次 restore 明確要求的目標。Activity Bar / view
+        // 重建可能在 restore 尾端讓它短暫失去原生焦點；若只依 hasFocus()
+        // 判斷，這類 layout 會跳過 focus()，最後反而把主視窗留在最上層。
+        // 新建視窗必須在完整 restore 後取得焦點；已存在的視窗仍保留原本
+        // 的 guard，避免使用者在非同步等待期間切回主視窗時被搶回焦點。
+        const canActivatePopout = isNewlyCreatedWindow ||
+          this.isWindowFocused(targetWin) ||
+          !this.isMainWindowFocused();
 
         const winLeaves = this.getLeavesForWindow(targetWin);
         if (winLeaves.length > 0 && canActivatePopout) {
@@ -2426,6 +2508,9 @@ export class WindowLayoutManager {
       // 視窗顯示後（containerEl 可見）重新 loadIfDeferred 才會載入真實內容。
       if (targetWin) {
         this.ensureDeferredViewsLoaded(targetWin);
+        if (isNewlyCreatedWindow) {
+          this.scheduleNewPopoutFocus(targetWin);
+        }
       }
 
       WindowLayoutsModal.renderAllInstances();
@@ -3626,7 +3711,8 @@ export class WindowLayoutManager {
     targetWin: Window | null,
     leaves: ViewState[],
     activeFilePath?: string,
-    skipUnchanged = false
+    skipUnchanged = false,
+    preferredLeaves?: WorkspaceLeaf[]
   ): Promise<string[]> {
     const currentWin = targetWin || (typeof activeWindow !== "undefined" ? activeWindow : window);
     const windowLeaves = await this.waitForWindowLeaves(currentWin, leaves.length);
@@ -3656,7 +3742,8 @@ export class WindowLayoutManager {
         // 非檔案 leaf（file-explorer / search / tag / outline / bookmarks 等）：
         // changeLayout 建立 leaf 後部分核心側欄 view 內容不會自動渲染（僅顯示 tab 標題）。
         // 以「已渲染 flag」檢查 + 延遲重試強制重新渲染。
-        const targetLeaf = leavesById.get(leafState.id) ||
+        const targetLeaf = preferredLeaves?.[i] ||
+          leavesById.get(leafState.id) ||
           (i < windowLeaves.length ? windowLeaves[i] : null);
         if (targetLeaf) {
           const extLeaf = targetLeaf as unknown as ExtendedWorkspaceLeaf;
@@ -3690,8 +3777,9 @@ export class WindowLayoutManager {
         progressNotice.setMessage(`🔄 ${t("restoreModal.restoringLayout")}... (${processedCount}/${totalFiles})`);
       }
 
-      let targetLeaf: WorkspaceLeaf | null = leavesById.get(leafState.id) || null;
-      if (i < windowLeaves.length && !targetLeaf) targetLeaf = windowLeaves[i];
+      let targetLeaf: WorkspaceLeaf | null = preferredLeaves?.[i] ||
+        leavesById.get(leafState.id) ||
+        (i < windowLeaves.length ? windowLeaves[i] : null);
 
       // 若該視窗現有分頁數少於所需分頁，自動為其切割建立新分頁容器
       if (!targetLeaf && windowLeaves.length > 0) {

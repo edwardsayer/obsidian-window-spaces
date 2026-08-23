@@ -303,7 +303,7 @@ describe("Validation & Auto-Save Guardrails (validationAndGuardrails.test.ts)", 
     expect(hasFocus).toHaveBeenCalled();
   });
 
-  test("clone restore (forceNewWindow without focusExistingWindow) still creates a new popout for an already-open space", async () => {
+  test("clone restore creates and focuses a new popout for an already-open space", async () => {
     const popoutBody = {
       classList: { contains: (className: string) => className === "is-popout-window" },
     };
@@ -348,7 +348,7 @@ describe("Validation & Auto-Save Guardrails (validationAndGuardrails.test.ts)", 
 
     await manager.restoreLayout(layout, { forceNewWindow: true, showNotifications: false });
 
-    expect(focusSpy).not.toHaveBeenCalled();
+    expect(focusSpy).toHaveBeenCalledWith(newWindow, null);
     expect(openPopoutLeaf).toHaveBeenCalledTimes(1);
   });
 
@@ -1112,7 +1112,7 @@ describe("Validation & Auto-Save Guardrails (validationAndGuardrails.test.ts)", 
     expect(body.getAttribute("data-layout-name")).toBeNull();
   });
 
-  test("restore skips setting the popout leaf active when the user is already in the main window", async () => {
+  test("restore focuses a newly-created popout even when async rebuild left the main window focused", async () => {
     const setActiveLeaf = vi.fn();
     const targetWin = {
       document: {
@@ -1163,9 +1163,10 @@ describe("Validation & Auto-Save Guardrails (validationAndGuardrails.test.ts)", 
 
     await manager.restoreLayout(layout, { forceNewWindow: true, showNotifications: false });
 
-    // 主視窗持有焦點時，不得把全域 activeLeaf 指到 popout leaf，也不得搶回焦點
-    expect(setActiveLeaf).not.toHaveBeenCalled();
-    expect(targetWin.focus).not.toHaveBeenCalled();
+    // 新建 popout 是明確的 restore 目標，即使 layout rebuild 期間主視窗
+    // 暫時持有焦點，完成 restore 後仍須把 popout 帶到最上層。
+    expect(setActiveLeaf).toHaveBeenCalledWith(popoutLeaf, { focus: true });
+    expect(targetWin.focus).toHaveBeenCalledTimes(1);
     hasFocusSpy.mockRestore();
   });
 

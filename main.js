@@ -2332,6 +2332,8 @@ var WindowLayoutManager = class {
   activeRestorePromise = null;
   isMatchingUnlabeled = false;
   isRestoringLayout = false;
+  /** Sidebar rebuild guard: blocks activity-bar column reconciliation during transient trees. */
+  isRebuildingPopoutLayout = false;
   renderAttemptedLeaves = /* @__PURE__ */ new WeakSet();
   deferredViewLoads = /* @__PURE__ */ new WeakMap();
   constructor(plugin) {
@@ -2460,7 +2462,8 @@ var WindowLayoutManager = class {
       targetWin,
       savedLeaves,
       layout.workspace?.activeFile,
-      true
+      true,
+      builtLeaves ?? void 0
     );
     if (!builtLeaves) {
       await this.restoreSavedTabSelections(targetWin, rootNode);
@@ -3207,14 +3210,20 @@ var WindowLayoutManager = class {
         leaves: []
       }
     };
+    const wasRestoringLayout = this.isRestoringLayout;
+    const wasRebuildingPopoutLayout = this.isRebuildingPopoutLayout;
+    this.isRestoringLayout = true;
+    this.isRebuildingPopoutLayout = true;
     try {
       await this.restoreOpenSpaceInPlace(override, targetWin, {
         showNotifications: false,
-        validateFiles: false,
         skipGeometry: true
       });
     } catch (e) {
       console.warn("[Window Spaces] Failed to rebuild layout with sidebars:", e);
+    } finally {
+      this.isRestoringLayout = wasRestoringLayout;
+      this.isRebuildingPopoutLayout = wasRebuildingPopoutLayout;
     }
   }
   /** 讀取目標 popout 目前的 live layout 樹（含目前開啟的 view state）。 */
@@ -3231,20 +3240,20 @@ var WindowLayoutManager = class {
   }
   /**
    * 在 layout 樹的欄位容器 children 前後插入標準 workspace-tabs sidebar 欄位。
-   * 欄位容器 = window/floating 的第一個 direct child 為 split 者（其 children 為欄位）；
-   * 若 rootNode 本身即 split，則視為欄位容器。
+   * 欄位容器 = window/floating 包裝本身的 direct children；原有的 nested split
+   * 是 content area，必須整體保留，不能把 sidebar 插進它的 children。
+   * 若 rootNode 本身即 split，則直接在該 split 的 children 插入 sidebar。
    */
   buildLayoutTreeWithSidebars(rootNode, leftView, rightView) {
     if (!rootNode) return null;
     const clone = JSON.parse(JSON.stringify(rootNode));
-    const isContainer = clone?.type === "window" || clone?.type === "floating";
-    let container;
-    if (isContainer) {
-      container = (clone.children || []).find((c) => c && c.type === "split");
-    } else {
-      container = clone;
+    let container = clone;
+    if (clone?.type === "floating") {
+      container = (clone.children || []).find((c) => c && c.type === "window") || (clone.children || []).find((c) => c && c.type === "split") || null;
     }
-    if (!container || container.type !== "split") return null;
+    if (!container || container.type !== "window" && container.type !== "split" || !Array.isArray(container.children)) {
+      return null;
+    }
     const mkTabs = (viewType) => ({
       type: "tabs",
       children: viewType && viewType !== "empty" ? [{ type: "leaf", state: { type: viewType, state: {} } }] : []
@@ -3288,7 +3297,10 @@ var WindowLayoutManager = class {
     if (!col) return col;
     if (col.type === "split") {
       if (col.direction === "vertical") {
-        return this.collapseSplitColumnIntoColumnTabs(col);
+        if (this.isSidebarOnlySplit(col)) {
+          return this.collapseSplitColumnIntoColumnTabs(col);
+        }
+        return col;
       }
       const children = (Array.isArray(col.children) ? col.children : []).map(
         (c) => this.normalizeColumnNode(c)
@@ -3296,6 +3308,37 @@ var WindowLayoutManager = class {
       return { ...col, children };
     }
     return col;
+  }
+  /**
+   * 判斷 vertical split 是否確實是可收斂的 sidebar multi-column。
+   * Empty/editor leaf 代表 content area 的合法 split，不能因方向相同
+   * 就折疊；這是 2x2 等巢狀 content layout 的重要區分。
+   */
+  isSidebarOnlySplit(col) {
+    const leafTypes = [];
+    const walk = (node) => {
+      if (!node) return;
+      if (node.type === "leaf") {
+        const type = node.state?.type;
+        leafTypes.push(typeof type === "string" ? type : "empty");
+        return;
+      }
+      if (Array.isArray(node.children)) node.children.forEach(walk);
+    };
+    walk(col);
+    if (leafTypes.length === 0 || leafTypes.every((type) => type === "empty")) return false;
+    const editorTypes = /* @__PURE__ */ new Set([
+      "markdown",
+      "pdf",
+      "canvas",
+      "excalidraw",
+      "image",
+      "audio",
+      "video",
+      "folder-spaces-explorer",
+      "folder-spaces-panel"
+    ]);
+    return leafTypes.every((type) => type !== "empty" && !editorTypes.has(type));
   }
   /**
    * 將「欄位＝split:vertical（水平並排多 tabs）的異常結構」收斂為單一
@@ -3674,6 +3717,18 @@ var WindowLayoutManager = class {
     targetWin.setTimeout(() => {
       void doFocusAndReveal(false);
     }, 200);
+  }
+  /**
+   * 新建 Popout 的 layout-change / Activity Bar callback 可能在第一次
+   * focus() 後才完成，並把主視窗重新置前。等第一輪 deferred view 與
+   * integrity timer 穩定後，再以同一個 active leaf 做一次明確聚焦。
+   */
+  scheduleNewPopoutFocus(targetWin) {
+    if (!targetWin || targetWin.closed || typeof targetWin.setTimeout !== "function") return;
+    targetWin.setTimeout(() => {
+      if (targetWin.closed) return;
+      this.focusTargetWindow(targetWin, this.getActiveLeafInWindow(targetWin));
+    }, 500);
   }
   /**
    * 取得指定視窗內「目前 active 的 tab」leaf（依 tab header 的 is-active class）。
@@ -4082,7 +4137,8 @@ var WindowLayoutManager = class {
           targetWin,
           savedLeaves,
           layout.workspace?.activeFile,
-          builtLeaves !== null
+          builtLeaves !== null,
+          builtLeaves ?? void 0
         );
       }
       if (builtLeaves && builtLeaves.length > 0) {
@@ -4102,7 +4158,7 @@ var WindowLayoutManager = class {
         this.layoutWindows.set(layout, targetWin);
         this.plugin.activityBars?.renderWindow(targetWin);
         this.restoreWindowGeometry(targetWin, layout.windowState, layout.includeGeometry, false);
-        const canActivatePopout = this.isWindowFocused(targetWin) || !this.isMainWindowFocused();
+        const canActivatePopout = isNewlyCreatedWindow || this.isWindowFocused(targetWin) || !this.isMainWindowFocused();
         const winLeaves = this.getLeavesForWindow(targetWin);
         if (winLeaves.length > 0 && canActivatePopout) {
           const activeLeaf = typeof this.app.workspace.getMostRecentLeaf === "function" ? this.app.workspace.getMostRecentLeaf() : this.app.workspace.activeLeaf;
@@ -4123,6 +4179,9 @@ var WindowLayoutManager = class {
       }
       if (targetWin) {
         this.ensureDeferredViewsLoaded(targetWin);
+        if (isNewlyCreatedWindow) {
+          this.scheduleNewPopoutFocus(targetWin);
+        }
       }
       WindowLayoutsModal.renderAllInstances();
       if (options.showNotifications !== false && this.plugin.settings.showNotifications !== false) {
@@ -5054,7 +5113,7 @@ var WindowLayoutManager = class {
   /**
    * 恢復檔案狀態 (在對應現有分頁中安全開立檔案，尊重原生 Layout)
    */
-  async restoreFileStatesForWindow(targetWin, leaves, activeFilePath, skipUnchanged = false) {
+  async restoreFileStatesForWindow(targetWin, leaves, activeFilePath, skipUnchanged = false, preferredLeaves) {
     const currentWin = targetWin || (typeof activeWindow !== "undefined" ? activeWindow : window);
     const windowLeaves = await this.waitForWindowLeaves(currentWin, leaves.length);
     const leavesById = /* @__PURE__ */ new Map();
@@ -5075,7 +5134,7 @@ var WindowLayoutManager = class {
       const leafState = leaves[i];
       const filePath = this.getFilePathFromLeafState(leafState);
       if (!filePath) {
-        const targetLeaf2 = leavesById.get(leafState.id) || (i < windowLeaves.length ? windowLeaves[i] : null);
+        const targetLeaf2 = preferredLeaves?.[i] || leavesById.get(leafState.id) || (i < windowLeaves.length ? windowLeaves[i] : null);
         if (targetLeaf2) {
           const extLeaf = targetLeaf2;
           const currentState = typeof extLeaf.getViewState === "function" ? extLeaf.getViewState() : null;
@@ -5101,8 +5160,7 @@ var WindowLayoutManager = class {
       if (progressNotice) {
         progressNotice.setMessage(`\u{1F504} ${t("restoreModal.restoringLayout")}... (${processedCount}/${totalFiles})`);
       }
-      let targetLeaf = leavesById.get(leafState.id) || null;
-      if (i < windowLeaves.length && !targetLeaf) targetLeaf = windowLeaves[i];
+      let targetLeaf = preferredLeaves?.[i] || leavesById.get(leafState.id) || (i < windowLeaves.length ? windowLeaves[i] : null);
       if (!targetLeaf && windowLeaves.length > 0) {
         try {
           const baseLeaf = windowLeaves[windowLeaves.length - 1];
@@ -7755,11 +7813,16 @@ var PopoutActivityBarManager = class {
     const existing = this.columnEnsurePromises.get(win);
     if (existing) return existing;
     const promise = (async () => {
+      const manager = this.plugin;
+      if (manager.manager?.isRebuildingPopoutLayout) return;
       const layout = this.getLayoutForWindow(win);
       if (!layout) return;
       const leftVisible = this.isSideVisibleForWindow(win, "left");
       const rightVisible = this.isSideVisibleForWindow(win, "right");
       const initialColumns = this.engine.getTopLevelColumnElements(win).length;
+      if (layout.activityBars && (leftVisible || rightVisible)) {
+        await this.rebuildMissingSidebars(win, layout);
+      }
       this.ensureSidebarHints(win);
       this.ensureSideColumnPresent(win, "left", leftVisible);
       this.ensureSideColumnPresent(win, "right", rightVisible);
@@ -7767,6 +7830,7 @@ var PopoutActivityBarManager = class {
       const finalColumns = this.engine.getTopLevelColumnElements(win).length;
       if (finalColumns !== initialColumns) {
         await this.waitForLayoutFrame(win);
+        if (manager.manager?.isRebuildingPopoutLayout) return;
         if (!this.hasSavedLayoutDimensions(layout.workspace?.layout)) {
           this.applyDefaultColumnSizing(win, leftVisible, rightVisible);
         }
