@@ -296,6 +296,7 @@ function isSidebarColumnElement(columnEl: HTMLElement | null | undefined): boole
 export class PopoutLayoutEngine {
   private app: App;
   private sidebarSidesByWindow = new WeakMap<Window, SidebarSides>();
+  private lastActiveContentPanesByWindow = new WeakMap<Window, WorkspaceParent>();
 
   constructor(app: App) {
     this.app = app;
@@ -312,6 +313,26 @@ export class PopoutLayoutEngine {
         ? this.workspace.getMostRecentLeaf()
         : this.workspace.activeLeaf;
     return activeLeaf && getWindowOfLeaf(activeLeaf) === win ? activeLeaf : null;
+  }
+
+  /**
+   * 記錄 Popout 中最後 active 的 content-area tab group。
+   *
+   * 側欄 view 被點選後，Obsidian 的 active leaf 會暫時落在 sidebar；
+   * 此記錄讓後續 getLeaf("tab"/"split") 仍能回到使用者最後操作的 content group。
+   * 只接受目前仍存在且未被標記為 sidebar 的 tab group，避免把側欄或已拆除的
+   * parent 留在記憶中。
+   */
+  rememberActiveContentPane(win: Window, leaf: WorkspaceLeaf | null | undefined): void {
+    if (!win || !leaf || getWindowOfLeaf(leaf) !== win) return;
+
+    const tabs = (leaf as unknown as ExtendedWorkspaceLeaf).parent;
+    if (!tabs) return;
+
+    const isCurrentCenterPane = this.getCenterPanes(win).some((pane) => pane.tabs === tabs);
+    if (isCurrentCenterPane) {
+      this.lastActiveContentPanesByWindow.set(win, tabs);
+    }
   }
 
   /** 取得指定視窗中最後一個 leaf（限定該 window）。 */
@@ -734,6 +755,27 @@ export class PopoutLayoutEngine {
     return container.offsetParent !== null;
   }
 
+  /** 以目前 active leaf 或最後記錄的 pane 決定 content-area 目標。 */
+  private pickPreferredCenterPopoutPane(panes: PopoutPane[], win: Window): PopoutPane | null {
+    const activeLeaf = this.getActiveLeafInWindow(win);
+    const activeTabs = activeLeaf
+      ? (activeLeaf as unknown as ExtendedWorkspaceLeaf).parent
+      : null;
+    const activePane = activeTabs ? panes.find((pane) => pane.tabs === activeTabs) : null;
+    if (activePane) {
+      this.lastActiveContentPanesByWindow.set(win, activePane.tabs);
+      return activePane;
+    }
+
+    const rememberedTabs = this.lastActiveContentPanesByWindow.get(win);
+    const rememberedPane = rememberedTabs
+      ? panes.find((pane) => pane.tabs === rememberedTabs)
+      : null;
+    if (rememberedPane) return rememberedPane;
+
+    return this.pickCenterPopoutPane(panes, win);
+  }
+
   /**
    * 同步取得/建立位於 Popout 視窗「中央編輯區」的 WorkspaceLeaf。
    * 用於避免側欄觸發開啟檔案時覆蓋側欄 View。
@@ -741,7 +783,7 @@ export class PopoutLayoutEngine {
   getCenterLeafSync(win: Window, newLeaf?: boolean | string): WorkspaceLeaf {
     const workspace = this.workspace;
     const centerPanes = this.getCenterPanes(win);
-    const targetPane = this.pickCenterPopoutPane(centerPanes, win);
+    const targetPane = this.pickPreferredCenterPopoutPane(centerPanes, win);
 
     if (targetPane) {
       const isNewTabRequested = newLeaf === true || newLeaf === "tab" || newLeaf === "split";

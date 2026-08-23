@@ -6948,6 +6948,7 @@ function isSidebarColumnElement(columnEl) {
 var PopoutLayoutEngine = class {
   app;
   sidebarSidesByWindow = /* @__PURE__ */ new WeakMap();
+  lastActiveContentPanesByWindow = /* @__PURE__ */ new WeakMap();
   constructor(app) {
     this.app = app;
   }
@@ -6958,6 +6959,23 @@ var PopoutLayoutEngine = class {
   getActiveLeafInWindow(win) {
     const activeLeaf = typeof this.workspace.getMostRecentLeaf === "function" ? this.workspace.getMostRecentLeaf() : this.workspace.activeLeaf;
     return activeLeaf && getWindowOfLeaf(activeLeaf) === win ? activeLeaf : null;
+  }
+  /**
+   * 記錄 Popout 中最後 active 的 content-area tab group。
+   *
+   * 側欄 view 被點選後，Obsidian 的 active leaf 會暫時落在 sidebar；
+   * 此記錄讓後續 getLeaf("tab"/"split") 仍能回到使用者最後操作的 content group。
+   * 只接受目前仍存在且未被標記為 sidebar 的 tab group，避免把側欄或已拆除的
+   * parent 留在記憶中。
+   */
+  rememberActiveContentPane(win, leaf) {
+    if (!win || !leaf || getWindowOfLeaf(leaf) !== win) return;
+    const tabs = leaf.parent;
+    if (!tabs) return;
+    const isCurrentCenterPane = this.getCenterPanes(win).some((pane) => pane.tabs === tabs);
+    if (isCurrentCenterPane) {
+      this.lastActiveContentPanesByWindow.set(win, tabs);
+    }
   }
   /** 取得指定視窗中最後一個 leaf（限定該 window）。 */
   getLastLeafInWindow(win) {
@@ -7312,6 +7330,20 @@ var PopoutLayoutEngine = class {
     if (!(container instanceof HTMLElement)) return false;
     return container.offsetParent !== null;
   }
+  /** 以目前 active leaf 或最後記錄的 pane 決定 content-area 目標。 */
+  pickPreferredCenterPopoutPane(panes, win) {
+    const activeLeaf = this.getActiveLeafInWindow(win);
+    const activeTabs = activeLeaf ? activeLeaf.parent : null;
+    const activePane = activeTabs ? panes.find((pane) => pane.tabs === activeTabs) : null;
+    if (activePane) {
+      this.lastActiveContentPanesByWindow.set(win, activePane.tabs);
+      return activePane;
+    }
+    const rememberedTabs = this.lastActiveContentPanesByWindow.get(win);
+    const rememberedPane = rememberedTabs ? panes.find((pane) => pane.tabs === rememberedTabs) : null;
+    if (rememberedPane) return rememberedPane;
+    return this.pickCenterPopoutPane(panes, win);
+  }
   /**
    * 同步取得/建立位於 Popout 視窗「中央編輯區」的 WorkspaceLeaf。
    * 用於避免側欄觸發開啟檔案時覆蓋側欄 View。
@@ -7319,7 +7351,7 @@ var PopoutLayoutEngine = class {
   getCenterLeafSync(win, newLeaf) {
     const workspace = this.workspace;
     const centerPanes = this.getCenterPanes(win);
-    const targetPane = this.pickCenterPopoutPane(centerPanes, win);
+    const targetPane = this.pickPreferredCenterPopoutPane(centerPanes, win);
     if (targetPane) {
       const isNewTabRequested = newLeaf === true || newLeaf === "tab" || newLeaf === "split";
       if (!isNewTabRequested) {
@@ -7730,7 +7762,7 @@ function releasePopoutLayoutEngine(id) {
 // src/shared/sharedVersion.ts
 var SHARED_API_VERSION = 5;
 var SHARED_COMPATIBLE_FROM_VERSION = 1;
-var SHARED_IMPLEMENTATION_REVISION = "2026-08-19T14:30:29Z";
+var SHARED_IMPLEMENTATION_REVISION = "2026-08-23T19:47:17Z";
 
 // src/popout/activityBar.ts
 var import_obsidian7 = require("obsidian");
@@ -7744,6 +7776,8 @@ var PopoutActivityBarManager = class {
   initializingWindows = /* @__PURE__ */ new Set();
   sidebarHintsByWindow = /* @__PURE__ */ new WeakMap();
   columnEnsurePromises = /* @__PURE__ */ new WeakMap();
+  /** Preserve live column weights while one sidebar is temporarily hidden. */
+  sidebarFlexSnapshots = /* @__PURE__ */ new WeakMap();
   constructor(plugin, engine) {
     this.app = plugin.app;
     this.plugin = plugin;
@@ -7820,7 +7854,7 @@ var PopoutActivityBarManager = class {
       const leftVisible = this.isSideVisibleForWindow(win, "left");
       const rightVisible = this.isSideVisibleForWindow(win, "right");
       const initialColumns = this.engine.getTopLevelColumnElements(win).length;
-      if (layout.activityBars && (leftVisible || rightVisible)) {
+      if (!manager.manager?.isRestoringLayout && layout.activityBars && (leftVisible || rightVisible)) {
         await this.rebuildMissingSidebars(win, layout);
       }
       this.ensureSidebarHints(win);
@@ -7934,8 +7968,10 @@ var PopoutActivityBarManager = class {
     const rightView = rightShow ? this.getItemsForWindowSide(win, "right")[0]?.viewType : void 0;
     const topCols = this.engine.getTopLevelColumnElements(win);
     const last = topCols.length - 1;
-    const leftMissing = leftShow && !(topCols[0] && this.columnContainsViewType(topCols[0], leftView));
-    const rightMissing = rightShow && !(topCols[last] && this.columnContainsViewType(topCols[last], rightView));
+    const leftPresent = topCols[0] && (this.isMarkedSidebarColumn(topCols[0], "left") || this.columnContainsAnyViewType(topCols[0], this.getItemsForWindowSide(win, "left").map((item) => item.viewType)));
+    const rightPresent = topCols[last] && (this.isMarkedSidebarColumn(topCols[last], "right") || this.columnContainsAnyViewType(topCols[last], this.getItemsForWindowSide(win, "right").map((item) => item.viewType)));
+    const leftMissing = leftShow && !leftPresent;
+    const rightMissing = rightShow && !rightPresent;
     if (!leftMissing && !rightMissing) return false;
     const manager = this.plugin.manager;
     if (!manager?.rebuildPopoutLayoutWithSidebars) return false;
@@ -7953,6 +7989,17 @@ var PopoutActivityBarManager = class {
     if (!colEl || !viewType) return false;
     return Array.from(colEl.querySelectorAll(".workspace-leaf [data-type]")).some((el) => el.getAttribute("data-type") === viewType);
   }
+  /** 欄位內是否包含該 Activity Bar 已配置的任一 view。 */
+  columnContainsAnyViewType(colEl, viewTypes) {
+    return viewTypes.some((viewType) => this.columnContainsViewType(colEl, viewType));
+  }
+  /** 判斷欄位是否已被同步標記為指定側的 sidebar。 */
+  isMarkedSidebarColumn(colEl, side) {
+    if (!colEl) return false;
+    return colEl.classList.contains(
+      side === "left" ? "mod-left-split" : "mod-right-split"
+    );
+  }
   async waitForLayoutFrame(win) {
     const raf = win.requestAnimationFrame?.bind(win);
     if (raf) {
@@ -7964,18 +8011,78 @@ var PopoutActivityBarManager = class {
   }
   applyDefaultColumnSizing(win, leftVisible, rightVisible) {
     const columns = this.engine.getTopLevelColumnElements(win);
-    const weights = leftVisible && rightVisible ? [20, 60, 20] : leftVisible ? [24, 76] : rightVisible ? [76, 24] : [100];
+    const weights = leftVisible && rightVisible ? [25, 50, 25] : leftVisible ? [25, 75] : rightVisible ? [75, 25] : [100];
     columns.forEach((column, index) => {
       const weight = weights[index];
       if (weight === void 0) return;
-      const customEl = column;
-      const flexGrow = String(weight);
-      if (typeof customEl.setCssProps === "function") {
-        customEl.setCssProps({ "flex-grow": flexGrow });
-      } else {
-        column.style.setProperty("flex-grow", flexGrow);
-      }
+      this.setColumnFlexGrow(column, weight);
     });
+  }
+  setColumnFlexGrow(column, flexGrow) {
+    if (!Number.isFinite(flexGrow) || flexGrow <= 0) return;
+    const customEl = column;
+    const value = String(flexGrow);
+    if (typeof customEl.setCssProps === "function") {
+      customEl.setCssProps({ "flex-grow": value });
+    } else {
+      column.style.setProperty("flex-grow", value);
+    }
+  }
+  getColumnFlexGrow(win, column) {
+    const inline = Number(column.style.flexGrow);
+    if (Number.isFinite(inline) && inline > 0) return inline;
+    try {
+      const computed = Number(win.getComputedStyle(column).flexGrow);
+      if (Number.isFinite(computed) && computed > 0) return computed;
+    } catch {
+    }
+    return 1;
+  }
+  captureSidebarFlexSnapshot(win) {
+    const columns = this.engine.getTopLevelColumnElements(win);
+    if (columns.length < 2) return null;
+    const left = this.engine.getColumnElement(win, "left");
+    const right = this.engine.getColumnElement(win, "right");
+    if (!left && !right) return null;
+    const entry = (element) => element && columns.includes(element) ? { element, flexGrow: this.getColumnFlexGrow(win, element) } : null;
+    const leftEntry = entry(left);
+    const rightEntry = entry(right);
+    const sideColumns = new Set(
+      [leftEntry?.element, rightEntry?.element].filter(
+        (element) => Boolean(element)
+      )
+    );
+    const center = columns.filter((column) => !sideColumns.has(column)).map((element) => ({
+      element,
+      flexGrow: this.getColumnFlexGrow(win, element)
+    }));
+    return { left: leftEntry, center, right: rightEntry };
+  }
+  restoreSidebarFlexSnapshot(snapshot) {
+    if (snapshot.left) this.setColumnFlexGrow(snapshot.left.element, snapshot.left.flexGrow);
+    snapshot.center.forEach((entry) => this.setColumnFlexGrow(entry.element, entry.flexGrow));
+    if (snapshot.right) this.setColumnFlexGrow(snapshot.right.element, snapshot.right.flexGrow);
+  }
+  /** Hide one side while assigning its released weight to content only. */
+  preserveOtherSidebarWidth(snapshot, hiddenSide) {
+    const hiddenEntry = hiddenSide === "left" ? snapshot.left : snapshot.right;
+    const centerWeight = snapshot.center.reduce((sum, entry) => sum + entry.flexGrow, 0);
+    if (!hiddenEntry || centerWeight <= 0) return;
+    const scale = (centerWeight + hiddenEntry.flexGrow) / centerWeight;
+    snapshot.center.forEach((entry) => {
+      this.setColumnFlexGrow(entry.element, entry.flexGrow * scale);
+    });
+    const otherEntry = hiddenSide === "left" ? snapshot.right : snapshot.left;
+    if (otherEntry) this.setColumnFlexGrow(otherEntry.element, otherEntry.flexGrow);
+  }
+  applyDefaultColumnSizingIfNeeded(win, force = false) {
+    const layout = this.getLayoutForWindow(win);
+    if (!force && layout && this.hasSavedLayoutDimensions(layout.workspace?.layout)) return;
+    this.applyDefaultColumnSizing(
+      win,
+      this.isSideVisibleForWindow(win, "left"),
+      this.isSideVisibleForWindow(win, "right")
+    );
   }
   hasSavedLayoutDimensions(node) {
     if (!node || !Array.isArray(node.children)) return false;
@@ -8833,6 +8940,7 @@ var PopoutActivityBarManager = class {
     }
     if (nextVisible && layout) {
       await this.rebuildMissingSidebars(win, layout);
+      this.applyDefaultColumnSizingIfNeeded(win, true);
     }
     this.renderWindow(win);
   }
@@ -8841,6 +8949,7 @@ var PopoutActivityBarManager = class {
     const isHidden = this.engine.isColumnHidden(win, side);
     const layout = this.getLayoutForWindow(win);
     if (isHidden) {
+      const savedFlex = this.sidebarFlexSnapshots.get(win);
       const columnEl = this.engine.getColumnElement(win, side);
       if (!columnEl) {
         await this.openFallbackViewForSide(win, side);
@@ -8848,6 +8957,12 @@ var PopoutActivityBarManager = class {
         this.engine.showColumn(win, side);
         this.markColumnAutoHideBlocked(win, side, 3e3);
         await this.ensureColumnViewsRendered(win, columnEl);
+      }
+      if (savedFlex) {
+        this.restoreSidebarFlexSnapshot(savedFlex);
+        this.sidebarFlexSnapshots.delete(win);
+      } else {
+        this.applyDefaultColumnSizingIfNeeded(win);
       }
       if (layout) {
         if (!layout.hidden) layout.hidden = {};
@@ -8859,7 +8974,14 @@ var PopoutActivityBarManager = class {
         new import_obsidian7.Notice(t("activityBar.cannotHideLastPane"));
         return;
       }
+      const snapshot = this.captureSidebarFlexSnapshot(win);
+      if (snapshot) this.sidebarFlexSnapshots.set(win, snapshot);
       this.engine.hideColumn(win, side);
+      if (snapshot) {
+        this.preserveOtherSidebarWidth(snapshot, side);
+      } else {
+        this.applyDefaultColumnSizingIfNeeded(win);
+      }
       if (layout) {
         if (!layout.hidden) layout.hidden = {};
         layout.hidden[side === "left" ? "leftSidebar" : "rightSidebar"] = true;
@@ -8996,12 +9118,13 @@ function routeGetLeaf(state, newLeaf) {
   if (newLeaf === "window") {
     return null;
   }
+  const isNewContentLeafRequested = newLeaf === true || newLeaf === "tab" || newLeaf === "split";
+  if (isNewContentLeafRequested) {
+    const centerLeaf = newLeaf === "split" ? engine.getCenterLeafSync(activeWindow2) : engine.getCenterLeafSync(activeWindow2, newLeaf);
+    return newLeaf === "split" ? splitCenterLeaf(state.workspace, centerLeaf) : centerLeaf;
+  }
   const activeLeaf = engine.getActiveLeafInWindow(activeWindow2);
   if (activeLeaf && engine.isLeafInSideColumn(activeWindow2, activeLeaf)) {
-    if (newLeaf === "split") {
-      const centerLeaf = engine.getCenterLeafSync(activeWindow2);
-      return splitCenterLeaf(state.workspace, centerLeaf);
-    }
     return engine.getCenterLeafSync(activeWindow2, newLeaf);
   }
   if (!activeLeaf || getWindowOfLeaf(activeLeaf) !== activeWindow2) {
@@ -9520,10 +9643,13 @@ var WindowSpacesPlugin = class extends import_obsidian8.Plugin {
     );
     this.registerEvent(
       this.app.workspace.on("active-leaf-change", (leaf) => {
+        const leafWindow = leaf ? getWindowOfLeaf(leaf) : null;
+        if (leaf && leafWindow && isPopoutWindow(leafWindow)) {
+          this.popoutLayout.rememberActiveContentPane(leafWindow, leaf);
+        }
         if (this.manager?.isRestoringLayout) return;
         this.manager.checkAndDebouncedAutoSaveAll();
         this.activityBars.updateActiveStatesAll();
-        const leafWindow = leaf ? getWindowOfLeaf(leaf) : null;
         if (leaf && leafWindow && isPopoutWindow(leafWindow)) {
           this.manager.scheduleViewRenderAfterActivation(leaf, leafWindow);
         }

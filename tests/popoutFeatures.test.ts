@@ -238,6 +238,91 @@ describe("popoutLayout helpers", () => {
     const leaf = { containerEl: leafContainer, view: { containerEl: leafContainer } } as any;
     expect(getPaneContainerElement(leaf)).toBe(tabs);
   });
+
+  test("remembers the last active content pane after focus moves to a sidebar", () => {
+    const firstTabs = { children: [] as any[] } as any;
+    const secondTabs = { children: [] as any[] } as any;
+    const sidebarTabs = { children: [] as any[] } as any;
+    const makeLeaf = (parent: any, type: string) => ({
+      parent,
+      containerEl: document.createElement("div"),
+      getViewState: () => ({ type }),
+    });
+    const firstLeaf = makeLeaf(firstTabs, "markdown");
+    const secondLeaf = makeLeaf(secondTabs, "markdown");
+    const sidebarLeaf = makeLeaf(sidebarTabs, "file-explorer");
+    firstTabs.children.push(firstLeaf);
+    secondTabs.children.push(secondLeaf);
+    sidebarTabs.children.push(sidebarLeaf);
+
+    const workspace = {
+      activeLeaf: sidebarLeaf,
+      getMostRecentLeaf: () => sidebarLeaf,
+      iterateAllLeaves: (callback: (leaf: any) => void) => {
+        callback(firstLeaf);
+        callback(secondLeaf);
+        callback(sidebarLeaf);
+      },
+      createLeafInParent: vi.fn().mockImplementation((parent: any, index: number) => {
+        const leaf = makeLeaf(parent, "empty");
+        parent.children.splice(index, 0, leaf);
+        return leaf;
+      }),
+    } as any;
+    const engine = new PopoutLayoutEngine({ workspace } as any);
+    const firstPane = { tabs: firstTabs, left: 0, width: 400, center: 200 };
+    const secondPane = { tabs: secondTabs, left: 400, width: 400, center: 600 };
+    vi.spyOn(engine, "getCenterPanes").mockReturnValue([firstPane, secondPane]);
+
+    engine.rememberActiveContentPane(window, secondLeaf);
+    const created = engine.getCenterLeafSync(window, "tab");
+
+    expect(created.parent).toBe(secondTabs);
+    expect(workspace.createLeafInParent).toHaveBeenCalledWith(secondTabs, 1);
+  });
+
+  test("falls back to a current center pane when the remembered pane was removed", () => {
+    const firstTabs = { children: [] as any[] } as any;
+    const secondTabs = { children: [] as any[] } as any;
+    const firstLeaf = {
+      parent: firstTabs,
+      containerEl: document.createElement("div"),
+      getViewState: () => ({ type: "markdown" }),
+    } as any;
+    const secondLeaf = {
+      parent: secondTabs,
+      containerEl: document.createElement("div"),
+      getViewState: () => ({ type: "markdown" }),
+    } as any;
+    firstTabs.children.push(firstLeaf);
+    secondTabs.children.push(secondLeaf);
+
+    const workspace = {
+      activeLeaf: secondLeaf,
+      getMostRecentLeaf: () => secondLeaf,
+      iterateAllLeaves: (callback: (leaf: any) => void) => callback(firstLeaf),
+      createLeafInParent: vi.fn().mockImplementation((parent: any, index: number) => {
+        const leaf = {
+          parent,
+          containerEl: document.createElement("div"),
+          getViewState: () => ({ type: "empty" }),
+        } as any;
+        parent.children.splice(index, 0, leaf);
+        return leaf;
+      }),
+    } as any;
+    const engine = new PopoutLayoutEngine({ workspace } as any);
+    const firstPane = { tabs: firstTabs, left: 0, width: 400, center: 200 };
+    const secondPane = { tabs: secondTabs, left: 400, width: 400, center: 600 };
+    const centerPanes = vi.spyOn(engine, "getCenterPanes").mockReturnValue([firstPane, secondPane]);
+
+    engine.rememberActiveContentPane(window, secondLeaf);
+    centerPanes.mockReturnValue([firstPane]);
+    const created = engine.getCenterLeafSync(window, "tab");
+
+    expect(created.parent).toBe(firstTabs);
+    expect(workspace.createLeafInParent).toHaveBeenCalledWith(firstTabs, 1);
+  });
 });
 
 describe("PopoutLayoutEngine hide/show + persistence", () => {
@@ -604,6 +689,53 @@ describe("WorkspaceInterceptor", () => {
       expect(leaf).toBe(splitResult);
       expect(engine.getCenterLeafSync).toHaveBeenCalledWith(popoutWin);
       expect(createLeafBySplit).toHaveBeenCalledWith(centerLeaf);
+      expect(originalGetLeaf).not.toHaveBeenCalled();
+    } finally {
+      interceptor.uninstall();
+      delete (globalThis as any).activeWindow;
+    }
+  });
+
+  test("routes getLeaf('split') from a content pane through the remembered center engine", () => {
+    const popoutWin = {
+      document: {
+        body: { classList: { contains: (cls: string) => cls === "is-popout-window" } },
+        hasFocus: () => true,
+      },
+    } as unknown as Window;
+
+    const contentLeaf = { id: "content-editor-leaf", getViewState: () => ({ type: "markdown" }) } as any;
+    const splitResult = { id: "content-split-leaf" } as any;
+    const originalGetLeaf = vi.fn().mockReturnValue("native-split-leaf");
+    const createLeafBySplit = vi.fn().mockReturnValue(splitResult);
+    const app = {
+      workspace: {
+        getLeftLeaf: vi.fn(),
+        getRightLeaf: vi.fn(),
+        getLeaf: originalGetLeaf,
+        createLeafBySplit,
+        revealLeaf: vi.fn(),
+        setActiveLeaf: vi.fn(),
+      },
+    } as any;
+
+    const engine = {
+      getActiveLeafInWindow: vi.fn().mockReturnValue(contentLeaf),
+      isLeafInSideColumn: vi.fn().mockReturnValue(false),
+      getCenterLeafSync: vi.fn().mockReturnValue(contentLeaf),
+      openSideLeafSync: vi.fn(),
+    } as any;
+
+    const interceptor = new WorkspaceInterceptor(app, engine);
+    interceptor.isManagedWindow = () => true;
+    interceptor.install();
+    (globalThis as any).activeWindow = popoutWin;
+
+    try {
+      const leaf = app.workspace.getLeaf("split");
+      expect(leaf).toBe(splitResult);
+      expect(engine.getCenterLeafSync).toHaveBeenCalledWith(popoutWin);
+      expect(createLeafBySplit).toHaveBeenCalledWith(contentLeaf);
       expect(originalGetLeaf).not.toHaveBeenCalled();
     } finally {
       interceptor.uninstall();
@@ -1075,16 +1207,44 @@ describe("PopoutActivityBarManager toggle behavior", () => {
     centerColEl.style.flexGrow = "60";
     rightColEl.style.flexGrow = "20";
 
-    // flex-grow 語意下，display:none 的欄位不參與 flex 佈局，剩餘欄位依
-    // 權重自動重新分配填滿（不需手動 rebalance），因此權重保持不變。
+    // 隱藏側欄釋放的權重只轉給 content，保留另一側 sidebar 的寬度。
     await (manager as any).toggleColumn(win, "right");
     expect(rightColEl.style.display).toBe("none");
     expect(leftColEl.style.flexGrow).toBe("20");
-    expect(centerColEl.style.flexGrow).toBe("60");
+    expect(centerColEl.style.flexGrow).toBe("80");
 
     await (manager as any).toggleColumn(win, "right");
     expect(rightColEl.style.display).toBe("");
     expect(rightColEl.style.flexGrow).toBe("20");
+  });
+
+  test("initial dual activity bars use 25/50/25 column weights", () => {
+    const { manager, win, leftColEl, centerColEl, rightColEl } = buildManager();
+
+    (manager as any).applyDefaultColumnSizing(win, true, true);
+
+    expect(leftColEl.style.flexGrow).toBe("25");
+    expect(centerColEl.style.flexGrow).toBe("50");
+    expect(rightColEl.style.flexGrow).toBe("25");
+  });
+
+  test("hiding one sidebar transfers only its weight to content and restores it on show", async () => {
+    const { manager, win, leftColEl, centerColEl, rightColEl } = buildManager();
+    leftColEl.style.flexGrow = "25";
+    centerColEl.style.flexGrow = "50";
+    rightColEl.style.flexGrow = "25";
+
+    await (manager as any).toggleSideSidebar(win, "right");
+
+    expect(leftColEl.style.flexGrow).toBe("25");
+    expect(centerColEl.style.flexGrow).toBe("75");
+    expect(rightColEl.style.flexGrow).toBe("25");
+
+    await (manager as any).toggleSideSidebar(win, "right");
+
+    expect(leftColEl.style.flexGrow).toBe("25");
+    expect(centerColEl.style.flexGrow).toBe("50");
+    expect(rightColEl.style.flexGrow).toBe("25");
   });
 
   test("restore reapplies saved dimensions as flex-grow weights to top-level and nested splits", () => {

@@ -615,6 +615,56 @@ describe("layout integrity guard", () => {
     teardown(env);
   });
 
+  test("does not rebuild missing sidebars while a Space restore is still materializing views", async () => {
+    const env = buildEnv();
+    vi.spyOn(env.manager as any, "getLayoutForWindow").mockReturnValue({
+      activityBars: {
+        left: { show: true },
+        right: { show: true },
+      },
+      workspace: { layout: { type: "window", children: [] } },
+    });
+    const rebuildSpy = vi
+      .spyOn(env.manager as any, "rebuildMissingSidebars")
+      .mockResolvedValue(true);
+    (env.manager as any).plugin.manager = { isRestoringLayout: true };
+
+    await (env.manager as any).ensureLayoutColumns(window);
+
+    expect(rebuildSpy).not.toHaveBeenCalled();
+    teardown(env);
+  });
+
+  test("does not rebuild a marked sidebar when its current view is not the default view", async () => {
+    const env = buildEnv();
+    const { leftCol, rightCol } = buildThreeColumns(env);
+    leftCol.classList.add("window-spaces-sidebar-column", "mod-sidedock", "mod-left-split");
+    rightCol.classList.add("window-spaces-sidebar-column", "mod-sidedock", "mod-right-split");
+
+    vi.spyOn(env.manager as any, "getLayoutForWindow").mockReturnValue({
+      activityBars: {
+        left: {
+          show: true,
+          items: [{ viewType: "folder-spaces-explorer", side: "left" }],
+        },
+        right: {
+          show: true,
+          items: [{ viewType: "backlink", side: "right" }],
+        },
+      },
+      workspace: { layout: { type: "window", children: [] } },
+    });
+    const rebuildSpy = vi.fn().mockResolvedValue(undefined);
+    (env.manager as any).plugin.manager = {
+      rebuildPopoutLayoutWithSidebars: rebuildSpy,
+    };
+
+    await (env.manager as any).ensureLayoutColumns(window);
+
+    expect(rebuildSpy).not.toHaveBeenCalled();
+    teardown(env);
+  });
+
   test("toggleView shows a hidden sidebar after opening its view", async () => {
     const env = buildEnv();
     const { leftCol } = buildThreeColumns(env);

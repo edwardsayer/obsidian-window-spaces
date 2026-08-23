@@ -26,6 +26,17 @@ interface WindowBars {
   columnButtons: { left: HTMLButtonElement; right: HTMLButtonElement };
 }
 
+interface ColumnFlexEntry {
+  element: HTMLElement;
+  flexGrow: number;
+}
+
+interface SidebarFlexSnapshot {
+  left: ColumnFlexEntry | null;
+  center: ColumnFlexEntry[];
+  right: ColumnFlexEntry | null;
+}
+
 /**
  * Popout Activity Bar 控制器。
  *
@@ -45,6 +56,8 @@ export class PopoutActivityBarManager {
   private initializingWindows = new Set<Window>();
   private sidebarHintsByWindow = new WeakMap<Window, SidebarSides>();
   private columnEnsurePromises = new WeakMap<Window, Promise<void>>();
+  /** Preserve live column weights while one sidebar is temporarily hidden. */
+  private sidebarFlexSnapshots = new WeakMap<Window, SidebarFlexSnapshot>();
 
   constructor(plugin: { app: App; settings: WindowSettings; saveSettings?: () => Promise<void> }, engine: PopoutLayoutEngine) {
     this.app = plugin.app;
@@ -145,7 +158,10 @@ export class PopoutActivityBarManager {
       // a second copy of the sidebar; the rebuild's final render will run the
       // normal column reconciliation against the completed tree.
       const manager = this.plugin as unknown as {
-        manager?: { isRebuildingPopoutLayout?: boolean };
+        manager?: {
+          isRebuildingPopoutLayout?: boolean;
+          isRestoringLayout?: boolean;
+        };
       };
       if (manager.manager?.isRebuildingPopoutLayout) return;
 
@@ -161,7 +177,14 @@ export class PopoutActivityBarManager {
       // createLeafBySplit would anchor a missing sidebar inside the first
       // content row. Reuse the target-only tree rebuild instead so the
       // original nested content split remains one content column.
-      if (layout.activityBars && (leftVisible || rightVisible)) {
+      // During restore, non-editor/sidebar views are still being materialized.
+      // A temporary empty endpoint must not be mistaken for a missing sidebar;
+      // the post-restore integrity pass will reconcile the completed tree.
+      if (
+        !manager.manager?.isRestoringLayout &&
+        layout.activityBars &&
+        (leftVisible || rightVisible)
+      ) {
         await this.rebuildMissingSidebars(win, layout);
       }
 
@@ -295,16 +318,22 @@ export class PopoutActivityBarManager {
     const leftView = leftShow ? this.getItemsForWindowSide(win, "left")[0]?.viewType : undefined;
     const rightView = rightShow ? this.getItemsForWindowSide(win, "right")[0]?.viewType : undefined;
 
-    // 「該側 sidebar 欄位是否已存在」不以 getColumnElement 判斷（它受 sidebar 標記
-    // 影響：disable 後欄位保留為 content 時會誤判為缺失），改看欄位容器最外欄
-    // 是否已含該側預設 view——若 disable 保留的欄位仍在，re-enable 就不重建。
+    // 「該側 sidebar 欄位是否已存在」優先看側欄標記；若 layout-change 尚未
+    // 完成標記同步，再以該側任一已配置 view 作為 fallback。不能只檢查第一個
+    // default view：使用者切換到同一 Activity Bar 的其他 view 後，Save 觸發
+    // renderWindow 不應把現有 sidebar 誤判成缺失並重建整棵 layout。
     const topCols = this.engine.getTopLevelColumnElements(win);
     const last = topCols.length - 1;
-    const leftMissing =
-      leftShow && !(topCols[0] && this.columnContainsViewType(topCols[0], leftView));
-    const rightMissing =
-      rightShow &&
-      !(topCols[last] && this.columnContainsViewType(topCols[last], rightView));
+    const leftPresent = topCols[0] && (
+      this.isMarkedSidebarColumn(topCols[0], "left") ||
+      this.columnContainsAnyViewType(topCols[0], this.getItemsForWindowSide(win, "left").map((item) => item.viewType))
+    );
+    const rightPresent = topCols[last] && (
+      this.isMarkedSidebarColumn(topCols[last], "right") ||
+      this.columnContainsAnyViewType(topCols[last], this.getItemsForWindowSide(win, "right").map((item) => item.viewType))
+    );
+    const leftMissing = leftShow && !leftPresent;
+    const rightMissing = rightShow && !rightPresent;
     if (!leftMissing && !rightMissing) return false;
 
     const manager = (this.plugin as unknown as {
@@ -338,6 +367,19 @@ export class PopoutActivityBarManager {
       .some((el) => el.getAttribute("data-type") === viewType);
   }
 
+  /** 欄位內是否包含該 Activity Bar 已配置的任一 view。 */
+  private columnContainsAnyViewType(colEl: HTMLElement | undefined, viewTypes: string[]): boolean {
+    return viewTypes.some((viewType) => this.columnContainsViewType(colEl, viewType));
+  }
+
+  /** 判斷欄位是否已被同步標記為指定側的 sidebar。 */
+  private isMarkedSidebarColumn(colEl: HTMLElement | undefined, side: PopoutSide): boolean {
+    if (!colEl) return false;
+    return colEl.classList.contains(
+      side === "left" ? "mod-left-split" : "mod-right-split"
+    );
+  }
+
   private async waitForLayoutFrame(win: Window): Promise<void> {
     const raf = win.requestAnimationFrame?.bind(win);
     if (raf) {
@@ -350,30 +392,111 @@ export class PopoutActivityBarManager {
 
   private applyDefaultColumnSizing(win: Window, leftVisible: boolean, rightVisible: boolean): void {
     const columns = this.engine.getTopLevelColumnElements(win);
-    // flex-grow 權重語意（與 Obsidian 原生 setDimension 一致）：容器縮放或
-    // 側欄收合（display:none）時剩餘欄位自動重新分配，不需 rebalance。
+    // flex-grow 權重語意（與 Obsidian 原生 setDimension 一致）：容器縮放時
+    // 依權重分配可見欄位；側欄收合時由 toggleSideSidebar 將釋放的權重只交給 content。
     const weights = leftVisible && rightVisible
-      ? [20, 60, 20]
+      ? [25, 50, 25]
       : leftVisible
-        ? [24, 76]
+        ? [25, 75]
         : rightVisible
-          ? [76, 24]
+          ? [75, 25]
           : [100];
 
     columns.forEach((column, index) => {
       const weight = weights[index];
       if (weight === undefined) return;
-      const customEl = column as unknown as {
-        setCssProps?: (props: Record<string, string>) => void;
-      };
-      const flexGrow = String(weight);
-      if (typeof customEl.setCssProps === "function") {
-        // setCssProps 以 setProperty(key, value) 套用，key 需為 kebab-case
-        customEl.setCssProps({ "flex-grow": flexGrow });
-      } else {
-        column.style.setProperty("flex-grow", flexGrow);
-      }
+      this.setColumnFlexGrow(column, weight);
     });
+  }
+
+  private setColumnFlexGrow(column: HTMLElement, flexGrow: number): void {
+    if (!Number.isFinite(flexGrow) || flexGrow <= 0) return;
+    const customEl = column as unknown as {
+      setCssProps?: (props: Record<string, string>) => void;
+    };
+    const value = String(flexGrow);
+    if (typeof customEl.setCssProps === "function") {
+      // setCssProps 以 setProperty(key, value) 套用，key 需為 kebab-case
+      customEl.setCssProps({ "flex-grow": value });
+    } else {
+      column.style.setProperty("flex-grow", value);
+    }
+  }
+
+  private getColumnFlexGrow(win: Window, column: HTMLElement): number {
+    const inline = Number(column.style.flexGrow);
+    if (Number.isFinite(inline) && inline > 0) return inline;
+    try {
+      const computed = Number(win.getComputedStyle(column).flexGrow);
+      if (Number.isFinite(computed) && computed > 0) return computed;
+    } catch {
+      // Fall back to a neutral weight in test/non-DOM environments.
+    }
+    return 1;
+  }
+
+  private captureSidebarFlexSnapshot(win: Window): SidebarFlexSnapshot | null {
+    const columns = this.engine.getTopLevelColumnElements(win);
+    if (columns.length < 2) return null;
+
+    const left = this.engine.getColumnElement(win, "left");
+    const right = this.engine.getColumnElement(win, "right");
+    if (!left && !right) return null;
+
+    const entry = (element: HTMLElement | null): ColumnFlexEntry | null =>
+      element && columns.includes(element)
+        ? { element, flexGrow: this.getColumnFlexGrow(win, element) }
+        : null;
+
+    const leftEntry = entry(left);
+    const rightEntry = entry(right);
+    const sideColumns = new Set(
+      [leftEntry?.element, rightEntry?.element].filter(
+        (element): element is HTMLElement => Boolean(element)
+      )
+    );
+    const center = columns
+      .filter((column) => !sideColumns.has(column))
+      .map((element) => ({
+        element,
+        flexGrow: this.getColumnFlexGrow(win, element),
+      }));
+
+    return { left: leftEntry, center, right: rightEntry };
+  }
+
+  private restoreSidebarFlexSnapshot(snapshot: SidebarFlexSnapshot): void {
+    if (snapshot.left) this.setColumnFlexGrow(snapshot.left.element, snapshot.left.flexGrow);
+    snapshot.center.forEach((entry) => this.setColumnFlexGrow(entry.element, entry.flexGrow));
+    if (snapshot.right) this.setColumnFlexGrow(snapshot.right.element, snapshot.right.flexGrow);
+  }
+
+  /** Hide one side while assigning its released weight to content only. */
+  private preserveOtherSidebarWidth(
+    snapshot: SidebarFlexSnapshot,
+    hiddenSide: PopoutSide
+  ): void {
+    const hiddenEntry = hiddenSide === "left" ? snapshot.left : snapshot.right;
+    const centerWeight = snapshot.center.reduce((sum, entry) => sum + entry.flexGrow, 0);
+    if (!hiddenEntry || centerWeight <= 0) return;
+
+    const scale = (centerWeight + hiddenEntry.flexGrow) / centerWeight;
+    snapshot.center.forEach((entry) => {
+      this.setColumnFlexGrow(entry.element, entry.flexGrow * scale);
+    });
+
+    const otherEntry = hiddenSide === "left" ? snapshot.right : snapshot.left;
+    if (otherEntry) this.setColumnFlexGrow(otherEntry.element, otherEntry.flexGrow);
+  }
+
+  private applyDefaultColumnSizingIfNeeded(win: Window, force = false): void {
+    const layout = this.getLayoutForWindow(win);
+    if (!force && layout && this.hasSavedLayoutDimensions(layout.workspace?.layout)) return;
+    this.applyDefaultColumnSizing(
+      win,
+      this.isSideVisibleForWindow(win, "left"),
+      this.isSideVisibleForWindow(win, "right")
+    );
   }
 
   private hasSavedLayoutDimensions(node: any): boolean {
@@ -1479,6 +1602,12 @@ export class PopoutActivityBarManager {
     // sidebar tabs）——取代 createLeafBySplit 對 split 欄位建錯層級的問題。
     if (nextVisible && layout) {
       await this.rebuildMissingSidebars(win, layout);
+      // Target-only rebuilds keep the final column count unchanged from the
+      // second render onward, so ensureLayoutColumns cannot infer that this
+      // was the first Activity Bar enable. Apply the initial 25/50/25 sizing
+      // explicitly so a newly inserted sidebar does not inherit an equal 1/3
+      // share from Obsidian's temporary tree.
+      this.applyDefaultColumnSizingIfNeeded(win, true);
     }
 
     this.renderWindow(win);
@@ -1490,6 +1619,7 @@ export class PopoutActivityBarManager {
     const layout = this.getLayoutForWindow(win);
 
     if (isHidden) {
+      const savedFlex = this.sidebarFlexSnapshots.get(win);
       // 原本隱藏 -> 切換為顯示
       const columnEl = this.engine.getColumnElement(win, side);
       if (!columnEl) {
@@ -1498,6 +1628,13 @@ export class PopoutActivityBarManager {
         this.engine.showColumn(win, side);
         this.markColumnAutoHideBlocked(win, side, 3000);
         await this.ensureColumnViewsRendered(win, columnEl);
+      }
+
+      if (savedFlex) {
+        this.restoreSidebarFlexSnapshot(savedFlex);
+        this.sidebarFlexSnapshots.delete(win);
+      } else {
+        this.applyDefaultColumnSizingIfNeeded(win);
       }
 
       if (layout) {
@@ -1511,7 +1648,14 @@ export class PopoutActivityBarManager {
         new Notice(t("activityBar.cannotHideLastPane"));
         return;
       }
+      const snapshot = this.captureSidebarFlexSnapshot(win);
+      if (snapshot) this.sidebarFlexSnapshots.set(win, snapshot);
       this.engine.hideColumn(win, side);
+      if (snapshot) {
+        this.preserveOtherSidebarWidth(snapshot, side);
+      } else {
+        this.applyDefaultColumnSizingIfNeeded(win);
+      }
 
       if (layout) {
         if (!layout.hidden) layout.hidden = {};

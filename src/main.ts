@@ -494,13 +494,17 @@ export default class WindowSpacesPlugin extends Plugin {
 
     this.registerEvent(
       this.app.workspace.on("active-leaf-change", (leaf: WorkspaceLeaf | null) => {
+        const leafWindow = leaf ? getWindowOfLeaf(leaf) : null;
+        if (leaf && leafWindow && isPopoutWindow(leafWindow)) {
+          this.popoutLayout.rememberActiveContentPane(leafWindow, leaf);
+        }
+
         if (this.manager?.isRestoringLayout) return;
         this.manager.checkAndDebouncedAutoSaveAll();
         this.activityBars.updateActiveStatesAll();
 
         // 等待 mousedown/mouseup/click 完成後，才檢查剛切換到的 Popout tab
         // 是否仍是空 DOM；主視窗不走此路徑，避免 File Explorer 單擊失效。
-        const leafWindow = leaf ? getWindowOfLeaf(leaf) : null;
         if (leaf && leafWindow && isPopoutWindow(leafWindow)) {
           this.manager.scheduleViewRenderAfterActivation(leaf, leafWindow);
         }
