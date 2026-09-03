@@ -323,6 +323,100 @@ describe("popoutLayout helpers", () => {
     expect(created.parent).toBe(firstTabs);
     expect(workspace.createLeafInParent).toHaveBeenCalledWith(firstTabs, 1);
   });
+
+  test("remembers the last active split independently for left and right sidebars", () => {
+    const rootEl = document.createElement("div");
+    rootEl.classList.add("workspace-split", "mod-root");
+
+    const makeSidebarColumn = (side: "left" | "right") => {
+      const column = document.createElement("div");
+      column.classList.add(
+        "workspace-split",
+        "mod-horizontal",
+        "window-spaces-sidebar-column",
+        side === "left" ? "mod-left-split" : "mod-right-split"
+      );
+      const topTabsEl = document.createElement("div");
+      topTabsEl.classList.add("workspace-tabs");
+      const bottomTabsEl = document.createElement("div");
+      bottomTabsEl.classList.add("workspace-tabs");
+      column.append(topTabsEl, bottomTabsEl);
+      rootEl.appendChild(column);
+      return { column, topTabsEl, bottomTabsEl };
+    };
+
+    const left = makeSidebarColumn("left");
+    const centerTabsEl = document.createElement("div");
+    centerTabsEl.classList.add("workspace-tabs");
+    rootEl.appendChild(centerTabsEl);
+    const right = makeSidebarColumn("right");
+    document.body.appendChild(rootEl);
+
+    const makeTabs = (containerEl: HTMLElement) => ({
+      containerEl,
+      children: [] as any[],
+    });
+    const leftTopTabs = makeTabs(left.topTabsEl);
+    const leftBottomTabs = makeTabs(left.bottomTabsEl);
+    const centerTabs = makeTabs(centerTabsEl);
+    const rightTopTabs = makeTabs(right.topTabsEl);
+    const rightBottomTabs = makeTabs(right.bottomTabsEl);
+    const makeLeaf = (parent: any, containerEl: HTMLElement, type: string) => ({
+      parent,
+      containerEl,
+      view: { containerEl },
+      getViewState: () => ({ type }),
+    });
+    const leftTopLeaf = makeLeaf(leftTopTabs, document.createElement("div"), "empty");
+    const leftBottomLeaf = makeLeaf(leftBottomTabs, document.createElement("div"), "empty");
+    const centerLeaf = makeLeaf(centerTabs, document.createElement("div"), "markdown");
+    const rightTopLeaf = makeLeaf(rightTopTabs, document.createElement("div"), "empty");
+    const rightBottomLeaf = makeLeaf(rightBottomTabs, document.createElement("div"), "empty");
+    left.topTabsEl.appendChild(leftTopLeaf.containerEl);
+    left.bottomTabsEl.appendChild(leftBottomLeaf.containerEl);
+    centerTabsEl.appendChild(centerLeaf.containerEl);
+    right.topTabsEl.appendChild(rightTopLeaf.containerEl);
+    right.bottomTabsEl.appendChild(rightBottomLeaf.containerEl);
+    leftTopTabs.children.push(leftTopLeaf);
+    leftBottomTabs.children.push(leftBottomLeaf);
+    centerTabs.children.push(centerLeaf);
+    rightTopTabs.children.push(rightTopLeaf);
+    rightBottomTabs.children.push(rightBottomLeaf);
+
+    let activeLeaf = centerLeaf;
+    const leaves = [leftTopLeaf, leftBottomLeaf, centerLeaf, rightTopLeaf, rightBottomLeaf];
+    const workspace = {
+      activeLeaf: centerLeaf,
+      getMostRecentLeaf: () => activeLeaf,
+      iterateAllLeaves: (callback: (leaf: any) => void) => leaves.forEach(callback),
+      createLeafInParent: vi.fn().mockImplementation((parent: any, index: number) => {
+        const leaf = makeLeaf(parent, document.createElement("div"), "empty");
+        parent.children.splice(index, 0, leaf);
+        return leaf;
+      }),
+      createLeafBySplit: vi.fn(),
+    } as any;
+    const engine = new PopoutLayoutEngine({ workspace } as any);
+
+    engine.rememberActiveContentPane(window, leftBottomLeaf);
+    engine.rememberActiveContentPane(window, rightBottomLeaf);
+    activeLeaf = centerLeaf;
+
+    const leftCreated = engine.openSideLeafSync(window, "left");
+    const rightCreated = engine.openSideLeafSync(window, "right");
+
+    expect(leftCreated?.parent).toBe(leftBottomTabs);
+    expect(rightCreated?.parent).toBe(rightBottomTabs);
+    expect(workspace.createLeafInParent).toHaveBeenNthCalledWith(1, leftBottomTabs, 1);
+    expect(workspace.createLeafInParent).toHaveBeenNthCalledWith(2, rightBottomTabs, 1);
+
+    // A removed remembered pane falls back to the first surviving pane on that side.
+    left.bottomTabsEl.remove();
+    const fallbackCreated = engine.openSideLeafSync(window, "left");
+    expect(fallbackCreated?.parent).toBe(leftTopTabs);
+
+    document.body.removeChild(rootEl);
+  });
 });
 
 describe("PopoutLayoutEngine hide/show + persistence", () => {
@@ -1228,6 +1322,35 @@ describe("PopoutActivityBarManager toggle behavior", () => {
     expect(rightColEl.style.flexGrow).toBe("25");
   });
 
+  test("refreshes Activity Bar controls without reapplying saved layout dimensions", () => {
+    const { manager, win } = buildManager();
+    const layout = {
+      id: "saved-activity-controls",
+      name: "Saved activity controls",
+      activityBars: {
+        left: { show: true, items: [{ viewType: "file-explorer", side: "left" }] },
+        right: { show: true, items: [{ viewType: "bookmarks", side: "right" }] },
+      },
+      workspace: { layout: { type: "window", children: [] } },
+    };
+    (manager as any).plugin.settings.spaces = [layout];
+    (win as any)._windowSpacesLayoutId = layout.id;
+
+    const renderBar = vi.spyOn(manager as any, "renderBar").mockImplementation(() => {});
+    const updateActiveStates = vi.spyOn(manager, "updateActiveStates").mockImplementation(() => {});
+    const applySavedLayoutDimensions = vi
+      .spyOn(manager as any, "applySavedLayoutDimensions")
+      .mockImplementation(() => {});
+
+    manager.refreshWindowActivityBars(win);
+
+    expect(renderBar).toHaveBeenCalledTimes(2);
+    expect(updateActiveStates).toHaveBeenCalledWith(win);
+    expect(applySavedLayoutDimensions).not.toHaveBeenCalled();
+
+    delete (win as any)._windowSpacesLayoutId;
+  });
+
   test("hiding one sidebar transfers only its weight to content and restores it on show", async () => {
     const { manager, win, leftColEl, centerColEl, rightColEl } = buildManager();
     leftColEl.style.flexGrow = "25";
@@ -1245,6 +1368,94 @@ describe("PopoutActivityBarManager toggle behavior", () => {
     expect(leftColEl.style.flexGrow).toBe("25");
     expect(centerColEl.style.flexGrow).toBe("50");
     expect(rightColEl.style.flexGrow).toBe("25");
+  });
+
+  test("persists pre-hide weights and restores them after a Space reload", async () => {
+    const { manager, win, leftColEl, centerColEl, rightColEl } = buildManager();
+    const spaceLayout = {
+      name: "Reloaded sidebar widths",
+      hidden: {},
+      workspace: { layout: {} },
+    } as any;
+    (manager as any).getLayoutForWindow = vi.fn(() => spaceLayout);
+    leftColEl.style.flexGrow = "25";
+    centerColEl.style.flexGrow = "50";
+    rightColEl.style.flexGrow = "25";
+
+    await (manager as any).toggleSideSidebar(win, "left");
+
+    expect(spaceLayout.hidden.sidebarFlex).toEqual({
+      left: 25,
+      center: [50],
+      right: 25,
+    });
+    expect(centerColEl.style.flexGrow).toBe("75");
+    expect(rightColEl.style.flexGrow).toBe("25");
+
+    // Simulate a newly restored Window: the WeakMap snapshot no longer exists.
+    (manager as any).sidebarFlexSnapshots.delete(win);
+    await (manager as any).toggleSideSidebar(win, "left");
+
+    expect(leftColEl.style.flexGrow).toBe("25");
+    expect(centerColEl.style.flexGrow).toBe("50");
+    expect(rightColEl.style.flexGrow).toBe("25");
+    expect(spaceLayout.hidden.sidebarFlex).toBeUndefined();
+  });
+
+  test("enforces a 200px re-shown sidebar minimum without changing the opposite sidebar", async () => {
+    const { manager, win, leftColEl, centerColEl, rightColEl } = buildManager();
+    const spaceLayout = {
+      name: "Minimum sidebar width",
+      hidden: {
+        leftSidebar: true,
+        sidebarFlex: { left: 5, center: [70], right: 25 },
+      },
+      workspace: { layout: {} },
+    } as any;
+    (manager as any).getLayoutForWindow = vi.fn(() => spaceLayout);
+    leftColEl.style.flexGrow = "5";
+    centerColEl.style.flexGrow = "70";
+    rightColEl.style.flexGrow = "25";
+    (manager as any).sidebarFlexSnapshots.delete(win);
+    (manager as any).engine.hideColumn(win, "left");
+    vi.spyOn(leftColEl, "getBoundingClientRect").mockReturnValue({ width: 100 } as DOMRect);
+
+    await (manager as any).toggleSideSidebar(win, "left");
+
+    // Current flex 5 renders as 100px, so 200px requires flex 10.
+    expect(Number(leftColEl.style.flexGrow)).toBeCloseTo(10, 5);
+    expect(Number(centerColEl.style.flexGrow)).toBeCloseTo(65, 5);
+    expect(rightColEl.style.flexGrow).toBe("25");
+  });
+
+  test("enforces a 200px minimum for a newly appended sidebar after a multi-column content area", () => {
+    const { manager, win, leftColEl, centerColEl, rightColEl } = buildManager();
+    const appendedSidebar = document.createElement("div");
+    appendedSidebar.classList.add("workspace-tabs");
+    document.body.appendChild(appendedSidebar);
+
+    const columns = [leftColEl, centerColEl, rightColEl, appendedSidebar];
+    vi.spyOn(manager.engine, "getTopLevelColumnElements").mockReturnValue(columns);
+    vi.spyOn(manager.engine, "getColumnElement").mockImplementation((_win, side) =>
+      side === "left" ? leftColEl : appendedSidebar
+    );
+
+    leftColEl.style.flexGrow = "25";
+    centerColEl.style.flexGrow = "50";
+    rightColEl.style.flexGrow = "25";
+    appendedSidebar.style.flexGrow = "1";
+    vi.spyOn(appendedSidebar, "getBoundingClientRect").mockReturnValue({ width: 10 } as DOMRect);
+
+    (manager as any).ensureSidebarMinimumWidth(win, "right");
+
+    // The appended right sidebar starts at the neutral flex weight 1. Its
+    // missing width is taken from content columns only; the left sidebar is
+    // unchanged and the right side reaches the 200px-equivalent weight.
+    expect(Number(appendedSidebar.style.flexGrow)).toBeCloseTo(20, 5);
+    expect(leftColEl.style.flexGrow).toBe("25");
+    expect(Number(centerColEl.style.flexGrow) + Number(rightColEl.style.flexGrow)).toBeCloseTo(56, 5);
+
+    appendedSidebar.remove();
   });
 
   test("restore reapplies saved dimensions as flex-grow weights to top-level and nested splits", () => {
@@ -2127,6 +2338,80 @@ describe("2-column layout sidebar inference (legacy / non-standard spaces)", () 
     expect(body.classList.contains("has-space-accents-panel")).toBe(false);
     expect(body.classList.contains("has-space-accents-activity-bar")).toBe(false);
     expect(body.classList.contains("has-window-space-color")).toBe(false);
+  });
+
+  test("refreshWindowActivityBars applies Space decorations without restoring dimensions", () => {
+    const app = { workspace: { iterateAllLeaves: vi.fn() } } as any;
+    const engine = new PopoutLayoutEngine(app);
+    const space = {
+      id: "decorated-space",
+      name: "Decorated",
+      icon: "🚀",
+      color: "#f43f5e",
+      borderInset: 3,
+      showFoldedCorner: true,
+      workspace: { layout: {} },
+    };
+    const settings = {
+      defaultIcon: "square",
+      defaultShowFoldedCorner: false,
+      popoutAccents: { enabled: true, splitter: true, activityBar: true },
+      spaces: [space],
+    } as any;
+    const manager = new PopoutActivityBarManager({ app, settings } as any, engine);
+
+    const createMockEl = (tag = "div") => {
+      const el = document.createElement(tag) as any;
+      el.empty = () => { el.innerHTML = ""; };
+      el.createDiv = (opts?: any) => {
+        const child = createMockEl("div");
+        if (typeof opts === "string") child.className = opts;
+        else if (opts?.cls) child.className = opts.cls;
+        el.appendChild(child);
+        return child;
+      };
+      el.createSpan = (opts?: any) => {
+        const child = createMockEl("span");
+        if (typeof opts === "string") child.className = opts;
+        else if (opts?.cls) child.className = opts.cls;
+        if (opts?.text) child.textContent = opts.text;
+        el.appendChild(child);
+        return child;
+      };
+      return el;
+    };
+
+    const testDoc = document.implementation.createHTMLDocument("Decorated Popout");
+    const testWin = {
+      closed: false,
+      document: testDoc,
+      _windowSpacesLayoutId: "decorated-space",
+    } as unknown as Window;
+    const leftBar = createMockEl();
+    const dragEl = createMockEl();
+    dragEl.className = "window-spaces-activity-drag";
+    leftBar.appendChild(dragEl);
+    const bars = {
+      left: leftBar,
+      right: createMockEl(),
+      spaceIdentity: createMockEl(),
+      viewButtons: new Map(),
+      columnButtons: {
+        left: document.createElement("button"),
+        right: document.createElement("button"),
+      },
+    };
+    (manager as any).barsByWindow.set(testWin, bars);
+    vi.spyOn(manager as any, "renderBar").mockImplementation(() => {});
+    vi.spyOn(manager, "updateActiveStates").mockImplementation(() => {});
+
+    manager.refreshWindowActivityBars(testWin);
+
+    expect(testDoc.body.style.getPropertyValue("--window-space-color")).toBe("#f43f5e");
+    expect(testDoc.body.style.getPropertyValue("--window-space-border-inset")).toBe("3px");
+    expect(testDoc.body.classList.contains("has-window-space-border")).toBe(true);
+    expect(testDoc.body.classList.contains("has-window-space-folded-corner")).toBe(true);
+    expect(bars.spaceIdentity.querySelector(".window-spaces-drag-emoji")?.textContent).toBe("🚀");
   });
 
   test("showVisibilityMenu renders full 4-item menu on space logo and 2-item menu on toggle button", async () => {

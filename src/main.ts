@@ -36,7 +36,7 @@ import { DEFAULT_SPACE_ICON } from "./spaceVisuals";
 const DEFAULT_SETTINGS: WindowSettings = {
   spaces: [],
   autoSave: false,
-  showNotifications: true,
+  showNotifications: false,
   version: "1.0.0",
   showLayoutStatusBar: true,
   layoutStatusBarDefaultApplied: false,
@@ -317,7 +317,9 @@ export default class WindowSpacesPlugin extends Plugin {
       (savedLayout) => {
         void (async () => {
           try {
-            await this.manager.saveLayout(savedLayout);
+            await this.manager.saveLayout(savedLayout, targetWindow, {
+              refreshLivePresentation: true,
+            });
           } catch (error: unknown) {
             const message = error instanceof Error ? error.message : String(error);
             new Notice(`${t("errors.failedToSave")}: ${message}`);

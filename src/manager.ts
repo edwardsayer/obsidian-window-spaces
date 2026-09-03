@@ -226,16 +226,16 @@ export class WindowLayoutManager {
       this.applySavedSplitDimensions(targetWin, rootNode);
     }
 
-    this.setLayoutLabelForWindow(targetWin, layout.name);
+    this.setLayoutLabelForWindow(targetWin, layout.name, false);
     this.syncWindowLeafMarker(targetWin, layout);
     this.refreshLayoutLabels();
 
+    this.plugin.activityBars?.prepareWindowForRestore(targetWin);
     if (layout.hidden) {
       this.applyHiddenStateAfterRestore(targetWin, layout.hidden);
     }
-
     this.layoutWindows.set(layout, targetWin);
-    this.plugin.activityBars?.renderWindow(targetWin);
+    this.plugin.activityBars?.renderWindow(targetWin, { allowDuringRestore: true });
     // 啟動 reconcile 跳過幾何（skipGeometry）：Obsidian 已在關閉時的位置
     // 開啟該 Popout，此時搬移會造成跳動；手動 restore 才套用儲存幾何。
     if (options.skipGeometry !== true) {
@@ -541,7 +541,11 @@ export class WindowLayoutManager {
    * 在指定 Popout 的內容區顯示目前套用的 layout 名稱，
    * 並呼叫 hookPopoutWindowTitle 覆寫視窗標題。
    */
-  setLayoutLabelForWindow(targetWin: Window | null, layoutName: string): void {
+  setLayoutLabelForWindow(
+    targetWin: Window | null,
+    layoutName: string,
+    renderActivityBars = true
+  ): void {
     if (!targetWin || !layoutName?.trim()) return;
 
     this.registerPopoutWindow(targetWin);
@@ -556,7 +560,9 @@ export class WindowLayoutManager {
 
     this.refreshLayoutStatusBar(targetWin);
     this.hookPopoutWindowTitle(targetWin);
-    this.plugin.activityBars?.renderWindow(targetWin);
+    if (renderActivityBars) {
+      this.plugin.activityBars?.renderWindow(targetWin);
+    }
 
     // 延遲再次觸發標題寫入，確保與 Obsidian 異步載入的 View 標題完成同步
     targetWin.setTimeout(() => this.hookPopoutWindowTitle(targetWin), 50);
@@ -1571,6 +1577,12 @@ export class WindowLayoutManager {
   private async saveLayoutDirectFromWindow(targetWin: Window): Promise<void> {
     try {
       const layoutName = this.layoutNames.get(targetWin) || "";
+      // 未命名的新視窗不能直接儲存；先開啟 Space Setting 讓使用者確認名稱與設定。
+      if (!layoutName.trim()) {
+        await this.saveLayoutFromWindow(targetWin);
+        return;
+      }
+
       const existing = this.plugin.settings.spaces.find((l: WindowLayout) => l.name === layoutName);
 
       const layout = await this.captureCurrentLayout(
@@ -1590,7 +1602,9 @@ export class WindowLayoutManager {
         layout.archived = existing.archived;
       }
 
-      await this.saveLayout(layout);
+      await this.saveLayout(layout, targetWin, {
+        refreshLivePresentation: false,
+      });
       if (this.plugin.settings.showNotifications !== false) {
         new Notice(`${t("notifications.layoutSaved")}: ${layout.name}`);
       }
@@ -2111,6 +2125,14 @@ export class WindowLayoutManager {
       // 紀錄該視窗目前隱藏的側欄/分頁群組（Activity Bar 與 Pane 隱藏功能持久化）
       try {
         capturedLayout.hidden = this.plugin.popoutLayout.captureHiddenState(currentWin);
+        const sidebarFlex = this.plugin.activityBars?.captureSidebarFlexState(currentWin) ||
+          existingLayout?.hidden?.sidebarFlex;
+        if (
+          sidebarFlex &&
+          (capturedLayout.hidden.leftSidebar || capturedLayout.hidden.rightSidebar)
+        ) {
+          capturedLayout.hidden.sidebarFlex = sidebarFlex;
+        }
       } catch {
         capturedLayout.hidden = undefined;
       }
@@ -2335,16 +2357,13 @@ export class WindowLayoutManager {
           targetOnlyBuildAttempted = true;
           builtLeaves = await this.rebuildTargetWindowStructure(targetWin, rootNode);
           if (layout.hidden && targetWin) {
-            try {
-              if (layout.hidden.leftSidebar) {
-                this.plugin.popoutLayout.hideColumn(targetWin, "left");
-              }
-              if (layout.hidden.rightSidebar) {
-                this.plugin.popoutLayout.hideColumn(targetWin, "right");
-              }
-            } catch {
-              // Ignore DOM not ready error during early apply
-            }
+            // Establish the Activity Bar's structural sidebar hints first,
+            // then hide synchronously in the same task so the restored layout
+            // is not painted once with both sidebars visible.
+            this.setLayoutLabelForWindow(targetWin, layout.name, false);
+            this.plugin.activityBars?.prepareWindowForRestore(targetWin);
+            this.applyHiddenStateAfterRestore(targetWin, layout.hidden);
+            this.plugin.activityBars?.renderWindow(targetWin, { allowDuringRestore: true });
           }
         }
 
@@ -2445,20 +2464,24 @@ export class WindowLayoutManager {
         }
       }
 
-      this.setLayoutLabelForWindow(targetWin, layout.name);
+      this.setLayoutLabelForWindow(targetWin, layout.name, false);
       // 回寫視窗識別記號：下次重啟可直接核對 leafIdMarker 識別此 space
       this.syncWindowLeafMarker(targetWin, layout);
       this.refreshLayoutLabels();
 
-      // 先套用隱藏的側欄/分頁群組，避免幾何對齊後再縮放側欄觸發橫向位移
-      if (targetWin && layout.hidden) {
-        this.applyHiddenStateAfterRestore(targetWin, layout.hidden);
+      // 先建立 Activity Bar 的 sidebar mapping，再在同一個 task 套用隱藏
+      // 狀態；這樣首次 paint 就是隱藏後的 layout，而不是先閃過完整三欄。
+      if (targetWin) {
+        this.plugin.activityBars?.prepareWindowForRestore(targetWin);
+        if (layout.hidden) {
+          this.applyHiddenStateAfterRestore(targetWin, layout.hidden);
+        }
+        this.plugin.activityBars?.renderWindow(targetWin, { allowDuringRestore: true });
       }
 
       // 5. 調整視窗尺寸與座標，並聚焦視窗
       if (targetWin) {
         this.layoutWindows.set(layout, targetWin);
-        this.plugin.activityBars?.renderWindow(targetWin);
         // 幾何已在 changeLayout 後立即套用；此處僅以差異驗證（force=false）
         // 校正檔案開啟期間可能出現的微幅偏移，避免無謂地移動已就位的視窗。
         this.restoreWindowGeometry(targetWin, layout.windowState, layout.includeGeometry, false);
@@ -2566,7 +2589,11 @@ export class WindowLayoutManager {
   /**
    * 保存新佈局或覆蓋既有佈局
    */
-  async saveLayout(layout: WindowLayout): Promise<void> {
+  async saveLayout(
+    layout: WindowLayout,
+    targetWindow?: Window,
+    options: { refreshLivePresentation?: boolean } = {}
+  ): Promise<void> {
     try {
       const settings = this.plugin.settings;
       if (!settings.spaces) {
@@ -2609,12 +2636,21 @@ export class WindowLayoutManager {
       await this.plugin.saveSettings();
       WindowLayoutsModal.renderAllInstances();
 
-      const sourceWindow = this.getWindowForLayout(layout);
-      this.setLayoutLabelForWindow(sourceWindow, layout.name);
-      if (sourceWindow) {
-        this.plugin.activityBars?.renderWindow(sourceWindow);
-      } else {
-        this.plugin.activityBars?.refreshAll();
+      if (options.refreshLivePresentation === true) {
+        // Prefer the Popout that initiated the save. Space Setting can rename
+        // the Space before this point, so resolving only by the new name may
+        // miss the still-open source window.
+        const sourceWindow = targetWindow &&
+          !targetWindow.closed &&
+          this.isPopoutDocument(targetWindow.document)
+          ? targetWindow
+          : this.getWindowForLayout(layout);
+        this.setLayoutLabelForWindow(sourceWindow, layout.name, false);
+        // Space Setting changes (accent color, border thickness, logo, folded
+        // corner, and Activity Bar view buttons) need to appear immediately.
+        // Refresh only those presentation surfaces; never reapply serialized
+        // dimensions to the live window.
+        this.plugin.activityBars?.refreshWindowActivityBars?.(sourceWindow);
       }
 
       if (this.plugin.settings.showNotifications !== false) {
@@ -4107,6 +4143,7 @@ export class WindowLayoutManager {
     const apply = (): void => {
       try {
         engine.applyHiddenState(targetWin, hidden);
+        this.plugin.activityBars?.applyHiddenSidebarFlexState(targetWin, hidden);
       } catch {
         // Ignore DOM not ready error
       }

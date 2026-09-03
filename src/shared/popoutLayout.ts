@@ -67,6 +67,12 @@ export interface PopoutColumn {
   panes: PopoutPane[];
 }
 
+interface LastActivePanes {
+  center?: WorkspaceParent;
+  left?: WorkspaceParent;
+  right?: WorkspaceParent;
+}
+
 /**
  * 實體側欄映射（由 plugin 同步）。
  *
@@ -95,7 +101,12 @@ export function getWindowOfLeaf(leaf: WorkspaceLeaf | null | undefined): Window 
   if (!leaf) return null;
   const extLeaf = leaf as unknown as ExtendedWorkspaceLeaf;
   const container = extLeaf.containerEl || (leaf.view as { containerEl?: HTMLElement } | null)?.containerEl;
-  return container?.ownerDocument?.defaultView ?? null;
+  return (
+    container?.ownerDocument?.defaultView ??
+    ((extLeaf as unknown as { getContainer?: () => { win?: Window } }).getContainer?.()?.win) ??
+    ((extLeaf as unknown as { win?: Window }).win) ??
+    null
+  );
 }
 
 /** 測量 WorkspaceTabs 容器本身的 DOMRect（背景 tab 寬高為 0，需測 tabs 容器）。 */
@@ -296,7 +307,7 @@ function isSidebarColumnElement(columnEl: HTMLElement | null | undefined): boole
 export class PopoutLayoutEngine {
   private app: App;
   private sidebarSidesByWindow = new WeakMap<Window, SidebarSides>();
-  private lastActiveContentPanesByWindow = new WeakMap<Window, WorkspaceParent>();
+  private lastActivePanesByWindow = new WeakMap<Window, LastActivePanes>();
 
   constructor(app: App) {
     this.app = app;
@@ -316,12 +327,10 @@ export class PopoutLayoutEngine {
   }
 
   /**
-   * 記錄 Popout 中最後 active 的 content-area tab group。
-   *
-   * 側欄 view 被點選後，Obsidian 的 active leaf 會暫時落在 sidebar；
-   * 此記錄讓後續 getLeaf("tab"/"split") 仍能回到使用者最後操作的 content group。
-   * 只接受目前仍存在且未被標記為 sidebar 的 tab group，避免把側欄或已拆除的
-   * parent 留在記憶中。
+   * 記錄 Popout 中最後 active 的 pane，content / left sidebar / right sidebar
+   * 各自維護一份。側欄 view 被點選後，Obsidian 的 active leaf 會暫時落在
+   * sidebar；此記錄讓後續新 tab 或 view 回到該區域最後操作的 split，而不會
+   * 每次都落到第一個 pane。
    */
   rememberActiveContentPane(win: Window, leaf: WorkspaceLeaf | null | undefined): void {
     if (!win || !leaf || getWindowOfLeaf(leaf) !== win) return;
@@ -329,9 +338,18 @@ export class PopoutLayoutEngine {
     const tabs = (leaf as unknown as ExtendedWorkspaceLeaf).parent;
     if (!tabs) return;
 
+    const remembered = this.lastActivePanesByWindow.get(win) || {};
+    const side = this.getSidebarSideForLeaf(win, leaf);
+    if (side) {
+      remembered[side] = tabs;
+      this.lastActivePanesByWindow.set(win, remembered);
+      return;
+    }
+
     const isCurrentCenterPane = this.getCenterPanes(win).some((pane) => pane.tabs === tabs);
     if (isCurrentCenterPane) {
-      this.lastActiveContentPanesByWindow.set(win, tabs);
+      remembered.center = tabs;
+      this.lastActivePanesByWindow.set(win, remembered);
     }
   }
 
@@ -460,7 +478,7 @@ export class PopoutLayoutEngine {
     const columnEl = this.getColumnElement(win, side);
 
     if (columnEl) {
-      const tabs = this.getSidebarTabsInColumn(win, columnEl);
+      const tabs = this.getSidebarTabsInColumn(win, side, columnEl);
       if (tabs) {
         if (viewType) {
           const existingInSidebar = findLeafInTabs(tabs, viewType);
@@ -525,13 +543,23 @@ export class PopoutLayoutEngine {
 
   /**
    * 在指定側欄欄位（頂層 column 元素）內解析目標 tabs 群組：
-   * 優先取該欄位中 active leaf 所在的 pane，否則第一個 pane 的 tabs。
+   * 優先取該欄位中 active leaf 所在的 pane，再取該側最後記憶的 pane，
+   * 最後才回退到第一個 pane 的 tabs。
    */
-  private getSidebarTabsInColumn(win: Window, columnEl: HTMLElement): WorkspaceParent | null {
+  private getSidebarTabsInColumn(
+    win: Window,
+    side: PopoutSide,
+    columnEl: HTMLElement
+  ): WorkspaceParent | null {
     const activeLeaf = this.getActiveLeafInWindow(win);
     if (activeLeaf) {
       const tabs = this.getTabsForLeafInColumn(win, columnEl, activeLeaf);
       if (tabs) return tabs;
+    }
+
+    const rememberedTabs = this.lastActivePanesByWindow.get(win)?.[side];
+    if (rememberedTabs && this.isTabsInColumn(win, columnEl, rememberedTabs)) {
+      return rememberedTabs;
     }
 
     let firstTabs: WorkspaceParent | null = null;
@@ -554,6 +582,25 @@ export class PopoutLayoutEngine {
     return null;
   }
 
+  /** 判斷記憶中的 tabs 群組是否仍存在於指定 sidebar column。 */
+  private isTabsInColumn(win: Window, columnEl: HTMLElement, tabs: WorkspaceParent): boolean {
+    if (tabs.containerEl instanceof HTMLElement && columnEl.contains(tabs.containerEl)) {
+      return true;
+    }
+
+    let found = false;
+    this.workspace.iterateAllLeaves((leaf: WorkspaceLeaf) => {
+      if (found || getWindowOfLeaf(leaf) !== win) return;
+      const extLeaf = leaf as unknown as ExtendedWorkspaceLeaf;
+      if (extLeaf.parent !== tabs) return;
+      const container = extLeaf.containerEl || (leaf.view as { containerEl?: HTMLElement } | null)?.containerEl;
+      if (container instanceof HTMLElement && columnEl.contains(container)) {
+        found = true;
+      }
+    });
+    return found;
+  }
+
   /** 攔截器專用：在指定側欄回傳一個 leaf（欄位不存在則建立），供第三方設定 view state。 */
   async openSideLeaf(win: Window, side: PopoutSide): Promise<WorkspaceLeaf> {
     return this.ensureSideColumn(win, side);
@@ -570,7 +617,7 @@ export class PopoutLayoutEngine {
     const columnEl = this.getColumnElement(win, side);
 
     if (columnEl) {
-      const tabs = this.getSidebarTabsInColumn(win, columnEl);
+      const tabs = this.getSidebarTabsInColumn(win, side, columnEl);
       if (tabs) {
         return this.createLeafInTabs(tabs);
       }
@@ -608,6 +655,22 @@ export class PopoutLayoutEngine {
       state: {},
     });
     return leaf;
+  }
+
+  /** 取得 leaf 所在的已標記 sidebar 側，供三區 pane 記憶使用。 */
+  private getSidebarSideForLeaf(win: Window, leaf: WorkspaceLeaf): PopoutSide | null {
+    if (getWindowOfLeaf(leaf) !== win) return null;
+    const extLeaf = leaf as unknown as ExtendedWorkspaceLeaf;
+    const container = extLeaf.containerEl || (leaf.view as { containerEl?: HTMLElement } | null)?.containerEl;
+    if (!(container instanceof HTMLElement)) return null;
+
+    const column = this.getTopLevelColumnForContainer(container);
+    if (!isSidebarColumnElement(column)) return null;
+    if (column?.classList.contains("mod-left-split")) return "left";
+    if (column?.classList.contains("mod-right-split")) return "right";
+    if (this.getColumnElement(win, "left") === column) return "left";
+    if (this.getColumnElement(win, "right") === column) return "right";
+    return null;
   }
 
   /**
@@ -763,11 +826,13 @@ export class PopoutLayoutEngine {
       : null;
     const activePane = activeTabs ? panes.find((pane) => pane.tabs === activeTabs) : null;
     if (activePane) {
-      this.lastActiveContentPanesByWindow.set(win, activePane.tabs);
+      const remembered = this.lastActivePanesByWindow.get(win) || {};
+      remembered.center = activePane.tabs;
+      this.lastActivePanesByWindow.set(win, remembered);
       return activePane;
     }
 
-    const rememberedTabs = this.lastActiveContentPanesByWindow.get(win);
+    const rememberedTabs = this.lastActivePanesByWindow.get(win)?.center;
     const rememberedPane = rememberedTabs
       ? panes.find((pane) => pane.tabs === rememberedTabs)
       : null;
@@ -938,12 +1003,13 @@ export class PopoutLayoutEngine {
     // （導致 enable activity bar 補欄後 getColumnElement 誤判缺欄、補欄
     // 建在巢狀層級）。下鑽規則：僅在 popout 視窗內，且 root 的直接欄位
     // 恰好只有一個 workspace-split（欄位容器）時，取其 children 當頂層欄位。
+    const popoutColumnContainer = topEls.length === 1 ? topEls[0] : undefined;
     if (
       isPopoutWindow(win) &&
-      topEls.length === 1 &&
-      topEls[0].classList.contains("workspace-split")
+      popoutColumnContainer &&
+      popoutColumnContainer.classList.contains("workspace-split")
     ) {
-      const containerChildren = Array.from(topEls[0].children).filter((el): el is HTMLElement => {
+      const containerChildren = Array.from(popoutColumnContainer.children).filter((el): el is HTMLElement => {
         if (!(el instanceof HTMLElement)) return false;
         return (
           el.classList.contains("workspace-tabs") ||
@@ -989,34 +1055,34 @@ export class PopoutLayoutEngine {
     const edge = this.getEdgeColumnElement(win, side);
     if (!edge) return null;
 
-    // 物理側欄標記優先：邊緣欄位仍帶該側 sidebar 標記即代表該側 sidebar 仍然存在。
-    // 關閉內容欄位造成的欄位數減少不得判為側欄缺失，否則補欄邏輯會在原本第 1 欄
-    // 左側誤補一個新欄（以 activity bar 第一個 view 填滿）。
-    const isSidebarForSide =
-      side === "left"
-        ? edge.classList.contains("mod-left-split")
-        : edge.classList.contains("mod-right-split");
-    if (isSidebarForSide) return edge;
-
     const configuredSides = this.sidebarSidesByWindow.get(win);
     if (configuredSides) {
       if (!configuredSides[side]) return null;
-      let requiredColumns: number;
-      if (typeof configuredSides.originalCount === "number") {
-        // 新式 hints：需求欄位數 = 原始欄位數 + activity bar 新開啟的側數。
-        // Professional 這類原始 2 欄的空間（兩側皆 sidebar）需求為 2；
-        // 原本 3 欄被 close all 破壞成 2 欄時需求為 3 → 回 null → 補欄。
-        const initialLeft = configuredSides.initialLeft ?? configuredSides.left;
-        const initialRight = configuredSides.initialRight ?? configuredSides.right;
-        const leftDelta = (configuredSides.left ? 1 : 0) - (initialLeft ? 1 : 0);
-        const rightDelta = (configuredSides.right ? 1 : 0) - (initialRight ? 1 : 0);
-        requiredColumns = configuredSides.originalCount + leftDelta + rightDelta;
-      } else {
-        // 舊式 hints（相容）：需求欄位數 = left + right + 1
-        requiredColumns = Number(configuredSides.left) + Number(configuredSides.right) + 1;
+
+      // 檢查是否為「新開啟 Activity Bar」的升級/補欄情境（Delta > 0）：
+      // 若該側是新開啟的（initial 為 false，目前為 true），需要有新增的欄位（originalCount + delta）。
+      const initialLeft = configuredSides.initialLeft ?? configuredSides.left;
+      const initialRight = configuredSides.initialRight ?? configuredSides.right;
+      const leftDelta = (configuredSides.left ? 1 : 0) - (initialLeft ? 1 : 0);
+      const rightDelta = (configuredSides.right ? 1 : 0) - (initialRight ? 1 : 0);
+      const deltaForSide = side === "left" ? leftDelta : rightDelta;
+
+      if (deltaForSide > 0 && typeof configuredSides.originalCount === "number") {
+        const requiredColumns = configuredSides.originalCount + leftDelta + rightDelta;
+        if (this.getTopLevelColumnElements(win).length < requiredColumns) return null;
       }
-      if (this.getTopLevelColumnElements(win).length < Math.max(2, requiredColumns)) return null;
-      return edge;
+
+      // 物理側欄標記優先：邊緣欄位（或其內部容器/tabs）仍帶該側 sidebar 標記即代表該側 sidebar 仍然存在。
+      const isSidebarForSide =
+        side === "left"
+          ? (edge.classList.contains("mod-left-split") || !!edge.querySelector(".mod-left-split"))
+          : (edge.classList.contains("mod-right-split") || !!edge.querySelector(".mod-right-split"));
+      if (isSidebarForSide) return edge;
+
+      // 正常運作狀態（非新開啟該側）：雙側皆開啟或單側開啟時，頂層需 ≥ 2 欄才能與對側或內容區共存
+      const topCount = this.getTopLevelColumnElements(win).length;
+      if (topCount >= 2) return edge;
+      return null;
     }
     return isSidebarColumnElement(edge) ? edge : null;
   }

@@ -1,6 +1,7 @@
 import { App, Menu, Notice, WorkspaceLeaf, setIcon } from "obsidian";
 import {
   ActivityBarItem,
+  SidebarFlexState,
   WindowLayout,
   WindowSettings,
   WindowSpaceActivityBarSettings,
@@ -194,8 +195,9 @@ export class PopoutActivityBarManager {
       // 確保側欄欄位存在（getColumnElement null → 補帶預設 view 的欄位）
       this.ensureSideColumnPresent(win, "left", leftVisible);
       this.ensureSideColumnPresent(win, "right", rightVisible);
-      // 維持最少一欄 content area（頂層欄位 ≥ activity bar 數 + 1）
+      // 維持最少欄位數（雙側皆開啟時 ≥ 2 欄；單側開啟時 ≥ 1 欄）
       this.ensureContentColumnPresent(win);
+      this.syncSidebarColumnClasses(win);
 
       const finalColumns = this.engine.getTopLevelColumnElements(win).length;
       if (finalColumns !== initialColumns) {
@@ -281,6 +283,18 @@ export class PopoutActivityBarManager {
   }
 
   /**
+   * Establish the post-rebuild sidebar mapping without rendering the bars.
+   * Restore uses this before applying hidden state so the first render already
+   * has the correct physical left/right columns.
+   */
+  prepareWindowForRestore(win: Window): void {
+    if (!win || win.closed) return;
+    this.resetSidebarHints(win);
+    this.ensureSidebarHints(win);
+    this.syncSidebarColumnClasses(win);
+  }
+
+  /**
    * 清除視窗內所有頂層欄位（含巢狀 split / tab group）的 sidebar 標記，
    * 將它們的語意重置為 content area。用於舊 space 升級的第一刻：即使既有
    * 欄位殘留 mod-left-split / mod-right-split / window-spaces-sidebar-column
@@ -323,14 +337,27 @@ export class PopoutActivityBarManager {
     // default view：使用者切換到同一 Activity Bar 的其他 view 後，Save 觸發
     // renderWindow 不應把現有 sidebar 誤判成缺失並重建整棵 layout。
     const topCols = this.engine.getTopLevelColumnElements(win);
+    if (topCols.length === 0) return false;
     const last = topCols.length - 1;
-    const leftPresent = topCols[0] && (
+
+    const configuredSides = this.getEngineSidebarHints(win);
+    const initialLeft = configuredSides?.initialLeft ?? leftShow;
+    const initialRight = configuredSides?.initialRight ?? rightShow;
+    const leftDelta = (leftShow ? 1 : 0) - (initialLeft ? 1 : 0);
+    const rightDelta = (rightShow ? 1 : 0) - (initialRight ? 1 : 0);
+
+    const isLeftDeltaUpgrade = leftDelta > 0 && typeof configuredSides?.originalCount === "number" && topCols.length < (configuredSides.originalCount + leftDelta + rightDelta);
+    const isRightDeltaUpgrade = rightDelta > 0 && typeof configuredSides?.originalCount === "number" && topCols.length < (configuredSides.originalCount + leftDelta + rightDelta);
+
+    const leftPresent = !isLeftDeltaUpgrade && topCols[0] && (
       this.isMarkedSidebarColumn(topCols[0], "left") ||
-      this.columnContainsAnyViewType(topCols[0], this.getItemsForWindowSide(win, "left").map((item) => item.viewType))
+      this.columnContainsAnyViewType(topCols[0], this.getItemsForWindowSide(win, "left").map((item) => item.viewType)) ||
+      (leftShow && rightShow ? topCols.length >= 2 : topCols.length >= 1)
     );
-    const rightPresent = topCols[last] && (
+    const rightPresent = !isRightDeltaUpgrade && topCols[last] && (
       this.isMarkedSidebarColumn(topCols[last], "right") ||
-      this.columnContainsAnyViewType(topCols[last], this.getItemsForWindowSide(win, "right").map((item) => item.viewType))
+      this.columnContainsAnyViewType(topCols[last], this.getItemsForWindowSide(win, "right").map((item) => item.viewType)) ||
+      (leftShow && rightShow ? topCols.length >= 2 : topCols.length >= 1)
     );
     const leftMissing = leftShow && !leftPresent;
     const rightMissing = rightShow && !rightPresent;
@@ -363,21 +390,57 @@ export class PopoutActivityBarManager {
   /** 欄位元素內是否包含指定 viewType 的 leaf。 */
   private columnContainsViewType(colEl: HTMLElement | undefined, viewType?: string): boolean {
     if (!colEl || !viewType) return false;
-    return Array.from(colEl.querySelectorAll(".workspace-leaf [data-type]"))
+    let found = false;
+    this.engine.workspace?.iterateAllLeaves?.((leaf: WorkspaceLeaf) => {
+      if (found) return;
+      const leafEl = (leaf as { containerEl?: HTMLElement }).containerEl || (leaf.view as { containerEl?: HTMLElement })?.containerEl;
+      if (leafEl && colEl.contains(leafEl)) {
+        const type = leaf.getViewState?.()?.type || (leaf.view as { getViewType?: () => string })?.getViewType?.();
+        if (type === viewType) {
+          found = true;
+        }
+      }
+    });
+    if (found) return true;
+
+    return Array.from(colEl.querySelectorAll(".workspace-leaf [data-type], .workspace-leaf"))
       .some((el) => el.getAttribute("data-type") === viewType);
   }
 
   /** 欄位內是否包含該 Activity Bar 已配置的任一 view。 */
-  private columnContainsAnyViewType(colEl: HTMLElement | undefined, viewTypes: string[]): boolean {
-    return viewTypes.some((viewType) => this.columnContainsViewType(colEl, viewType));
+  private columnContainsAnyViewType(colEl: HTMLElement | undefined, viewTypes: (string | undefined)[]): boolean {
+    if (!colEl || !viewTypes || viewTypes.length === 0) return false;
+    const validTypes = new Set(viewTypes.filter((t): t is string => !!t));
+    if (validTypes.size === 0) return false;
+
+    let found = false;
+    this.engine.workspace?.iterateAllLeaves?.((leaf: WorkspaceLeaf) => {
+      if (found) return;
+      const leafEl = (leaf as { containerEl?: HTMLElement }).containerEl || (leaf.view as { containerEl?: HTMLElement })?.containerEl;
+      if (leafEl && colEl.contains(leafEl)) {
+        const type = leaf.getViewState?.()?.type || (leaf.view as { getViewType?: () => string })?.getViewType?.();
+        if (type && validTypes.has(type)) {
+          found = true;
+        }
+      }
+    });
+    if (found) return true;
+
+    return Array.from(colEl.querySelectorAll(".workspace-leaf [data-type], .workspace-leaf"))
+      .some((el) => {
+        const dt = el.getAttribute("data-type");
+        return dt && validTypes.has(dt);
+      });
   }
 
   /** 判斷欄位是否已被同步標記為指定側的 sidebar。 */
   private isMarkedSidebarColumn(colEl: HTMLElement | undefined, side: PopoutSide): boolean {
     if (!colEl) return false;
-    return colEl.classList.contains(
-      side === "left" ? "mod-left-split" : "mod-right-split"
-    );
+    const cls = side === "left" ? "mod-left-split" : "mod-right-split";
+    return colEl.classList.contains(cls) ||
+      colEl.classList.contains("window-spaces-sidebar-column") ||
+      !!colEl.querySelector(`.${cls}`) ||
+      !!colEl.querySelector(".window-spaces-sidebar-column");
   }
 
   private async waitForLayoutFrame(win: Window): Promise<void> {
@@ -469,6 +532,148 @@ export class PopoutActivityBarManager {
     if (snapshot.left) this.setColumnFlexGrow(snapshot.left.element, snapshot.left.flexGrow);
     snapshot.center.forEach((entry) => this.setColumnFlexGrow(entry.element, entry.flexGrow));
     if (snapshot.right) this.setColumnFlexGrow(snapshot.right.element, snapshot.right.flexGrow);
+  }
+
+  /** Convert a live snapshot into the serializable form stored with a Space. */
+  private serializeSidebarFlexSnapshot(snapshot: SidebarFlexSnapshot): SidebarFlexState {
+    return {
+      left: snapshot.left?.flexGrow,
+      center: snapshot.center.map((entry) => entry.flexGrow),
+      right: snapshot.right?.flexGrow,
+    };
+  }
+
+  /**
+   * Capture the original column weights for a hidden sidebar. Prefer the
+   * pre-hide live snapshot; after a reload, fall back to the current DOM.
+   */
+  captureSidebarFlexState(win: Window): SidebarFlexState | null {
+    const snapshot = this.sidebarFlexSnapshots.get(win) || this.captureSidebarFlexSnapshot(win);
+    return snapshot ? this.serializeSidebarFlexSnapshot(snapshot) : null;
+  }
+
+  /** Restore a persisted column snapshot against the current top-level DOM. */
+  private restorePersistedSidebarFlexState(win: Window, state: SidebarFlexState): boolean {
+    const columns = this.engine.getTopLevelColumnElements(win);
+    if (columns.length < 2) return false;
+
+    const left = this.engine.getColumnElement(win, "left");
+    const right = this.engine.getColumnElement(win, "right");
+    const sideColumns = new Set(
+      [left, right].filter((element): element is HTMLElement => Boolean(element))
+    );
+    const center = columns.filter((column) => !sideColumns.has(column));
+    let restored = false;
+
+    if (left && typeof state.left === "number" && Number.isFinite(state.left) && state.left > 0) {
+      this.setColumnFlexGrow(left, state.left);
+      restored = true;
+    }
+    (state.center || []).forEach((flexGrow, index) => {
+      const column = center[index];
+      if (column && Number.isFinite(flexGrow) && flexGrow > 0) {
+        this.setColumnFlexGrow(column, flexGrow);
+        restored = true;
+      }
+    });
+    if (right && typeof state.right === "number" && Number.isFinite(state.right) && state.right > 0) {
+      this.setColumnFlexGrow(right, state.right);
+      restored = true;
+    }
+
+    return restored;
+  }
+
+  /**
+   * Apply the saved width projection while a sidebar is hidden. This keeps
+   * the opposite sidebar at its pre-hide width during restore, even though
+   * the hidden column still retains its serialized flex weight in the DOM.
+   */
+  applyHiddenSidebarFlexState(
+    win: Window,
+    hidden: { leftSidebar?: boolean; rightSidebar?: boolean; sidebarFlex?: SidebarFlexState }
+  ): void {
+    const state = hidden.sidebarFlex;
+    if (!state || (!hidden.leftSidebar && !hidden.rightSidebar)) return;
+
+    const columns = this.engine.getTopLevelColumnElements(win);
+    if (columns.length < 2) return;
+    const left = this.engine.getColumnElement(win, "left");
+    const right = this.engine.getColumnElement(win, "right");
+    const sideColumns = new Set(
+      [left, right].filter((element): element is HTMLElement => Boolean(element))
+    );
+    const center = columns.filter((column) => !sideColumns.has(column));
+    const centerWeights = (state.center || []).filter(
+      (weight): weight is number => Number.isFinite(weight) && weight > 0
+    );
+    const centerWeight = centerWeights.reduce((sum, weight) => sum + weight, 0);
+    if (center.length === 0 || centerWeight <= 0) return;
+
+    const hiddenWeight =
+      (hidden.leftSidebar ? state.left || 0 : 0) +
+      (hidden.rightSidebar ? state.right || 0 : 0);
+    const scale = (centerWeight + hiddenWeight) / centerWeight;
+
+    if (left && typeof state.left === "number" && state.left > 0) {
+      this.setColumnFlexGrow(left, state.left);
+    }
+    if (right && typeof state.right === "number" && state.right > 0) {
+      this.setColumnFlexGrow(right, state.right);
+    }
+    center.forEach((column, index) => {
+      const weight = centerWeights[index];
+      if (weight !== undefined) this.setColumnFlexGrow(column, weight * scale);
+    });
+  }
+
+  /**
+   * A malformed/legacy snapshot must not re-show a sidebar as a sliver. Take
+   * the missing width from content only so the opposite sidebar keeps its
+   * current width.
+   */
+  private ensureSidebarMinimumWidth(win: Window, side: PopoutSide): void {
+    const MIN_SIDEBAR_WIDTH_PX = 200;
+    const sidebar = this.engine.getColumnElement(win, side);
+    if (!sidebar) return;
+
+    const measuredWidth = sidebar.getBoundingClientRect().width;
+    if (!Number.isFinite(measuredWidth) || measuredWidth <= 0 || measuredWidth >= MIN_SIDEBAR_WIDTH_PX) {
+      return;
+    }
+
+    const current = this.getColumnFlexGrow(win, sidebar);
+    if (!Number.isFinite(current) || current <= 0) return;
+
+    const columns = this.engine.getTopLevelColumnElements(win);
+    const left = this.engine.getColumnElement(win, "left");
+    const right = this.engine.getColumnElement(win, "right");
+    const sideColumns = new Set(
+      [left, right].filter((element): element is HTMLElement => Boolean(element))
+    );
+    const center = columns.filter((column) => !sideColumns.has(column));
+    const centerWeight = center.reduce(
+      (sum, column) => sum + this.getColumnFlexGrow(win, column),
+      0
+    );
+    if (center.length === 0 || centerWeight <= 0) return;
+
+    // flex-grow is unitless, so convert the pixel deficit into the equivalent
+    // weight using the sidebar's current rendered width. The transferred
+    // weight is taken from content only; the opposite sidebar is untouched.
+    const requestedSidebarWeight = current * (MIN_SIDEBAR_WIDTH_PX / measuredWidth);
+    const additionalWeight = Math.min(
+      Math.max(0, requestedSidebarWeight - current),
+      Math.max(0, centerWeight - 1)
+    );
+    if (additionalWeight <= 0) return;
+
+    const remainingCenterWeight = centerWeight - additionalWeight;
+    const scale = remainingCenterWeight / centerWeight;
+    center.forEach((column) => {
+      this.setColumnFlexGrow(column, this.getColumnFlexGrow(win, column) * scale);
+    });
+    this.setColumnFlexGrow(sidebar, current + additionalWeight);
   }
 
   /** Hide one side while assigning its released weight to content only. */
@@ -689,9 +894,6 @@ export class PopoutActivityBarManager {
       },
     });
 
-    body.classList.add("window-spaces-has-left-activity");
-    body.classList.add("window-spaces-has-right-activity");
-
     this.injectedWindows.add(win);
 
     this.renderWindow(win);
@@ -743,6 +945,27 @@ export class PopoutActivityBarManager {
     Array.from(this.injectedWindows).forEach((win) => {
       if (!live.includes(win)) this.cleanupWindow(win);
     });
+  }
+
+  /**
+   * Refresh the live Space presentation without touching layout dimensions.
+   *
+   * Space Setting Save needs its visual options (accent color, border
+   * thickness, logo, folded corner) and Activity Bar view list to appear
+   * immediately. A full renderWindow() would also reapply serialized
+   * dimensions and can change the live content/sidebar proportions, so update
+   * those DOM surfaces without running column reconciliation or dimension
+   * restoration. The direct toolbar Save intentionally does not call this.
+   */
+  refreshWindowActivityBars(win: Window): void {
+    if (!win || win.closed) return;
+    const bars = this.barsByWindow.get(win);
+    if (!bars) return;
+
+    this.updateDragHandleIcon(bars, win);
+    this.renderBar(bars, win, "left");
+    this.renderBar(bars, win, "right");
+    this.updateActiveStates(win);
   }
 
   getLayoutForWindow(win: Window): WindowLayout | null {
@@ -833,9 +1056,63 @@ export class PopoutActivityBarManager {
     bars.spaceIdentity.setAttribute("aria-label", layout?.name || "Window Space");
   }
 
+  /** Restore-time lifecycle render guard: wait until saved hidden columns are applied. */
+  private shouldDeferRestoreRender(win: Window, allowDuringRestore: boolean): boolean {
+    if (allowDuringRestore) return false;
+    const manager = (this.plugin as unknown as {
+      manager?: { isRestoringLayout?: boolean };
+    }).manager;
+    if (!manager?.isRestoringLayout) return false;
+
+    const layout = this.getLayoutForWindow(win);
+    if (!layout) {
+      // A newly opened Popout can receive window-open before the manager has
+      // assigned its Space name. Do not paint its completed column tree during
+      // that gap; the restore path will render it after applying hidden state.
+      return true;
+    }
+    if (!layout.hidden) return false;
+    const leftPending = layout.hidden.leftSidebar && !this.engine.isColumnHidden(win, "left");
+    const rightPending = layout.hidden.rightSidebar && !this.engine.isColumnHidden(win, "right");
+    return Boolean(leftPending || rightPending);
+  }
+
+  /**
+   * Keep a restore target hidden until its Space label and saved sidebar state
+   * have been applied. The bar elements are inserted before Obsidian finishes
+   * materializing the target tree, so merely skipping renderWindowNow() would
+   * still let the raw flex bar containers paint once with both sides visible.
+   */
+  private applyDeferredRestoreVisibility(win: Window): void {
+    const bars = this.barsByWindow.get(win);
+    if (!bars) return;
+
+    bars.left.classList.add("window-spaces-activity-hidden");
+    bars.right.classList.add("window-spaces-activity-hidden");
+    bars.spaceIdentity.classList.add("window-spaces-space-identity-drag-region");
+
+    const body = win.document?.body;
+    if (!body) return;
+    body.classList.remove("window-spaces-has-left-activity");
+    body.classList.remove("window-spaces-has-right-activity");
+    body.classList.add("window-spaces-left-activity-hidden");
+    body.classList.add("window-spaces-right-activity-hidden");
+    this.updateTabHeaderAvoidance(win, false);
+  }
+
   /** 重建指定視窗的按鈕內容。 */
-  renderWindow(win: Window): void {
-    void this.ensureLayoutColumns(win).then(() => this.renderWindowNow(win));
+  renderWindow(win: Window, options: { allowDuringRestore?: boolean } = {}): void {
+    const allowDuringRestore = options.allowDuringRestore === true;
+    if (this.shouldDeferRestoreRender(win, allowDuringRestore)) {
+      this.applyDeferredRestoreVisibility(win);
+      return;
+    }
+
+    void this.ensureLayoutColumns(win).then(() => {
+      if (!this.shouldDeferRestoreRender(win, allowDuringRestore)) {
+        this.renderWindowNow(win);
+      }
+    });
     this.renderWindowNow(win);
     // activity bar 設定/空間切換後，排程完整性檢查（補欄 / 藏起 / 解除隱藏）
     this.scheduleLayoutIntegrityCheck(win);
@@ -863,6 +1140,22 @@ export class PopoutActivityBarManager {
     this.renderBar(bars, win, "left");
     this.renderBar(bars, win, "right");
     this.applySavedLayoutDimensions(win);
+    const layout = this.getLayoutForWindow(win);
+    if (layout?.hidden) {
+      this.applyHiddenSidebarFlexState(win, layout.hidden);
+    }
+    // A newly enabled side can be appended after an existing multi-column
+    // content area. In that shape the default sizing pass only assigns the
+    // known content weights and Obsidian leaves the new edge column at its
+    // neutral flex-grow of 1 (a single-digit sliver). Enforce the same 200px
+    // minimum used by the explicit sidebar show path after all saved/default
+    // dimensions have been applied.
+    if (this.isSideVisibleForWindow(win, "left")) {
+      this.ensureSidebarMinimumWidth(win, "left");
+    }
+    if (this.isSideVisibleForWindow(win, "right")) {
+      this.ensureSidebarMinimumWidth(win, "right");
+    }
     this.updateActiveStates(win);
   }
 
@@ -896,9 +1189,9 @@ export class PopoutActivityBarManager {
     const isVisible = this.isSideVisibleForWindow(win, side);
     bar.classList.toggle("window-spaces-activity-hidden", !isVisible);
 
-    // 移除舊的 view 按鈕與分隔線（保留 bar 容器與固定按鈕）。
+    // 移除舊的 view 按鈕（保留 bar 容器與固定按鈕）。
     // viewButtons 同時保存左右兩側的按鈕，因此只清理目前這一側。
-    bar.querySelectorAll(".window-spaces-activity-view, .window-spaces-activity-divider").forEach((el) => {
+    bar.querySelectorAll(".window-spaces-activity-view").forEach((el) => {
       bars.viewButtons.forEach((button, key) => {
         if (button === el) bars.viewButtons.delete(key);
       });
@@ -925,9 +1218,6 @@ export class PopoutActivityBarManager {
     } else {
       bar.prepend(colBtn);
     }
-
-    // 固定控制與 view 按鈕之間的分隔線
-    bar.createDiv({ cls: "window-spaces-activity-divider" });
 
     const items = this.getItemsForWindowSide(win, side);
     const configuredTypes = new Set<string>();
@@ -1222,19 +1512,22 @@ export class PopoutActivityBarManager {
       const plugin = this.plugin as unknown as { manager?: { isRestoringLayout?: boolean } };
       if (plugin.manager?.isRestoringLayout) return;
 
-      // 1. 依 activity bar 可見性建立/更新 hints（記錄原始欄位數）
+      // 1. 先行同步側欄標記（確保新建/拖曳後的 split 節點立即取得 mod-left-split / mod-right-split）
+      this.syncSidebarColumnClasses(win);
+
+      // 2. 依 activity bar 可見性建立/更新 hints（記錄即時欄位數）
       this.ensureSidebarHints(win);
 
       const leftVisible = this.isSideVisibleForWindow(win, "left");
       const rightVisible = this.isSideVisibleForWindow(win, "right");
 
-      // 2. 補足側欄欄位（getColumnElement null → 補帶預設 view 的欄位）
+      // 3. 補足側欄欄位（getColumnElement null → 補帶預設 view 的欄位）
       this.ensureSideColumnPresent(win, "left", leftVisible);
       this.ensureSideColumnPresent(win, "right", rightVisible);
-      // 維持最少一欄 content area（頂層欄位 ≥ activity bar 數 + 1）
+      // 維持最少欄位數（雙側皆開啟時 ≥ 2 欄；單側開啟時 ≥ 1 欄）
       this.ensureContentColumnPresent(win);
 
-      // 3. 欄位狀態整理（側欄收合狀態機）
+      // 4. 欄位狀態整理（側欄收合狀態機）
       const blocked = this.autoHideBlockedUntil.get(win);
       const now = Date.now();
       for (const side of ["left", "right"] as const) {
@@ -1366,8 +1659,9 @@ export class PopoutActivityBarManager {
   private ensureContentColumnPresent(win: Window): WorkspaceLeaf | null {
     const leftVisible = this.isSideVisibleForWindow(win, "left");
     const rightVisible = this.isSideVisibleForWindow(win, "right");
-    const requiredColumns = Number(leftVisible) + Number(rightVisible) + 1;
-    if (this.engine.getTopLevelColumnElements(win).length >= Math.max(1, requiredColumns)) return null;
+    // 雙側 activity bar 皆顯示時需至少 2 欄；單側或無顯示時需至少 1 欄
+    const requiredColumns = (leftVisible && rightVisible) ? 2 : 1;
+    if (this.engine.getTopLevelColumnElements(win).length >= requiredColumns) return null;
 
     const now = Date.now();
     const lastAttempt = this.columnFillAttempts.get(win);
@@ -1591,6 +1885,7 @@ export class PopoutActivityBarManager {
         }
         if (layout.hidden) {
           layout.hidden[side === "left" ? "leftSidebar" : "rightSidebar"] = false;
+          delete layout.hidden.sidebarFlex;
         }
       }
 
@@ -1620,6 +1915,7 @@ export class PopoutActivityBarManager {
 
     if (isHidden) {
       const savedFlex = this.sidebarFlexSnapshots.get(win);
+      const persistedFlex = layout?.hidden?.sidebarFlex;
       // 原本隱藏 -> 切換為顯示
       const columnEl = this.engine.getColumnElement(win, side);
       if (!columnEl) {
@@ -1633,13 +1929,17 @@ export class PopoutActivityBarManager {
       if (savedFlex) {
         this.restoreSidebarFlexSnapshot(savedFlex);
         this.sidebarFlexSnapshots.delete(win);
+      } else if (persistedFlex) {
+        this.restorePersistedSidebarFlexState(win, persistedFlex);
       } else {
         this.applyDefaultColumnSizingIfNeeded(win);
       }
+      this.ensureSidebarMinimumWidth(win, side);
 
       if (layout) {
         if (!layout.hidden) layout.hidden = {};
         layout.hidden[side === "left" ? "leftSidebar" : "rightSidebar"] = false;
+        delete layout.hidden.sidebarFlex;
         await this.plugin.saveSettings?.();
       }
     } else {
@@ -1660,6 +1960,10 @@ export class PopoutActivityBarManager {
       if (layout) {
         if (!layout.hidden) layout.hidden = {};
         layout.hidden[side === "left" ? "leftSidebar" : "rightSidebar"] = true;
+        const sidebarFlex = snapshot
+          ? this.serializeSidebarFlexSnapshot(snapshot)
+          : this.captureSidebarFlexState(win);
+        if (sidebarFlex) layout.hidden.sidebarFlex = sidebarFlex;
         await this.plugin.saveSettings?.();
       }
     }

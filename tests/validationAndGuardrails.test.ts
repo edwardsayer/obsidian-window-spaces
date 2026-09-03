@@ -52,6 +52,110 @@ describe("Validation & Auto-Save Guardrails (validationAndGuardrails.test.ts)", 
     expect(validWithIconAndColor.color).toBe("#ef4444");
   });
 
+  test("direct save does not refresh the live Popout presentation", async () => {
+    mockPlugin.settings.showNotifications = false;
+    const renderWindow = vi.fn();
+    const refreshWindowActivityBars = vi.fn();
+    mockPlugin.activityBars = { renderWindow, refreshWindowActivityBars };
+    const sourceWindow = {} as Window;
+    const existing: WindowLayout = {
+      id: "save-live-widths",
+      name: "Live widths",
+      timestamp: 1,
+      windowState: { size: { width: 800, height: 600 } },
+      workspace: { layout: {}, leaves: [] },
+      metadata: { fileCount: 0, tabCount: 0, splitCount: 0 },
+    };
+    mockPlugin.settings.spaces = [existing];
+
+    vi.spyOn(manager as any, "getWindowForLayout").mockReturnValue(sourceWindow);
+    vi.spyOn(manager as any, "setLayoutLabelForWindow").mockImplementation(() => {});
+
+    await manager.saveLayout({ ...existing, workspace: { layout: {}, leaves: [] } });
+
+    expect(renderWindow).not.toHaveBeenCalled();
+    expect(refreshWindowActivityBars).not.toHaveBeenCalled();
+    expect((manager as any).setLayoutLabelForWindow).not.toHaveBeenCalled();
+    expect((manager as any).getWindowForLayout).not.toHaveBeenCalled();
+  });
+
+  test("direct save opens Space Setting when the popout has no name", async () => {
+    const sourceWindow = {} as Window;
+    const openSaveModal = vi.fn();
+    mockPlugin.openSaveLayoutModal = openSaveModal;
+    vi.spyOn(manager, "captureCurrentLayout").mockResolvedValue({
+      id: "unnamed-capture",
+      name: "",
+      timestamp: Date.now(),
+      windowState: { size: { width: 800, height: 600 } },
+      workspace: { layout: {}, leaves: [] },
+      metadata: { fileCount: 0, tabCount: 0, splitCount: 0 },
+    });
+    (manager as any).layoutNames.set(sourceWindow, "");
+
+    await (manager as any).saveLayoutDirectFromWindow(sourceWindow);
+
+    expect(openSaveModal).toHaveBeenCalledWith(expect.objectContaining({ name: "" }), sourceWindow);
+  });
+
+  test("direct save keeps saving immediately for a named popout", async () => {
+    const sourceWindow = {} as Window;
+    const saveLayout = vi.spyOn(manager, "saveLayout").mockResolvedValue(undefined);
+    vi.spyOn(manager, "captureCurrentLayout").mockResolvedValue({
+      id: "named-capture",
+      name: "Named Space",
+      timestamp: Date.now(),
+      windowState: { size: { width: 800, height: 600 } },
+      workspace: { layout: {}, leaves: [] },
+      metadata: { fileCount: 0, tabCount: 0, splitCount: 0 },
+    });
+    mockPlugin.settings.spaces = [];
+    (manager as any).layoutNames.set(sourceWindow, "Named Space");
+
+    await (manager as any).saveLayoutDirectFromWindow(sourceWindow);
+
+    expect(saveLayout).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "Named Space" }),
+      sourceWindow,
+      { refreshLivePresentation: false }
+    );
+  });
+
+  test("saveLayout refreshes the initiating Popout even when its Space was renamed", async () => {
+    mockPlugin.settings.showNotifications = false;
+    const refreshWindowActivityBars = vi.fn();
+    mockPlugin.activityBars = { refreshWindowActivityBars };
+
+    const targetDocument = document.implementation.createHTMLDocument("Popout");
+    targetDocument.body.classList.add("is-popout-window");
+    const targetWindow = {
+      closed: false,
+      document: targetDocument,
+    } as unknown as Window;
+    const fallbackWindow = {} as Window;
+    const existing: WindowLayout = {
+      id: "renamed-save",
+      name: "Old name",
+      timestamp: 1,
+      windowState: { size: { width: 800, height: 600 } },
+      workspace: { layout: {}, leaves: [] },
+      metadata: { fileCount: 0, tabCount: 0, splitCount: 0 },
+    };
+    mockPlugin.settings.spaces = [existing];
+
+    vi.spyOn(manager as any, "getWindowForLayout").mockReturnValue(fallbackWindow);
+    vi.spyOn(manager as any, "setLayoutLabelForWindow").mockImplementation(() => {});
+
+    await manager.saveLayout(
+      { ...existing, name: "New name", workspace: { layout: {}, leaves: [] } },
+      targetWindow,
+      { refreshLivePresentation: true }
+    );
+
+    expect(refreshWindowActivityBars).toHaveBeenCalledWith(targetWindow);
+    expect((manager as any).getWindowForLayout).not.toHaveBeenCalled();
+  });
+
   test("ensureViewRendered rebuilds only when content is empty and view is not a file view", () => {
     const contentEl = document.createElement("div");
     contentEl.classList.add("view-content");

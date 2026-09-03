@@ -206,6 +206,19 @@ export interface PopoutHiddenState {
   leftSidebar?: boolean;
   rightSidebar?: boolean;
   hiddenLeafIds?: string[];
+  /** Original top-level flex weights captured before a sidebar was hidden. */
+  sidebarFlex?: SidebarFlexState;
+}
+
+/**
+ * Top-level column flex weights used to restore a sidebar after a Space reload.
+ * The center array preserves nested content columns without coupling this data
+ * to a particular Obsidian workspace tree shape.
+ */
+export interface SidebarFlexState {
+  left?: number;
+  center: number[];
+  right?: number;
 }
 
 /**

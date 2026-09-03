@@ -10,11 +10,11 @@
  *   OBSIDIAN_EXE="<路徑>" npm run obsidian:debug
  */
 
-const { spawn } = require('child_process');
-const fs = require('fs');
-const http = require('http');
-const path = require('path');
-const os = require('os');
+import { spawn } from 'child_process';
+import fs from 'fs';
+import http from 'http';
+import path from 'path';
+import os from 'os';
 
 const rawArgs = process.argv.slice(2);
 const portArg = rawArgs.find((a) => /^\d+$/.test(a));
@@ -38,11 +38,29 @@ function resolveObsidianExe() {
   return 'obsidian';
 }
 
-function endpointUp() {
+/**
+ * 確認該 port 是「Obsidian 的 debug port」，而非其他程式（如 Chrome）佔用。
+ * 只檢查 /json/version 回 200 不夠——Chrome 開 debug port 時也會回 200。
+ * 以 /json/list 中是否存在 app://obsidian.md 的 page target 為準。
+ */
+function endpointIsObsidian() {
   return new Promise((resolve) => {
-    const req = http.get(`http://127.0.0.1:${PORT}/json/version`, (res) => {
-      res.resume();
-      resolve(res.statusCode === 200);
+    const req = http.get(`http://127.0.0.1:${PORT}/json/list`, (res) => {
+      let data = '';
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+      res.on('end', () => {
+        try {
+          const targets = JSON.parse(data);
+          resolve(
+            Array.isArray(targets) &&
+            targets.some((t) => typeof t?.url === 'string' && t.url.includes('app://obsidian.md'))
+          );
+        } catch {
+          resolve(false);
+        }
+      });
     });
     req.on('error', () => resolve(false));
     req.setTimeout(1000, () => {
@@ -52,10 +70,10 @@ function endpointUp() {
   });
 }
 
-async function waitForEndpoint(timeoutMs) {
+async function waitForObsidianEndpoint(timeoutMs) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    if (await endpointUp()) return true;
+    if (await endpointIsObsidian()) return true;
     await new Promise((r) => setTimeout(r, 400));
   }
   return false;
@@ -67,7 +85,7 @@ async function waitForEndpoint(timeoutMs) {
   console.log(`🖥️  Obsidian: ${exe}`);
   console.log(`🔌  Debug port: ${PORT}`);
 
-  if (await endpointUp()) {
+  if (await endpointIsObsidian()) {
     console.log(`✅ Obsidian 已帶 debug port 執行中：http://127.0.0.1:${PORT}`);
     console.log(`   可開啟 http://127.0.0.1:${PORT}/json 檢視各視窗 target。`);
     return;
@@ -79,6 +97,7 @@ async function waitForEndpoint(timeoutMs) {
   }
 
   console.log('⏳ 啟動 Obsidian（若已有一般執行中的 Obsidian，請先完全退出）...');
+  console.log(`   （port ${PORT} 目前被其他程式佔用或尚未開啟 debug port，將嘗試啟動 Obsidian）`);
   const launchArgs = [`--remote-debugging-port=${PORT}`];
   if (VAULT_PATH) {
     console.log(`📁 Vault: ${VAULT_PATH}`);
@@ -90,7 +109,7 @@ async function waitForEndpoint(timeoutMs) {
   });
   child.unref();
 
-  if (await waitForEndpoint(8000)) {
+  if (await waitForObsidianEndpoint(8000)) {
     console.log(`✅ Obsidian 偵錯模式已啟動：http://127.0.0.1:${PORT}`);
     console.log(`   - 每個視窗（主視窗 / popout）各自是獨立 target：http://127.0.0.1:${PORT}/json`);
     console.log(`   - 可使用 Chrome DevTools 或本專案的 npm run probe 進行即時檢查。`);

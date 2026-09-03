@@ -1218,38 +1218,72 @@ button.mod-destructive:hover,
 }
 
 /* ===== Popout Activity Bars ===== */
+/* Activity Bar 尺寸以 Obsidian 原生變數為準（不硬編碼），讓不同解析度 /
+   縮放 / 使用者主題調整 ribbon 時自動跟隨：
+   - --ribbon-width：ribbon 寬（原生 44px，可被主題/設定覆寫）
+   - --ribbon-padding：ribbon 內距（原生 8px 4px 12px）
+   - --icon-l：按鈕 icon 尺寸（原生 18px）
+   --window-spaces-activity-bar-width 同時被 body margin 避讓與 tab header
+   padding 引用，統一在此定義。 */
+:root {
+  --window-spaces-activity-bar-width: var(--ribbon-width, 44px);
+}
+
 /* CRITICAL: 與左右側欄 padding 連動，修改時需同時檢視 body class 規則 */
 .window-spaces-activity-bar {
   position: fixed;
   top: 0;
   bottom: 0;
-  width: var(--window-spaces-activity-bar-width, 44px);
+  width: var(--window-spaces-activity-bar-width, var(--ribbon-width, 44px));
   z-index: var(--layer-side-dock, 10);
   display: flex;
   flex-direction: column;
   align-items: center;
-  /* 對齊主視窗 ribbon：配合 divider margin 0，使 toggle 底→首顆 view 按鈕
-     距離（4+1+4 = 9px）對齊 ribbon sidebar-toggle → 首顆 action（9px） */
-  gap: 4px;
-  padding: 6px 2px 8px 2px;
+  /* 對齊主視窗 ribbon：按鈕間距用 --size-2-3（6px），與 .side-dock-actions
+     的 gap 一致（實測 ribbon 的 action 包在 side-dock-actions 容器內，
+     gap 為 6px，非 ribbon 容器的 4px）；水平/底部 padding 沿用 ribbon 變數
+     （--size-4-1 = 4px、--ribbon-padding = 8px 4px 12px）。
+     左側 bar 的 top padding 由 drag 區接管（0），右側 bar 因有 border-top
+     保留 6px top padding。 */
+  gap: var(--size-2-3, 6px);
+  padding: 0 var(--size-4-1, 4px) var(--size-4-3, 12px) var(--size-4-1, 4px);
   box-sizing: border-box;
   /* 對齊 sidebar 區與 editor tab area tabbar 的 non-active 底色 */
-  background-color: var(--background-secondary);
+  background-color: var(--ribbon-background, var(--background-secondary));
   user-select: none;
 }
 .window-spaces-activity-left {
   left: 0;
   top: 0;
-  border-right: 1px solid var(--background-modifier-border);
-  /* Drag 區接管 titlebar 全高：移除頂部 padding，讓 drag 區從視窗頂開始 */
-  padding: 0 0 8px 0;
+  border-right: var(--divider-width, var(--tab-outline-width, 1px)) solid var(--divider-color, var(--tab-outline-color, var(--background-modifier-border)));
+  /* Drag 區接管 titlebar 全高：移除頂部 padding，讓 drag 區從視窗頂開始。
+     其餘 padding（4px 水平 / 12px 底部）繼承基礎規則，與 ribbon 一致。 */
+  padding: 0 var(--size-4-1, 4px) var(--size-4-3, 12px) var(--size-4-1, 4px);
 }
 .window-spaces-activity-right {
   right: 0;
-  top: var(--header-height, 40px);
-  border-left: 1px solid var(--background-modifier-border);
-  border-top: 1px solid var(--background-modifier-border);
-  padding-top: 6px;
+  /* Titlebar（z-index 30）會覆蓋 top 0 到 header-height 的區域；讓 bar
+     自身從相同的 header 起點開始，避免以固定 top 減去宣告 border 寬度。
+     在異質 DPI 下，1px border 的實際 rasterized 寬度可能是 0.8px，
+     因此不能用 `header-height - tab-outline-width` 來定位另一條線。 */
+  top: 0;
+  border-left: var(--divider-width, var(--tab-outline-width, 1px)) solid var(--divider-color, var(--tab-outline-color, var(--background-modifier-border)));
+  padding: 0 var(--size-4-1, 4px) var(--size-4-3, 12px) var(--size-4-1, 4px);
+}
+
+/* 右側 bar 的上方區域與左側 .window-spaces-activity-drag、以及原生
+   .workspace-tab-header-container 共用同一個 header box 定義。Pseudo element
+   不會蓋住右上角原生控制鈕（titlebar z-index 較高），但能讓其下方的 border
+   由同一個 height + border-bottom 組合產生，跨 DPI 仍落在同一個 raster row。 */
+.window-spaces-activity-right::before {
+  content: "";
+  flex: 0 0 auto;
+  width: calc(100% + 2 * var(--size-4-1, 4px));
+  margin: 0 calc(-1 * var(--size-4-1, 4px));
+  height: var(--header-height, 40px);
+  border-bottom: var(--tab-outline-width, 1px) solid var(--tab-outline-color, var(--background-modifier-border));
+  box-sizing: border-box;
+  pointer-events: none;
 }
 
 /* 右側 Activity Bar 顯示時，最右邊 column 的 tab header 以負 margin 延伸至視窗右緣：
@@ -1287,17 +1321,22 @@ body.is-popout-window.window-spaces-has-right-activity .workspace-split.mod-root
 /* 每個 Activity Bar 頂端（標題列高度）的拖曳區：拖曳移動整個視窗 */
 .window-spaces-activity-drag {
   flex: 0 0 auto;
-  width: 100%;
-  /* +1px 讓 border-bottom 與 tab header border（40.0-40.89）對齊 */
-  height: calc(var(--header-height, 40px) + 1px);
+  /* 負 margin 抵消 bar 的水平 padding（--size-4-1），讓拖曳區保持 bar 全寬、
+     邊緣也能拖曳視窗；margin 不影響後續按鈕的 gap 排版 */
+  width: calc(100% + 2 * var(--size-4-1, 4px));
+  margin: 0 calc(-1 * var(--size-4-1, 4px));
+  /* 高度 = header-height，讓 border-bottom 與 tab header 的 border-bottom
+     在同一水平（0→header-height，border 底緣對齊）；使用與
+     .workspace-tab-header-container 相同的 --tab-outline-* 變數，避免跨螢幕/DPI 1px 偏差 */
+  height: var(--header-height, 40px);
   -webkit-app-region: drag;
   cursor: default;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
+  font-size: var(--icon-m, 16px);
   user-select: none;
-  border-bottom: 1px solid var(--background-modifier-border);
+  border-bottom: var(--tab-outline-width, 1px) solid var(--tab-outline-color, var(--background-modifier-border));
   box-sizing: border-box;
 }
 .window-spaces-activity-left .window-spaces-activity-drag + .window-spaces-activity-btn,
@@ -1307,13 +1346,13 @@ body.is-popout-window.window-spaces-has-right-activity .workspace-split.mod-root
   margin-top: 0;
 }
 .window-spaces-activity-drag svg {
-  width: 16px;
-  height: 16px;
+  width: var(--icon-m, 16px);
+  height: var(--icon-m, 16px);
   color: var(--window-space-color, var(--text-muted));
 }
 .window-spaces-activity-drag .window-spaces-drag-emoji {
   line-height: 1;
-  font-size: 16px;
+  font-size: var(--icon-m, 16px);
 }
 
 /* Keep the Space icon visible even when the left Activity Bar is hidden. */
@@ -1338,24 +1377,25 @@ body.is-popout-window.window-spaces-has-right-activity .workspace-split.mod-root
 }
 .window-spaces-space-identity .window-spaces-space-icon {
   position: absolute;
-  /* 對齊：左起點 = activity bar icon 左起點（13.6px）、上起點 = tab header icon 上起點（11.4px）；
-     大小 16x16 與 activity bar icon 一致；此位置同時接近 logo area（44x40）置中 */
-  top: 11.4px;
-  left: 13.6px;
+  /* 對齊 tab header icon：尺寸用 --icon-l（與 tab icon 相同變數），
+     並以變數計算置中於 area，主題調整 ribbon 寬 / header 高 / icon 大小時
+     自動跟隨，垂直中心與 tab icon 一致 */
+  top: calc((var(--header-height, 40px) - var(--icon-l, 18px)) / 2);
+  left: calc((var(--window-spaces-activity-bar-width, 44px) - var(--icon-l, 18px)) / 2);
   z-index: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
+  width: var(--icon-l, 18px);
+  height: var(--icon-l, 18px);
   line-height: 1;
-  font-size: 16px;
+  font-size: var(--icon-l, 18px);
   pointer-events: auto;
   -webkit-app-region: drag;
 }
 .window-spaces-space-identity .window-spaces-space-icon svg {
-  width: 16px;
-  height: 16px;
+  width: var(--icon-l, 18px);
+  height: var(--icon-l, 18px);
   color: var(--window-space-color, var(--text-muted));
 }
 
@@ -1373,11 +1413,11 @@ body.is-popout-window.window-spaces-has-left-activity:not(.window-spaces-left-ac
 
 body.is-popout-window.window-spaces-has-left-activity:not(.window-spaces-left-activity-hidden)
   .window-spaces-space-identity .window-spaces-space-icon {
-  /* 與基礎規則一致：對齊 activity bar icon 左起點與 tab header icon 上起點 */
-  top: 11.4px;
-  left: 13.6px;
-  width: 16px;
-  height: 16px;
+  /* 與基礎規則一致：對齊 tab header icon（--icon-l、置中於 area） */
+  top: calc((var(--header-height, 40px) - var(--icon-l, 18px)) / 2);
+  left: calc((var(--window-spaces-activity-bar-width, 44px) - var(--icon-l, 18px)) / 2);
+  width: var(--icon-l, 18px);
+  height: var(--icon-l, 18px);
   pointer-events: auto;
   -webkit-app-region: drag;
 }
@@ -1391,8 +1431,8 @@ body.is-popout-window.window-spaces-has-left-activity:not(.window-spaces-left-ac
   height: var(--header-height, 40px) !important;
   top: 0 !important;
   background-color: var(--background-secondary) !important;
-  border-right: 1px solid var(--background-modifier-border) !important;
-  border-bottom: 1px solid var(--background-modifier-border) !important;
+  border-right: var(--divider-width, var(--tab-outline-width, 1px)) solid var(--divider-color, var(--tab-outline-color, var(--background-modifier-border))) !important;
+  border-bottom: var(--tab-outline-width, 1px) solid var(--tab-outline-color, var(--background-modifier-border)) !important;
   border-radius: 0 !important;
   pointer-events: auto !important;
   -webkit-app-region: drag !important;
@@ -1488,7 +1528,7 @@ body.is-popout-window.has-window-space-color.has-space-accents-tab
 
 body.is-popout-window.has-window-space-color.has-space-accents-tab
   .workspace-tab-header-container {
-  border-bottom: 1px solid var(--tab-outline-color) !important;
+  border-bottom: var(--tab-outline-width, 1px) solid var(--tab-outline-color) !important;
 }
 
 /* 2026-02 反饋：Obsidian 的 container-inner 有 margin-bottom: -1px 且背景不透明，
@@ -1629,7 +1669,8 @@ body.is-popout-window.has-window-space-color.has-space-accents-activity-bar
   ) !important;
 }
 
-/* 2026-02 反饋：activity bar 的「上方 border」（drag 區 border-bottom / 右側 top border）
+/* 2026-02 反饋：activity bar 的「上方 border」（drag 區 border-bottom / 右側 pseudo
+   header border-bottom）
    顏色須與「其他方向」的視覺邊界一致。當 panel accent 作用時，activity bar 的垂直
    邊界由相鄰 sidebar 的亮線主導；因此上方 border 也套用相同亮色，避免上方灰線與
    垂直亮線不一致（Activity Bar tint 本身仍由 has-space-accents-activity-bar 控制）。 */
@@ -1642,8 +1683,8 @@ body.is-popout-window.has-window-space-color.has-space-accents-panel
   ) !important;
 }
 body.is-popout-window.has-window-space-color.has-space-accents-panel
-  .window-spaces-activity-right {
-  border-top-color: color-mix(
+  .window-spaces-activity-right::before {
+  border-bottom-color: color-mix(
     in srgb,
     var(--window-space-color) 35%,
     var(--background-modifier-border)
@@ -1691,15 +1732,17 @@ body.is-popout-window .workspace-tab-header-spacer {
 
 .window-spaces-activity-btn {
   flex: 0 0 auto;
-  width: 36px;
-  /* 對齊 ribbon action button：icon 18px + padding 4px = 26px 高 */
-  height: 26px;
+  /* 對齊 ribbon action button：尺寸由變數計算，主題調整 --icon-l 或
+     --size-* 時自動跟隨（原生 ribbon action 同為 icon-l + size-2 padding）。
+     寬 = icon-l + 2×size-2-3（18+6×2=30）、高 = icon-l + 2×size-2-2（18+4×2=26） */
+  width: calc(var(--icon-l, 18px) + 2 * var(--size-2-3, 6px));
+  height: calc(var(--icon-l, 18px) + 2 * var(--size-2-2, 4px));
   padding: var(--size-2-2, 4px) var(--size-2-3, 6px);
   border: none;
-  border-radius: var(--radius-s, 4px);
+  border-radius: var(--clickable-icon-radius, var(--radius-s, 4px));
   background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
+  color: var(--icon-color, var(--text-muted));
+  cursor: var(--cursor, pointer);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1708,10 +1751,10 @@ body.is-popout-window .workspace-tab-header-spacer {
 }
 .window-spaces-activity-btn:hover {
   background-color: var(--background-modifier-hover);
-  color: var(--text-normal);
+  color: var(--icon-color-hover, var(--text-normal));
 }
 .window-spaces-activity-btn.is-active {
-  color: var(--text-normal);
+  color: var(--icon-color-active, var(--text-normal));
   background-color: var(--background-modifier-hover);
   border: none !important;
   box-shadow: none !important;
@@ -1730,19 +1773,9 @@ body.is-popout-window .workspace-tab-header-spacer {
   height: var(--icon-l, 18px);
 }
 
-/* Popout Activity Bar Native Sidebar Toggle Button Styling */
-.window-spaces-sidebar-toggle-btn {
-  position: relative;
-  /* 對齊主視窗 ribbon 首顆按鈕（sidebar-toggle-button）：高 = header - 1，
-     上下 padding 8px / 7px，icon 為 --icon-l */
-  width: 100%;
-  height: calc(var(--header-height, 40px) - 1px);
-  padding: var(--size-4-2, 8px) 0 7px 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
+/* Popout Activity Bar Native Sidebar Toggle Button Styling。
+   Toggle 鈕的 layout（尺寸 / padding / 間距）一律繼承 .window-spaces-activity-btn
+   基礎樣式，與其他按鈕一致；此處只保留 icon 圖形的特別樣式。 */
 .window-spaces-sidebar-toggle-btn .sidebar-toggle-icon-inner {
   stroke: none;
   transition: width 0.15s ease;
@@ -1766,15 +1799,6 @@ body.is-popout-window .workspace-tab-header-spacer {
 
 .window-spaces-sidebar-toggle-btn.mod-right.is-open .sidebar-toggle-icon-inner {
   width: var(--sidebar-right-toggle-inner-width-open, 24%);
-}
-
-/* 固定控制與 view 按鈕之間的分隔線 */
-.window-spaces-activity-divider {
-  flex: 0 0 auto;
-  width: calc(100% - 16px);
-  height: 1px;
-  background-color: var(--background-modifier-border);
-  margin: 0;
 }
 
 /* 側欄欄位（被判定為 sidebar 的頂層欄）：底色與邊距對齊主視窗 sidebar */

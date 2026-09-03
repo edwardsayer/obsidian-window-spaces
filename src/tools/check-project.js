@@ -43,7 +43,8 @@ const requiredFiles = [
   'src/shared/popoutLayout.ts',
   'src/shared/popoutLayoutRegistry.ts',
   'src/shared/sharedVersion.ts',
-  'src/shared/workspaceInterceptor.ts'
+  'src/shared/workspaceInterceptor.ts',
+  'src/shared/windowActiveFileTracker.ts'
 ];
 
 let allFilesExist = true;
