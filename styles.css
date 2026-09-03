@@ -1605,15 +1605,35 @@ body.is-popout-window.has-window-space-color.has-space-accents-splitter
     color-mix(in srgb, var(--window-space-color) 70%, transparent) !important;
 }
 
-/* 3. Panel Border & Focus Outline: 窗格邊框與焦點指示 */
+/* 3. Panel Border & Focus Outline: 窗格邊框與焦點指示
+   .workspace-tabs 的 top border 若直接套在 layout box 上，會把原生
+   .workspace-tab-header-container 往下推；在非整數 DPR 時，該 layout border
+   與 activity bar / tab header 的 border 會落在不同的 raster row。保留左右與
+   底部 border 作為 panel frame，只有 top edge 改用 overlay，避免改變 flex/split
+   的版面尺寸。 */
 body.is-popout-window.has-window-space-color.has-space-accents-panel
   .workspace-tabs {
-  border: 1px solid
-    color-mix(
-      in srgb,
-      var(--window-space-color) 35%,
-      var(--background-modifier-border)
-    ) !important;
+  position: relative;
+  border-top: 0 !important;
+  border-right: var(--tab-outline-width, 1px) solid var(--tab-outline-color) !important;
+  border-bottom: var(--tab-outline-width, 1px) solid var(--tab-outline-color) !important;
+  border-left: var(--tab-outline-width, 1px) solid var(--tab-outline-color) !important;
+}
+
+/* Overlay the panel's top edge in the same coordinate space as the native tab
+   header. A zero-height pseudo element paints the border without consuming
+   layout space, so it stays aligned when the window moves between displays. */
+body.is-popout-window.has-window-space-color.has-space-accents-panel
+  .workspace-tabs::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: var(--tab-outline-width, 1px) solid var(--tab-outline-color) !important;
+  pointer-events: none;
+  z-index: 1;
 }
 
 body.is-popout-window.has-window-space-color.has-space-accents-panel
