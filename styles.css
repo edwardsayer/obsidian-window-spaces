@@ -1636,6 +1636,27 @@ body.is-popout-window.has-window-space-color.has-space-accents-panel
   z-index: 1;
 }
 
+/* 3a. Maximized windows with zero outer frame inset
+   `has-window-space-border` is enabled only when the saved frame inset is
+   greater than zero. When it is absent in a maximized window, the root panel
+   perimeter touches the viewport edge; suppress only those top/bottom panel
+   edges so they are not mistaken for the outer frame. Borders at an internal
+   split remain intact. The selectors follow Obsidian's root layout structure
+   and do not depend on a platform-specific window size or pixel offset. */
+body.is-popout-window.is-maximized.has-window-space-color.has-space-accents-panel:not(.has-window-space-border)
+  .workspace-split.mod-root > .workspace-tabs::after,
+body.is-popout-window.is-maximized.has-window-space-color.has-space-accents-panel:not(.has-window-space-border)
+  .workspace-split.mod-root > .workspace-split > .workspace-tabs:first-of-type::after {
+  content: none !important;
+}
+
+body.is-popout-window.is-maximized.has-window-space-color.has-space-accents-panel:not(.has-window-space-border)
+  .workspace-split.mod-root > .workspace-tabs,
+body.is-popout-window.is-maximized.has-window-space-color.has-space-accents-panel:not(.has-window-space-border)
+  .workspace-split.mod-root > .workspace-split > .workspace-tabs:last-of-type {
+  border-bottom: 0 !important;
+}
+
 body.is-popout-window.has-window-space-color.has-space-accents-panel
   .workspace-tabs:focus-within {
   /* 2026-02 反饋：active content window 不需要在 border 特別高亮，移除 focus outline */
