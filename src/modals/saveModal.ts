@@ -711,7 +711,7 @@ export class SaveLayoutModal extends Modal {
           });
         });
         row.addButton((button) => {
-          button.setButtonText(t("settings.removeView")).setDestructive().onClick(() => {
+          button.setButtonText(t("settings.removeView")).setWarning().onClick(() => {
             const items = draft.items ?? [];
             if (!canRemoveActivityBarItem(items, enumerateAvailableViews(this.app)[side])) {
               new Notice(t("settings.keepOneActivityBarView"));

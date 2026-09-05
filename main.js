@@ -6043,7 +6043,7 @@ var WindowSpacesSettingTab = class extends import_obsidian4.PluginSettingTab {
     this.createSettingIn(dangerGroup, (s) => {
       s.setName(t("settings.resetSettings")).setDesc(t("settings.resetSettingsDescription"));
       s.addButton((button) => {
-        button.setButtonText(t("settings.resetButton")).setDestructive().onClick(async () => {
+        button.setButtonText(t("settings.resetButton")).setWarning().onClick(async () => {
           const confirmed = await this.showConfirmDialog(
             t("settings.resetConfirmMessage"),
             t("settings.resetConfirmTitle")
@@ -6111,7 +6111,7 @@ var WindowSpacesSettingTab = class extends import_obsidian4.PluginSettingTab {
         });
       });
       s.addButton((button) => {
-        button.setButtonText(t("settings.removeView")).setDestructive().onClick(() => {
+        button.setButtonText(t("settings.removeView")).setWarning().onClick(() => {
           const current = this.plugin.settings.activityBars?.[side] ?? [];
           if (!canRemoveActivityBarItem(current, enumerateAvailableViews(this.app)[side])) {
             new import_obsidian4.Notice(t("settings.keepOneActivityBarView"));
@@ -6956,7 +6956,7 @@ var SaveLayoutModal = class extends import_obsidian5.Modal {
           });
         });
         row.addButton((button) => {
-          button.setButtonText(t("settings.removeView")).setDestructive().onClick(() => {
+          button.setButtonText(t("settings.removeView")).setWarning().onClick(() => {
             const items2 = draft.items ?? [];
             if (!canRemoveActivityBarItem(items2, enumerateAvailableViews(this.app)[side])) {
               new import_obsidian5.Notice(t("settings.keepOneActivityBarView"));

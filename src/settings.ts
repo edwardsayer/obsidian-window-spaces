@@ -336,7 +336,7 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
       s.addButton((button) => {
         button
           .setButtonText(t("settings.resetButton"))
-          .setDestructive()
+          .setWarning()
           .onClick(async () => {
             const confirmed = await this.showConfirmDialog(
               t("settings.resetConfirmMessage"),
@@ -425,7 +425,7 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
       });
 
       s.addButton((button) => {
-        button.setButtonText(t("settings.removeView")).setDestructive().onClick(() => {
+        button.setButtonText(t("settings.removeView")).setWarning().onClick(() => {
           const current = this.plugin.settings.activityBars?.[side] ?? [];
           if (!canRemoveActivityBarItem(current, enumerateAvailableViews(this.app)[side])) {
             new Notice(t("settings.keepOneActivityBarView"));
