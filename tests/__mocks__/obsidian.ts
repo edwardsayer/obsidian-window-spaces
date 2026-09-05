@@ -6,6 +6,15 @@ export class Notice {
   hide() {}
 }
 
+// Obsidian 在 Node prototype 上注入的 instanceOf（cross-window instanceof，jsdom 沒有）。
+if (typeof Node.prototype.instanceOf !== "function") {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (Node.prototype as unknown as { instanceOf: (type: abstract new (...args: never[]) => unknown) => boolean }).instanceOf =
+    function instanceOf(this: Node, type: abstract new (...args: never[]) => unknown) {
+      return this instanceof type;
+    };
+}
+
 // Obsidian 在 runtime 對 HTMLElement prototype 加入的 helper，jsdom 沒有；
 // setIconWithCheck 依賴 el.empty()，在此補上以貼近真實環境。
 if (typeof HTMLElement.prototype.empty !== "function") {
@@ -14,6 +23,20 @@ if (typeof HTMLElement.prototype.empty !== "function") {
       this.removeChild(this.firstChild);
     }
   };
+}
+
+// Obsidian 在 Document 上注入的 createDiv/createEl helper（jsdom 沒有）。
+function obsidianDocumentCreateHelper(tagName: string) {
+  return function create(this: Document, cls?: string) {
+    const el = this.createElement(tagName);
+    if (cls) el.className = cls;
+    return el;
+  };
+}
+if (typeof (document as unknown as { createDiv?: unknown }).createDiv !== "function") {
+  const docExt = document as unknown as { createDiv: unknown; createEl: unknown };
+  docExt.createDiv = obsidianDocumentCreateHelper("div");
+  docExt.createEl = obsidianDocumentCreateHelper("div");
 }
 
 export class TFile {

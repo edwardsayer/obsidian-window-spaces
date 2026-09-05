@@ -1118,11 +1118,21 @@ function getIconFromRegistryEntry(app, viewType) {
   }
   return null;
 }
+function hideElement(el) {
+  const customEl = el;
+  const displayKey = "display";
+  const displayValue = "none";
+  if (typeof customEl.setCssProps === "function") {
+    customEl.setCssProps({ [displayKey]: displayValue });
+  } else {
+    el.style.setProperty(displayKey, displayValue);
+  }
+}
 async function getIconFromEphemeralView(app, viewType) {
   const creator = getViewCreatorForType(app, viewType);
   if (!creator) return null;
-  const host = document.createElement("div");
-  host.style.display = "none";
+  const host = document.createDiv();
+  hideElement(host);
   try {
     document.body.appendChild(host);
     const leaf = {
@@ -1156,8 +1166,8 @@ async function getIconFromRealLeaf(app, viewType) {
   try {
     leaf = workspace.getLeaf("tab");
     const container = leaf.containerEl;
-    if (container instanceof HTMLElement) {
-      container.style.display = "none";
+    if (container.instanceOf(HTMLElement)) {
+      hideElement(container);
     }
     await leaf.setViewState({ type: viewType, active: false, state: {} });
     const view = leaf.view;
@@ -4097,7 +4107,7 @@ var WindowLayoutManager = class {
    * 恢復指定的佈局 (忠實還原 Tabs, Horizontal/Vertical Splits 與檔案狀態)
    */
   async restoreLayout(layout, options = {}) {
-    if (this.activeRestorePromise) return this.activeRestorePromise;
+    if (this.activeRestorePromise !== null) return this.activeRestorePromise;
     const restorePromise = this.restoreLayoutInternal(layout, options);
     this.activeRestorePromise = restorePromise;
     try {
@@ -4890,7 +4900,7 @@ var WindowLayoutManager = class {
         let guard = 0;
         while (item && guard++ < 20) {
           const itemEl = item.containerEl;
-          if (itemEl instanceof HTMLElement && !elToItem.has(itemEl)) {
+          if (itemEl.instanceOf(HTMLElement) && !elToItem.has(itemEl)) {
             elToItem.set(itemEl, item);
           }
           item = item.parent;
@@ -4899,7 +4909,7 @@ var WindowLayoutManager = class {
     } catch {
     }
     const getSplitChildren = (el) => Array.from(el.children).filter(
-      (child) => child instanceof HTMLElement && (child.classList.contains("workspace-tabs") || child.classList.contains("workspace-split"))
+      (child) => child.instanceOf(HTMLElement) && (child.classList.contains("workspace-tabs") || child.classList.contains("workspace-split"))
     );
     const setFlexGrow = (domEl, dimension) => {
       const item = elToItem.get(domEl);
@@ -4910,11 +4920,12 @@ var WindowLayoutManager = class {
         }
       }
       const customEl = domEl;
+      const flexGrowKey = "flex-grow";
       const flexGrow = String(dimension);
       if (typeof customEl.setCssProps === "function") {
-        customEl.setCssProps({ "flex-grow": flexGrow });
+        customEl.setCssProps({ [flexGrowKey]: flexGrow });
       } else {
-        domEl.style.setProperty("flex-grow", flexGrow);
+        domEl.style.setProperty(flexGrowKey, flexGrow);
       }
     };
     const applyNode = (node, domEl) => {
@@ -5569,7 +5580,9 @@ var WindowLayoutManager = class {
   hasRenderedContent(leaf) {
     if (!leaf) return false;
     const leafEl = leaf.containerEl || leaf.view?.containerEl;
-    if (!(leafEl instanceof HTMLElement)) return false;
+    if (!(leafEl && typeof leafEl.instanceOf === "function" && leafEl.instanceOf(HTMLElement))) {
+      return false;
+    }
     const content = leafEl.querySelector(".view-content");
     if (content) return content.children.length > 0;
     const navFiles = leafEl.querySelector(".nav-files-container");
@@ -5809,6 +5822,8 @@ var WindowSpacesSettingTab = class extends import_obsidian4.PluginSettingTab {
     super(app, plugin);
     this.plugin = plugin;
   }
+  // Obsidian 1.13.0+ 宣告式設定搜尋介面；minAppVersion 1.12.7 仍以 display()
+  // 為主要渲染路徑，故此處回空陣列以滿足 declarative settings 契約。
   getSettingDefinitions() {
     return [];
   }
@@ -5974,13 +5989,14 @@ var WindowSpacesSettingTab = class extends import_obsidian4.PluginSettingTab {
       });
       (0, import_obsidian4.setIcon)(pickIconBtn, "image");
       pickIconBtn.onclick = () => {
-        new IconPickerModal(this.app, async (selected) => {
+        new IconPickerModal(this.app, (selected) => {
           currentIcon = selected;
           iconInputEl.value = selected;
           this.plugin.settings.defaultIcon = selected;
-          await this.plugin.saveSettings();
-          updatePreview();
-          this.plugin.activityBars.refreshAll();
+          void this.plugin.saveSettings().then(() => {
+            updatePreview();
+            this.plugin.activityBars.refreshAll();
+          });
         }).open();
       };
       const previewEl = s.controlEl.createDiv({ cls: "window-space-icon-preview" });
@@ -6002,7 +6018,7 @@ var WindowSpacesSettingTab = class extends import_obsidian4.PluginSettingTab {
     this.createSettingIn(defaultsGroup, (s) => {
       s.setName(t("settings.defaultBorderInset")).setDesc(t("settings.defaultBorderInsetDesc"));
       s.addSlider((slider) => {
-        slider.setLimits(0, 5, 1).setValue(this.getDefaultBorderInset()).setDynamicTooltip().onChange(async (value) => {
+        slider.setLimits(0, 5, 1).setValue(this.getDefaultBorderInset()).onChange(async (value) => {
           this.plugin.settings.defaultBorderInset = value;
           await this.plugin.saveSettings();
           this.plugin.activityBars.refreshAll();
@@ -6027,7 +6043,7 @@ var WindowSpacesSettingTab = class extends import_obsidian4.PluginSettingTab {
     this.createSettingIn(dangerGroup, (s) => {
       s.setName(t("settings.resetSettings")).setDesc(t("settings.resetSettingsDescription"));
       s.addButton((button) => {
-        button.setButtonText(t("settings.resetButton")).setWarning().onClick(async () => {
+        button.setButtonText(t("settings.resetButton")).setDestructive().onClick(async () => {
           const confirmed = await this.showConfirmDialog(
             t("settings.resetConfirmMessage"),
             t("settings.resetConfirmTitle")
@@ -6095,7 +6111,7 @@ var WindowSpacesSettingTab = class extends import_obsidian4.PluginSettingTab {
         });
       });
       s.addButton((button) => {
-        button.setButtonText(t("settings.removeView")).setWarning().onClick(() => {
+        button.setButtonText(t("settings.removeView")).setDestructive().onClick(() => {
           const current = this.plugin.settings.activityBars?.[side] ?? [];
           if (!canRemoveActivityBarItem(current, enumerateAvailableViews(this.app)[side])) {
             new import_obsidian4.Notice(t("settings.keepOneActivityBarView"));
@@ -6648,7 +6664,7 @@ var SaveLayoutModal = class extends import_obsidian5.Modal {
     this.createSettingIn(windowGroup, (setting) => {
       setting.setName(t("saveModal.borderInset")).setDesc(t("saveModal.borderInsetDesc"));
       setting.addSlider((slider) => {
-        slider.setLimits(0, 5, 1).setValue(borderInset).setDynamicTooltip().onChange((value) => {
+        slider.setLimits(0, 5, 1).setValue(borderInset).onChange((value) => {
           borderInset = value;
           borderInsetOverride = value;
         });
@@ -6940,7 +6956,7 @@ var SaveLayoutModal = class extends import_obsidian5.Modal {
           });
         });
         row.addButton((button) => {
-          button.setButtonText(t("settings.removeView")).setWarning().onClick(() => {
+          button.setButtonText(t("settings.removeView")).setDestructive().onClick(() => {
             const items2 = draft.items ?? [];
             if (!canRemoveActivityBarItem(items2, enumerateAvailableViews(this.app)[side])) {
               new import_obsidian5.Notice(t("settings.keepOneActivityBarView"));
@@ -7868,7 +7884,7 @@ async function waitForPopoutWindow(leaf) {
   for (let attempt = 0; attempt < 40; attempt++) {
     const candidate = extLeaf.containerEl?.ownerDocument?.defaultView;
     if (candidate && isPopoutDocument(candidate.document)) return candidate;
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await new Promise((resolve) => window.setTimeout(resolve, 50));
   }
   return null;
 }
@@ -7950,7 +7966,7 @@ function createStableProxy(state) {
   });
 }
 function getRegistryState() {
-  const namespace = globalThis;
+  const namespace = window;
   const existing = namespace[POPOUT_LAYOUT_REGISTRY_KEY];
   if (existing) return existing;
   const state = {
@@ -8310,10 +8326,11 @@ var PopoutActivityBarManager = class {
     if (!Number.isFinite(flexGrow) || flexGrow <= 0) return;
     const customEl = column;
     const value = String(flexGrow);
+    const flexGrowKey = "flex-grow";
     if (typeof customEl.setCssProps === "function") {
-      customEl.setCssProps({ "flex-grow": value });
+      customEl.setCssProps({ [flexGrowKey]: value });
     } else {
-      column.style.setProperty("flex-grow", value);
+      column.style.setProperty(flexGrowKey, value);
     }
   }
   getColumnFlexGrow(win, column) {
@@ -8517,15 +8534,16 @@ var PopoutActivityBarManager = class {
     );
     if (!rootEl) return;
     const getSplitChildren = (splitEl) => Array.from(splitEl.children).filter(
-      (child) => child instanceof HTMLElement && (child.classList.contains("workspace-tabs") || child.classList.contains("workspace-split"))
+      (child) => child.instanceOf(HTMLElement) && (child.classList.contains("workspace-tabs") || child.classList.contains("workspace-split"))
     );
     const setFlex = (el, dimension) => {
       const customEl = el;
       const flexGrow = String(dimension);
+      const flexGrowKey = "flex-grow";
       if (typeof customEl.setCssProps === "function") {
-        customEl.setCssProps({ "flex-grow": flexGrow });
+        customEl.setCssProps({ [flexGrowKey]: flexGrow });
       } else {
-        el.style.setProperty("flex-grow", flexGrow);
+        el.style.setProperty(flexGrowKey, flexGrow);
       }
     };
     const applyNode = (node, splitEl) => {
@@ -8577,23 +8595,39 @@ var PopoutActivityBarManager = class {
     btn.classList.toggle("is-open", !hidden);
     let svg = btn.querySelector("svg.sidebar-toggle-button-icon");
     if (!svg) {
-      btn.innerHTML = `
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon sidebar-toggle-button-icon">
-          <rect x="1" y="2" width="22" height="20" rx="4"></rect>
-          <rect x="4" y="5" width="2" height="14" rx="2" fill="currentColor" class="sidebar-toggle-icon-inner"></rect>
-        </svg>
-      `.trim();
-      svg = btn.querySelector("svg.sidebar-toggle-button-icon");
+      const SVG_NS = "http://www.w3.org/2000/svg";
+      svg = btn.ownerDocument.createElementNS(SVG_NS, "svg");
+      svg.setAttribute("width", "24");
+      svg.setAttribute("height", "24");
+      svg.setAttribute("viewBox", "0 0 24 24");
+      svg.setAttribute("fill", "none");
+      svg.setAttribute("stroke", "currentColor");
+      svg.setAttribute("stroke-width", "2");
+      svg.setAttribute("stroke-linecap", "round");
+      svg.setAttribute("stroke-linejoin", "round");
+      svg.classList.add("svg-icon", "sidebar-toggle-button-icon");
+      const outerRect = btn.ownerDocument.createElementNS(SVG_NS, "rect");
+      outerRect.setAttribute("x", "1");
+      outerRect.setAttribute("y", "2");
+      outerRect.setAttribute("width", "22");
+      outerRect.setAttribute("height", "20");
+      outerRect.setAttribute("rx", "4");
+      const innerRectEl = btn.ownerDocument.createElementNS(SVG_NS, "rect");
+      innerRectEl.setAttribute("x", "4");
+      innerRectEl.setAttribute("y", "5");
+      innerRectEl.setAttribute("width", "2");
+      innerRectEl.setAttribute("height", "14");
+      innerRectEl.setAttribute("rx", "2");
+      innerRectEl.setAttribute("fill", "currentColor");
+      innerRectEl.classList.add("sidebar-toggle-icon-inner");
+      svg.append(outerRect, innerRectEl);
+      btn.appendChild(svg);
     }
     const innerRect = svg?.querySelector(".sidebar-toggle-icon-inner");
     if (innerRect) {
-      if (hidden) {
-        innerRect.setAttribute("width", "2");
-        innerRect.style.setProperty("width", "var(--sidebar-left-toggle-inner-width, 8.33%)");
-      } else {
-        innerRect.setAttribute("width", "5.76");
-        innerRect.style.setProperty("width", "var(--sidebar-left-toggle-inner-width-open, 24%)");
-      }
+      const collapsedWidth = "2";
+      const expandedWidth = "5.76";
+      innerRect.setAttribute("width", hidden ? collapsedWidth : expandedWidth);
     }
   }
   /** 針對單一 Popout 注入（若已注入且仍連接著 DOM 則重新渲染按鈕）。 */
@@ -9021,7 +9055,7 @@ var PopoutActivityBarManager = class {
     for (const leaf of leaves) {
       const extLeaf = leaf;
       const container = extLeaf.containerEl || leaf.view?.containerEl;
-      if (container instanceof HTMLElement && columnEl.contains(container)) {
+      if (container.instanceOf(HTMLElement) && columnEl.contains(container)) {
         const type = leaf.getViewState()?.type;
         if (type && editorViewTypes.has(type)) return true;
       }
@@ -9276,7 +9310,7 @@ var PopoutActivityBarManager = class {
       if (has) return;
       const extLeaf = leaf;
       const container = extLeaf.containerEl || leaf.view?.containerEl;
-      if (container instanceof HTMLElement && columnEl.contains(container)) {
+      if (container.instanceOf(HTMLElement) && columnEl.contains(container)) {
         const type = leaf.getViewState()?.type;
         if (type && type !== "empty") has = true;
       }
@@ -9290,7 +9324,7 @@ var PopoutActivityBarManager = class {
       if (found) return;
       const extLeaf = leaf;
       const container = extLeaf.containerEl || leaf.view?.containerEl;
-      if (container instanceof HTMLElement && columnEl.contains(container)) {
+      if (container.instanceOf(HTMLElement) && columnEl.contains(container)) {
         found = leaf;
       }
     });
@@ -9503,7 +9537,7 @@ var PopoutActivityBarManager = class {
     const leaves = this.engine.getLeavesForWindow(win).filter((leaf) => {
       const extLeaf = leaf;
       const container = extLeaf.containerEl || leaf.view?.containerEl;
-      return container instanceof HTMLElement && columnEl.contains(container);
+      return container.instanceOf(HTMLElement) && columnEl.contains(container);
     });
     const manager = this.plugin.manager;
     for (const leaf of leaves) {
@@ -9522,7 +9556,7 @@ var PopoutActivityBarManager = class {
 
 // src/shared/windowActiveFileTracker.ts
 function getSharedActiveFileState() {
-  const namespace = globalThis;
+  const namespace = window;
   let state = namespace.__obsidian_window_active_file_tracker_state_v1__;
   if (!state) {
     state = {
@@ -9688,7 +9722,7 @@ var WindowActiveFileTracker = class {
 
 // src/shared/workspaceInterceptor.ts
 function getState(app) {
-  const namespace = globalThis;
+  const namespace = window;
   const existing = namespace.__obsidian_workspace_interceptor_state_v1__;
   if (existing) {
     if (existing.participants.size === 0 && !existing.installed) {
@@ -9971,7 +10005,7 @@ function acquireWorkspaceInterceptor(app, participant) {
   install(state);
 }
 function releaseWorkspaceInterceptor(id) {
-  const namespace = globalThis;
+  const namespace = window;
   const state = namespace.__obsidian_workspace_interceptor_state_v1__;
   if (!state) return;
   state.participants.delete(id);

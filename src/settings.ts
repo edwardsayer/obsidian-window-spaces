@@ -1,4 +1,5 @@
 import { App, PluginSettingTab, Setting, Notice, Modal, setIcon } from "obsidian";
+import type { SettingDefinitionItem } from "obsidian";
 import * as obsidian from "obsidian";
 import { t } from "./i18n";
 import { SettingGroupLike } from "./types";
@@ -74,7 +75,9 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
     this.plugin = plugin;
   }
 
-  getSettingDefinitions(): any[] {
+  // Obsidian 1.13.0+ 宣告式設定搜尋介面；minAppVersion 1.12.7 仍以 display()
+  // 為主要渲染路徑，故此處回空陣列以滿足 declarative settings 契約。
+  getSettingDefinitions(): SettingDefinitionItem[] {
     return [];
   }
 
@@ -267,13 +270,14 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
       });
       setIcon(pickIconBtn, "image");
       pickIconBtn.onclick = () => {
-        new IconPickerModal(this.app, async (selected) => {
+        new IconPickerModal(this.app, (selected) => {
           currentIcon = selected;
           iconInputEl.value = selected;
           this.plugin.settings.defaultIcon = selected;
-          await this.plugin.saveSettings();
-          updatePreview();
-          this.plugin.activityBars.refreshAll();
+          void this.plugin.saveSettings().then(() => {
+            updatePreview();
+            this.plugin.activityBars.refreshAll();
+          });
         }).open();
       };
 
@@ -300,7 +304,6 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
         slider
           .setLimits(0, 5, 1)
           .setValue(this.getDefaultBorderInset())
-          .setDynamicTooltip()
           .onChange(async (value) => {
             this.plugin.settings.defaultBorderInset = value;
             await this.plugin.saveSettings();
@@ -333,7 +336,7 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
       s.addButton((button) => {
         button
           .setButtonText(t("settings.resetButton"))
-          .setWarning()
+          .setDestructive()
           .onClick(async () => {
             const confirmed = await this.showConfirmDialog(
               t("settings.resetConfirmMessage"),
@@ -422,7 +425,7 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
       });
 
       s.addButton((button) => {
-        button.setButtonText(t("settings.removeView")).setWarning().onClick(() => {
+        button.setButtonText(t("settings.removeView")).setDestructive().onClick(() => {
           const current = this.plugin.settings.activityBars?.[side] ?? [];
           if (!canRemoveActivityBarItem(current, enumerateAvailableViews(this.app)[side])) {
             new Notice(t("settings.keepOneActivityBarView"));

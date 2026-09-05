@@ -1817,16 +1817,17 @@ body.is-popout-window .workspace-tab-header-spacer {
 /* Popout Activity Bar Native Sidebar Toggle Button Styling。
    Toggle 鈕的 layout（尺寸 / padding / 間距）一律繼承 .window-spaces-activity-btn
    基礎樣式，與其他按鈕一致；此處只保留 icon 圖形的特別樣式。 */
+/* 收合狀態由 is-collapsed / is-open class 控制（JS 僅同步 class，不寫 inline style）。 */
 .window-spaces-sidebar-toggle-btn .sidebar-toggle-icon-inner {
   stroke: none;
   transition: width 0.15s ease;
 }
 
-.window-spaces-sidebar-toggle-btn.mod-left .sidebar-toggle-icon-inner {
+.window-spaces-sidebar-toggle-btn.is-collapsed .sidebar-toggle-icon-inner {
   width: var(--sidebar-left-toggle-inner-width, 8.33%);
 }
 
-.window-spaces-sidebar-toggle-btn.mod-left.is-open .sidebar-toggle-icon-inner {
+.window-spaces-sidebar-toggle-btn.is-open .sidebar-toggle-icon-inner {
   width: var(--sidebar-left-toggle-inner-width-open, 24%);
 }
 

@@ -340,7 +340,6 @@ export class SaveLayoutModal extends Modal {
         slider
           .setLimits(0, 5, 1)
           .setValue(borderInset)
-          .setDynamicTooltip()
           .onChange((value) => {
             borderInset = value;
             borderInsetOverride = value;
@@ -712,7 +711,7 @@ export class SaveLayoutModal extends Modal {
           });
         });
         row.addButton((button) => {
-          button.setButtonText(t("settings.removeView")).setWarning().onClick(() => {
+          button.setButtonText(t("settings.removeView")).setDestructive().onClick(() => {
             const items = draft.items ?? [];
             if (!canRemoveActivityBarItem(items, enumerateAvailableViews(this.app)[side])) {
               new Notice(t("settings.keepOneActivityBarView"));

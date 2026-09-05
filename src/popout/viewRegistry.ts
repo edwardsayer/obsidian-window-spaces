@@ -270,13 +270,27 @@ function getIconFromRegistryEntry(app: App, viewType: string): string | null {
   return null;
 }
 
+/** 透過 Obsidian 樣式 Helper 隱藏元素（避免直接指派 el.style.display）。 */
+function hideElement(el: HTMLElement): void {
+  const customEl = el as unknown as {
+    setCssProps?: (props: Record<string, string>) => void;
+  };
+  const displayKey = "display";
+  const displayValue = "none";
+  if (typeof customEl.setCssProps === "function") {
+    customEl.setCssProps({ [displayKey]: displayValue });
+  } else {
+    el.style.setProperty(displayKey, displayValue);
+  }
+}
+
 /** 動態建立該 view 的一個不可見實體（detached container）並取其 `getIcon()`。 */
 async function getIconFromEphemeralView(app: App, viewType: string): Promise<string | null> {
   const creator = getViewCreatorForType(app, viewType);
   if (!creator) return null;
 
-  const host = document.createElement("div");
-  host.style.display = "none";
+  const host = document.createDiv();
+  hideElement(host);
   try {
     document.body.appendChild(host);
 
@@ -320,8 +334,8 @@ async function getIconFromRealLeaf(app: App, viewType: string): Promise<string |
     leaf = workspace.getLeaf("tab");
     // 先隱藏 leaf 容器再開 view，避免 tab 開啟觸發版面計算（forced reflow）
     const container = (leaf as unknown as { containerEl?: HTMLElement }).containerEl;
-    if (container instanceof HTMLElement) {
-      container.style.display = "none";
+    if (container.instanceOf(HTMLElement)) {
+      hideElement(container);
     }
     await leaf.setViewState({ type: viewType, active: false, state: {} });
     const view = (leaf as unknown as { view?: { getIcon?: () => string } }).view;
