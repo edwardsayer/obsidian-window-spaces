@@ -1795,7 +1795,7 @@ body.is-popout-window .workspace-tab-header-spacer {
   color: var(--icon-color-hover, var(--text-normal));
 }
 .window-spaces-activity-btn.is-active {
-  color: var(--icon-color-active, var(--text-normal));
+  color: var(--tab-text-color-active, var(--text-normal));
   background-color: var(--background-modifier-hover);
   border: none !important;
   box-shadow: none !important;

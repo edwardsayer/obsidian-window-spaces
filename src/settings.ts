@@ -7,6 +7,7 @@ import {
   applyItemIcon,
   enumerateAvailableViews,
   ensureViewIcon,
+  getViewsFromHostSplit,
   resolveViewIcon,
   resolveViewLabel,
   setIconWithCheck,
@@ -339,8 +340,25 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
               t("settings.resetConfirmTitle")
             );
             if (confirmed) {
-              this.plugin.settings.spaces = [];
-              await this.plugin.saveSettings();
+              try {
+                await this.plugin.resetSettingsPreservingSpaces();
+              } catch (error: unknown) {
+                const message = error instanceof Error ? error.message : String(error);
+                console.warn("Failed to reset Window Spaces settings:", error);
+                new Notice(`${t("errors.failedToSave")}: ${message}`);
+                return;
+              }
+
+              // Resetting auto-save to its factory default must also cancel a
+              // pending debounce owned by this settings tab.
+              this.removeAutoSave();
+              this.plugin.refreshRibbonIcons();
+              if (this.plugin.workspaceInterceptor) {
+                this.plugin.workspaceInterceptor.enabled =
+                  this.plugin.settings.workspaceInterceptorEnabled !== false;
+              }
+              this.plugin.manager?.refreshLayoutLabels();
+              this.plugin.activityBars?.refreshAll();
               this.display(); // 重新顯示設定頁面
               new Notice(t("settings.resetSuccess"));
             }
@@ -475,6 +493,38 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
   private renderActivityBarSide(section: HTMLElement, side: "left" | "right", heading: string): void {
     new Setting(section).setName(heading).setHeading();
     const group = this.createGroup(section) ?? section;
+
+    // Keep host adoption explicit. A live mirror would overwrite a Space's
+    // independent view selection whenever the main window changes.
+    let refreshSelect: () => void = () => undefined;
+    let renderItemRows: () => void = () => undefined;
+    this.createSettingIn(group, (s) => {
+      s.setName(t("settings.importFromHost"));
+      s.setDesc(t("settings.importFromHostDesc"));
+      s.addButton((button) => {
+        button.setButtonText(t("settings.importFromHost")).onClick(async () => {
+          const imported = getViewsFromHostSplit(this.app, side);
+          if (imported.length === 0) {
+            new Notice(t("settings.importFromHostEmpty"));
+            return;
+          }
+
+          const previousActivityBars = this.plugin.settings.activityBars;
+          this.plugin.settings.activityBars = this.plugin.settings.activityBars ?? { left: [], right: [] };
+          this.plugin.settings.activityBars[side] = imported;
+          try {
+            await this.plugin.saveSettings();
+            this.plugin.activityBars.refreshAll();
+            renderItemRows();
+            new Notice(t("settings.importFromHostSuccess"));
+          } catch (error: unknown) {
+            this.plugin.settings.activityBars = previousActivityBars;
+            console.warn("Failed to import Activity Bar views from host sidebar:", error);
+          }
+        });
+      });
+    });
+
     this.createSettingIn(group, (s) => {
       s.setName(t("settings.defaultActivityBarVisibility"));
       s.setDesc(t("settings.defaultActivityBarVisibilityDesc"));
@@ -548,9 +598,9 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
       });
     });
 
-    const refreshSelect = () => this.rebuildViewSelect(selectEl, side);
+    refreshSelect = () => this.rebuildViewSelect(selectEl, side);
 
-    const renderItemRows = () => {
+    renderItemRows = () => {
       const current = this.plugin.settings.activityBars?.[side];
       const items = Array.isArray(current) ? current : [];
       const validItems = items.filter(isActivityBarItem);

@@ -5,10 +5,13 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = 9333;
 const VAULT_PATH = 'E:\\vaults\\quartz-vault';
-const PROJECT_ROOT = 'D:\\GitDev\\ObsidianWindowSpaces';
-const SCREENSHOTS_DIR = path.join(PROJECT_ROOT, 'screenshots');
+const PROJECT_ROOT = path.resolve(__dirname, '..');
+const SCREENSHOTS_DIR = path.join(PROJECT_ROOT, 'assets', 'screenshots');
 const OBSIDIAN_CONFIG_PATH = path.join(process.env.APPDATA, 'obsidian', 'obsidian.json');
 
 function resolveObsidianExe() {

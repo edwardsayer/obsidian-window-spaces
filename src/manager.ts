@@ -3704,7 +3704,14 @@ export class WindowLayoutManager {
     const explicitLeaves = Array.isArray(layout.workspace?.leaves)
       ? layout.workspace.leaves
       : [];
-    const explicitById = new Map(explicitLeaves.map((leaf) => [leaf.id, leaf]));
+    // Without a layout tree, workspace.leaves is the only available source;
+    // preserve it for legacy layouts, including entries without an id.
+    if (fromLayout.length === 0) return explicitLeaves;
+
+    const explicitLeavesWithStableIds = explicitLeaves.filter((leaf) =>
+      typeof leaf?.id === "string" && leaf.id.trim().length > 0
+    );
+    const explicitById = new Map(explicitLeavesWithStableIds.map((leaf) => [leaf.id, leaf]));
 
     const result = fromLayout.map((leaf) => {
       const explicit = explicitById.get(leaf.id);
@@ -3716,9 +3723,15 @@ export class WindowLayoutManager {
       };
     });
 
+    // When the layout tree is present it is the authoritative ordering and
+    // cardinality. Id-less workspace.leaves entries are legacy snapshots of
+    // the same views, not additional tabs; only stable IDs can identify a
+    // leaf that is genuinely missing from the tree.
     const resultIds = new Set(result.map((leaf) => leaf.id));
-    explicitLeaves.forEach((leaf) => {
-      if (!resultIds.has(leaf.id)) result.push(leaf);
+    explicitLeavesWithStableIds.forEach((leaf) => {
+      if (resultIds.has(leaf.id)) return;
+      result.push(leaf);
+      resultIds.add(leaf.id);
     });
     return result;
   }

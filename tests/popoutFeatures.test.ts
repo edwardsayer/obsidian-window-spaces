@@ -20,6 +20,8 @@ import {
   applyViewIcon,
   ensureViewIcon,
   enumerateAvailableViews,
+  getDefaultActivityBarItems,
+  getViewsFromHostSplit,
   resolveViewIcon,
   resolveViewLabel,
   sortViewTypesByLabel,
@@ -1887,6 +1889,28 @@ describe("view icon resolution", () => {
     expect(btn.getAttribute("data-icon")).toBe("layout");
   });
 
+  test("applyViewIcon uses a known plugin icon before the generic layout fallback", () => {
+    const btn = document.createElement("button");
+    applyViewIcon(btn, { workspace: {} } as any, "recent-files");
+    expect(btn.getAttribute("data-icon")).toBe("clock");
+  });
+
+  test("applyViewIcon lets an open plugin view override its known fallback icon", async () => {
+    const btn = document.createElement("button");
+    document.body.appendChild(btn);
+    const app = {
+      workspace: {
+        iterateAllLeaves: (cb: (leaf: any) => void) => {
+          cb({ view: { getViewType: () => "notebook-navigator", getIcon: () => "notebook-tabs" } });
+        },
+      },
+    } as any;
+
+    applyViewIcon(btn, app, "notebook-navigator", { allowDynamicIcon: true });
+    expect(btn.getAttribute("data-icon")).toBe("notebook-navigator");
+    await vi.waitFor(() => expect(btn.getAttribute("data-icon")).toBe("notebook-tabs"));
+  });
+
   test("ensureViewIcon finds icon from an open leaf across all windows", async () => {
     const app = {
       workspace: {
@@ -1993,6 +2017,78 @@ describe("view icon resolution", () => {
 });
 
 describe("viewRegistry enumeration", () => {
+  test("factory defaults follow native sidebar grouping and return detached items", () => {
+    const left = getDefaultActivityBarItems("left");
+    const right = getDefaultActivityBarItems("right");
+
+    expect(left.map((item) => item.viewType)).toEqual([
+      "file-explorer",
+      "search",
+      "bookmarks",
+      "window-spaces-layouts",
+    ]);
+    expect(right.map((item) => item.viewType)).toEqual([
+      "outline",
+      "all-properties",
+      "tag",
+      "backlink",
+    ]);
+    expect(left.map((item) => item.icon)).toEqual([
+      "folder-closed",
+      "search",
+      "bookmark",
+      "layout",
+    ]);
+    expect(right.map((item) => item.icon)).toEqual([
+      "list",
+      "archive",
+      "tags",
+      "links-coming-in",
+    ]);
+
+    left[0].icon = "custom-icon";
+    expect(getDefaultActivityBarItems("left")[0].icon).toBe("folder-closed");
+  });
+
+  test("imports ordered, unique, embeddable views from the requested host sidebar", () => {
+    const app = {
+      workspace: {
+        leftSplit: {
+          children: [
+            {
+              view: {
+                getViewType: () => "file-explorer",
+                getIcon: () => "lucide-folder-closed",
+                getDisplayText: () => "Files",
+              },
+            },
+            {
+              children: [
+                { view: { getViewType: () => "some-plugin-view" } },
+                { view: { getViewType: () => "some-plugin-view" } },
+              ],
+            },
+            { view: { getViewType: () => "empty" } },
+          ],
+        },
+        rightSplit: {
+          children: [
+            { getViewState: () => ({ type: "outline" }) },
+            { view: { getViewType: () => "markdown" } },
+          ],
+        },
+      },
+    } as any;
+
+    expect(getViewsFromHostSplit(app, "left")).toEqual([
+      { viewType: "file-explorer", side: "left", label: "Files", icon: "lucide-folder-closed" },
+      { viewType: "some-plugin-view", side: "left" },
+    ]);
+    expect(getViewsFromHostSplit(app, "right")).toEqual([
+      { viewType: "outline", side: "right" },
+    ]);
+  });
+
   test("enumerateAvailableViews includes builtin views and dedupes", () => {
     const app = {
       viewRegistry: {

@@ -189,6 +189,10 @@ export interface TranslationStrings {
     defaultFoldedCornerDesc: string;
     defaultActivityBarVisibility: string;
     defaultActivityBarVisibilityDesc: string;
+    importFromHost: string;
+    importFromHostDesc: string;
+    importFromHostSuccess: string;
+    importFromHostEmpty: string;
     dragToReorder: string;
     keepOneActivityBarView: string;
     popoutAccentsTitle: string;

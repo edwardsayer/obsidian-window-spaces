@@ -10,18 +10,54 @@ import { ActivityBarItem, ExtendedViewRegistry } from "../types";
  * 3. 自訂 type 輸入（由設定頁處理）。
  */
 
-/** 內建側欄可用的精選 View（icon 為 Lucide icon 名稱）。 */
+/** 內建側欄可用的精選 View（對齊 Obsidian 原生左右 Sidedock 習慣配置）。 */
 export const BUILTIN_SIDEBAR_VIEWS: ActivityBarItem[] = [
-  { viewType: "file-explorer", label: "File explorer", icon: "folder", side: "left" },
+  // Left Sidedock (導覽、檔案與空間管理)
+  { viewType: "file-explorer", label: "File explorer", icon: "folder-closed", side: "left" },
   { viewType: "search", label: "Search", icon: "search", side: "left" },
-  { viewType: "outline", label: "Outline", icon: "list-tree", side: "left" },
+  { viewType: "bookmarks", label: "Bookmarks", icon: "bookmark", side: "left" },
   { viewType: "window-spaces-layouts", label: "Window Spaces", icon: "layout", side: "left" },
-  { viewType: "bookmarks", label: "Bookmarks", icon: "bookmark", side: "right" },
-  { viewType: "backlink", label: "Backlinks", icon: "link", side: "right" },
-  { viewType: "tag", label: "Tags", icon: "tag", side: "right" },
-  { viewType: "all-properties", label: "Properties", icon: "list", side: "right" },
-  { viewType: "canvas", label: "Canvas", icon: "frame", side: "right" },
+
+  // Right Sidedock (內容資訊、大綱與關聯)
+  { viewType: "outline", label: "Outline", icon: "list", side: "right" },
+  { viewType: "all-properties", label: "Properties", icon: "archive", side: "right" },
+  { viewType: "tag", label: "Tags", icon: "tags", side: "right" },
+  { viewType: "backlink", label: "Backlinks", icon: "links-coming-in", side: "right" },
 ];
+
+/** Return a detached copy so settings edits cannot mutate the registry defaults. */
+export function getDefaultActivityBarItems(side: "left" | "right"): ActivityBarItem[] {
+  return BUILTIN_SIDEBAR_VIEWS
+    .filter((item) => item.side === side)
+    .map((item) => ({ ...item }));
+}
+
+/** 常見官方視圖與熱門社群外掛的靜態 Icon 對照表（加速解析，零閃爍）。 */
+export const KNOWN_PLUGIN_VIEW_ICONS: Record<string, string> = {
+  "outgoing-link": "arrow-up-right",
+  "folder-spaces-explorer": "folders",
+  "recent-files": "clock",
+  "notebook-navigator": "notebook-navigator",
+  "omnisearch": "search",
+  "graph": "git-fork",
+  "localgraph": "git-fork",
+  "sync": "refresh-cw",
+  "canvas": "frame",
+  "command-palette": "terminal",
+  "calendar": "calendar",
+  "dataview": "table",
+  "excalidraw": "pen-tool",
+};
+
+/** 常見視圖的顯示標籤對照表。 */
+export const KNOWN_PLUGIN_VIEW_LABELS: Record<string, string> = {
+  "outgoing-link": "Outgoing links",
+  "recent-files": "Recent files",
+  "notebook-navigator": "Notebook Navigator",
+  "omnisearch": "Omnisearch",
+  "localgraph": "Local graph",
+  "graph": "Graph view",
+};
 
 /** 已知非側欄可嵌入的 View type（列舉時排除）。 */
 const EXCLUDED_VIEW_TYPES = new Set<string>([
@@ -35,6 +71,8 @@ const EXCLUDED_VIEW_TYPES = new Set<string>([
   "sync",
 ]);
 
+// INTERNAL API: App.viewRegistry/viewByType - no public API exposes the installed view registry;
+// return an empty registry when the host does not expose it.
 function getViewRegistry(app: App): ExtendedViewRegistry {
   return (app as unknown as { viewRegistry?: ExtendedViewRegistry })?.viewRegistry ?? {};
 }
@@ -78,16 +116,28 @@ export function getFileTypeIcon(viewType: string): string | null {
   return FILE_VIEW_ICONS[viewType] ?? null;
 }
 
-/** 取得某 view type 的 icon（檔案固定 icon → 快取 → 內建清單 → fallback）。 */
-export function resolveViewIcon(_app: App, viewType: string): string {
+function getStaticViewIcon(viewType: string): string | null {
   const fixedFileIcon = FILE_VIEW_ICONS[viewType];
   if (fixedFileIcon) return fixedFileIcon;
 
   const cached = iconCache.get(viewType);
   if (cached?.icon) return cached.icon;
 
-  const builtin = BUILTIN_SIDEBAR_VIEWS.find((item) => item.viewType === viewType);
-  const icon = builtin?.icon ?? null;
+  return KNOWN_PLUGIN_VIEW_ICONS[viewType] ??
+    BUILTIN_SIDEBAR_VIEWS.find((item) => item.viewType === viewType)?.icon ??
+    null;
+}
+
+function shouldValidateKnownPluginIcon(viewType: string): boolean {
+  return Boolean(KNOWN_PLUGIN_VIEW_ICONS[viewType]) &&
+    !FILE_VIEW_ICONS[viewType] &&
+    !BUILTIN_SIDEBAR_VIEWS.some((item) => item.viewType === viewType);
+}
+
+/** 取得某 view type 的 icon（動態快取 → 已知對照 → 內建 fallback）。 */
+export function resolveViewIcon(_app: App, viewType: string): string {
+  const cached = iconCache.get(viewType);
+  const icon = getStaticViewIcon(viewType);
   iconCache.set(viewType, { icon, dynamicAttempted: cached?.dynamicAttempted ?? false });
   return icon ?? "layout";
 }
@@ -112,7 +162,7 @@ export function applyViewIcon(
   if (fixedFileIcon && setIconWithCheck(btn, fixedFileIcon)) return;
 
   const cached = iconCache.get(viewType);
-  const icon = cached?.icon ?? BUILTIN_SIDEBAR_VIEWS.find((item) => item.viewType === viewType)?.icon ?? null;
+  const icon = getStaticViewIcon(viewType);
   if (icon) {
     setIconWithCheck(btn, icon);
   } else {
@@ -121,8 +171,9 @@ export function applyViewIcon(
 
   // 動態偵測（gated）：僅在「無固定/內建 icon」且「此 view 位於 activity bar」且「尚未嘗試過」時進行，
   // 避免為無關 view 浪費掃描 / 建立實體的開銷。
-  if (!icon && opts?.allowDynamicIcon && !cached?.dynamicAttempted) {
-    iconCache.set(viewType, { icon: null, dynamicAttempted: true });
+  if (opts?.allowDynamicIcon && !cached?.dynamicAttempted &&
+    (!icon || shouldValidateKnownPluginIcon(viewType))) {
+    iconCache.set(viewType, { icon, dynamicAttempted: true });
     void detectViewIcon(app, viewType).then((dynamicIcon) => {
       if (!dynamicIcon) return;
       iconCache.set(viewType, { icon: dynamicIcon, dynamicAttempted: true });
@@ -310,18 +361,23 @@ async function detectViewIcon(app: App, viewType: string): Promise<string | null
  */
 export async function ensureViewIcon(app: App, viewType: string): Promise<string | null> {
   const cached = iconCache.get(viewType);
-  if (cached?.icon) return cached.icon;
+  if (cached?.icon && (!shouldValidateKnownPluginIcon(viewType) || cached.dynamicAttempted)) {
+    return cached.icon;
+  }
 
   const icon = await detectViewIcon(app, viewType);
-  iconCache.set(viewType, { icon, dynamicAttempted: true });
-  return icon;
+  const resolvedIcon = icon || cached?.icon || null;
+  iconCache.set(viewType, { icon: resolvedIcon, dynamicAttempted: true });
+  return resolvedIcon;
 }
 
 /** 設定頁 icon 選擇器提供的候選 icon 清單。 */
 export const ICON_CHOICES = [
   "folder", "search", "list-tree", "bookmark", "link", "tag", "list",
+  "folder-closed", "archive", "tags", "links-coming-in",
   "layout", "frame", "canvas", "history", "star", "hash", "file-text",
   "image", "audio", "video", "calendar", "mail", "message-square",
+  "arrow-up-right", "book-open", "clock", "git-fork", "table", "pen-tool",
   "command", "terminal", "code", "pen", "pencil", "note", "copy",
   "settings", "sliders-horizontal", "filter", "globe", "eye",
   "eye-off", "check", "x", "plus", "minus", "arrow-right", "arrow-left",
@@ -344,7 +400,7 @@ export function formatViewTypeId(viewType: string): string {
     .join(" ");
 }
 
-/** 取得某 view type 的顯示名稱（registry → 內建清單 → 美化 viewType）。 */
+/** 取得某 view type 的顯示名稱（registry → 已知社群外掛表 → 內建清單 → 美化 viewType）。 */
 export function resolveViewLabel(app: App, viewType: string): string {
   // 1. 優先取 view 自己在 viewRegistry 註冊的 display text
   try {
@@ -356,11 +412,15 @@ export function resolveViewLabel(app: App, viewType: string): string {
     // fallthrough
   }
 
-  // 2. 取內建清單
+  // 2. 取已知社群外掛顯示標籤
+  const knownLabel = KNOWN_PLUGIN_VIEW_LABELS[viewType];
+  if (knownLabel) return knownLabel;
+
+  // 3. 取內建清單
   const builtin = BUILTIN_SIDEBAR_VIEWS.find((item) => item.viewType === viewType);
   if (builtin?.label) return builtin.label;
 
-  // 3. Fallback：純粹將 ID 的 '-' 替換為空格，單詞首字母大寫
+  // 4. Fallback：純粹將 ID 的 '-' 替換為空格，單詞首字母大寫
   return formatViewTypeId(viewType);
 }
 
@@ -408,4 +468,118 @@ export function enumerateAvailableViews(app: App): {
   }
 
   return { left, right };
+}
+
+/**
+ * 從主視窗指定側欄（leftSplit 或 rightSplit）讀取實際開啟的 views。
+ * This is intentionally an explicit import source rather than a live mirror.
+ */
+export function getViewsFromHostSplit(app: App, side: "left" | "right"): ActivityBarItem[] {
+  // INTERNAL API: Workspace.leftSplit/rightSplit - the public Workspace API has
+  // no main-window sidebar tree enumeration; fall back to an empty import.
+  const ws = (app as unknown as { workspace?: {
+    leftSplit?: unknown;
+    rightSplit?: unknown;
+  } })?.workspace;
+  if (!ws || typeof ws !== "object") {
+    console.warn("[Window Spaces] Host workspace sidebar API is unavailable");
+    return [];
+  }
+
+  const splitKey = side === "left" ? "leftSplit" : "rightSplit";
+  if (!(splitKey in ws)) {
+    console.warn(`[Window Spaces] Host workspace ${splitKey} API is unavailable`);
+    return [];
+  }
+
+  const split = ws[splitKey];
+  if (!split) return [];
+  if (typeof split !== "object") {
+    console.warn(`[Window Spaces] Host workspace ${splitKey} has an unexpected shape`);
+    return [];
+  }
+
+  const imported = new Map<string, ActivityBarItem>();
+  const visited = new WeakSet<object>();
+  const walk = (node: unknown) => {
+    if (!node || typeof node !== "object") return;
+    if (visited.has(node)) return;
+    visited.add(node);
+
+    const n = node as {
+      view?: { getViewType?: () => string };
+      getViewType?: () => string;
+      getViewState?: () => { type?: string };
+      children?: unknown[];
+    };
+
+    let type: string | undefined;
+    try {
+      type = (typeof n.view?.getViewType === "function" ? n.view.getViewType() : undefined) ||
+        (typeof n.getViewType === "function" ? n.getViewType() : undefined) ||
+        (typeof n.getViewState === "function" ? n.getViewState()?.type : undefined);
+    } catch {
+      // A deferred/third-party view may not expose its state during import.
+    }
+    if (type && typeof type === "string" && !EXCLUDED_VIEW_TYPES.has(type)) {
+      const existing = imported.get(type);
+      const view = n.view as {
+        getIcon?: () => string;
+        getDisplayText?: () => string;
+      } | undefined;
+      let icon: string | undefined;
+      let label: string | undefined;
+      try {
+        const candidateIcon = view?.getIcon?.();
+        if (typeof candidateIcon === "string" && candidateIcon.trim()) icon = candidateIcon;
+        const candidateLabel = view?.getDisplayText?.();
+        if (typeof candidateLabel === "string" && candidateLabel.trim()) label = candidateLabel;
+      } catch {
+        // A deferred/third-party view may not expose metadata during import.
+      }
+
+      if (existing) {
+        // Keep the first tree position, but accept metadata from a later tab
+        // when the first instance was deferred or incomplete.
+        if (!existing.icon && icon) existing.icon = icon;
+        if (!existing.label && label) existing.label = label;
+      } else {
+        imported.set(type, {
+          viewType: type,
+          side,
+          ...(label ? { label } : {}),
+          ...(icon ? { icon } : {}),
+        });
+      }
+    }
+    if (Array.isArray(n.children)) {
+      n.children.forEach(walk);
+    }
+  };
+  walk(split);
+
+  return Array.from(imported.values());
+}
+
+/**
+ * 外掛啟動時預熱安全的 icon sources（known map / registry entry）。
+ * 不在啟動期建立 real leaf，避免為每個已安裝 view 改動 workspace layout。
+ */
+export function prewarmViewIcons(app: App): void {
+  try {
+    const types = new Set([
+      ...BUILTIN_SIDEBAR_VIEWS.map((item) => item.viewType),
+      ...getRegistryViewTypes(app),
+    ]);
+    for (const viewType of types) {
+      if (!iconCache.has(viewType)) {
+        const fixed = getStaticViewIcon(viewType) || getIconFromRegistryEntry(app, viewType);
+        if (fixed) {
+          iconCache.set(viewType, { icon: fixed, dynamicAttempted: false });
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("[Window Spaces] Prewarm view icons failed:", err);
+  }
 }

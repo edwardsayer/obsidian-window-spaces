@@ -30,41 +30,48 @@ import {
 } from "./shared/sharedVersion";
 import { PopoutActivityBarManager } from "./popout/activityBar";
 import { WorkspaceInterceptor } from "./popout/workspaceInterceptor";
-import { BUILTIN_SIDEBAR_VIEWS } from "./popout/viewRegistry";
+import {
+  getDefaultActivityBarItems,
+  prewarmViewIcons,
+} from "./popout/viewRegistry";
 import { DEFAULT_SPACE_ICON } from "./spaceVisuals";
 
-const DEFAULT_SETTINGS: WindowSettings = {
-  spaces: [],
-  autoSave: false,
-  showNotifications: false,
-  version: "1.0.0",
-  showLayoutStatusBar: true,
-  layoutStatusBarDefaultApplied: false,
-  showWindowLayoutsRibbonIcon: true,
-  sortBy: "updated-desc",
-  sectionsOrder: [],
-  groupBySection: true,
-  showArchived: false,
-  defaultIcon: DEFAULT_SPACE_ICON,
-  colorPresets: DEFAULT_COLOR_PRESETS,
-  defaultBorderInset: 1,
-  visualDefaultsVersion: 1,
-  defaultShowFoldedCorner: true,
-  activityBars: {
-    left: BUILTIN_SIDEBAR_VIEWS.filter((item) => item.side === "left"),
-    right: BUILTIN_SIDEBAR_VIEWS.filter((item) => item.side === "right"),
-  },
-  activityBarDefaults: {
-    left: true,
-    right: true,
-  },
-  popoutAccents: {
-    enabled: true,
-    splitter: true,
-    activityBar: true,
-  },
-  workspaceInterceptorEnabled: true,
-};
+function createDefaultSettings(): WindowSettings {
+  return {
+    spaces: [],
+    autoSave: false,
+    showNotifications: false,
+    version: "1.0.0",
+    showLayoutStatusBar: true,
+    layoutStatusBarDefaultApplied: false,
+    showWindowLayoutsRibbonIcon: true,
+    sortBy: "updated-desc",
+    sectionsOrder: [],
+    groupBySection: true,
+    showArchived: false,
+    defaultIcon: DEFAULT_SPACE_ICON,
+    colorPresets: [...DEFAULT_COLOR_PRESETS],
+    defaultBorderInset: 1,
+    visualDefaultsVersion: 1,
+    defaultShowFoldedCorner: true,
+    activityBars: {
+      left: getDefaultActivityBarItems("left"),
+      right: getDefaultActivityBarItems("right"),
+    },
+    activityBarDefaults: {
+      left: true,
+      right: true,
+    },
+    popoutAccents: {
+      enabled: true,
+      splitter: true,
+      activityBar: true,
+    },
+    workspaceInterceptorEnabled: true,
+  };
+}
+
+const DEFAULT_SETTINGS: WindowSettings = createDefaultSettings();
 
 export default class WindowSpacesPlugin extends Plugin {
   declare settings: WindowSettings;
@@ -114,6 +121,7 @@ export default class WindowSpacesPlugin extends Plugin {
       WINDOW_LAYOUTS_VIEW_TYPE,
       (leaf) => new WindowLayoutsView(leaf, this)
     );
+    prewarmViewIcons(this.app);
 
     // 註冊命令
     this.registerCommands();
@@ -179,13 +187,11 @@ export default class WindowSpacesPlugin extends Plugin {
 
   async loadSettings() {
     const savedSettings = (await this.loadData()) as
-      | (Partial<WindowSettings> & { layouts?: WindowLayout[] })
+      | Partial<WindowSettings>
       | null;
-    if (savedSettings && savedSettings.layouts && !savedSettings.spaces) {
-      savedSettings.spaces = savedSettings.layouts;
-      delete savedSettings.layouts;
-    }
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, savedSettings);
+    // Build a detached default object so editing a newly-created settings list
+    // cannot mutate the module-level factory defaults used by Reset Settings.
+    this.settings = Object.assign(createDefaultSettings(), savedSettings);
 
     // Version 1 used 3px as the default frame inset. Migrate that legacy
     // default to Obsidian's native 1px accent-border thickness once, while
@@ -221,6 +227,27 @@ export default class WindowSpacesPlugin extends Plugin {
 
   async saveSettings() {
     await this.saveData(this.settings);
+  }
+
+  /**
+   * Restore every plugin option to its factory value while retaining the
+   * user's saved Spaces verbatim. The caller is responsible for refreshing
+   * UI/runtime effects after the save succeeds.
+   */
+  async resetSettingsPreservingSpaces(): Promise<void> {
+    const previousSettings = this.settings;
+    const spaces = Array.isArray(previousSettings?.spaces) ? previousSettings.spaces : [];
+    this.settings = createDefaultSettings();
+    this.settings.spaces = spaces;
+
+    try {
+      await this.saveSettings();
+    } catch (error: unknown) {
+      // Keep an I/O failure from leaving the live plugin in a reset-but-unsaved
+      // state. No Space object was mutated during the reset attempt.
+      this.settings = previousSettings;
+      throw error;
+    }
   }
 
   registerCommands() {

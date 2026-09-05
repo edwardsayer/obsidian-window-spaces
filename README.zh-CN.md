@@ -28,7 +28,7 @@ Obsidian 灵活的布局与强大的插件生态，让许多人将其视为终�
 
 | 🗺️ 独立 Popout 窗口工作舱 | 🗂️ 侧边栏原生管理面板 | 📑 编辑区标签页管理模式 |
 | :---: | :---: | :---: |
-| ![独立 Popout 工作舱](screenshots/multi-workspaces.png) | ![侧边栏面板](screenshots/sidebar.png) | ![标签页管理模式](screenshots/tab-panel.png) |
+| ![独立 Popout 工作舱](assets/screenshots/multi-workspaces.png) | ![侧边栏面板](assets/screenshots/sidebar.png) | ![标签页管理模式](assets/screenshots/tab-panel.png) |
 | *Canvas 视觉白板 + Markdown 双栏分屏与状态栏识别* | *整合式 Spaces 选择器、启用状态提示与快速搜索* | *在主编辑区标签页中进行完整工作区管理与检视* |
 
 ---
@@ -122,7 +122,7 @@ Window Spaces 与社区中许多强大且占空间的插件（如 **Excalidraw**
 
 详细整合案例与多窗口工作流示范，请参阅：
 
-📖 **[完整使用手册与插件协同工作指南](doc/user-guide.md)**
+📖 **[完整使用手册与插件协同工作指南](docs/user-guide.zh-CN.md)**
 
 ---
 

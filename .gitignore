@@ -153,12 +153,17 @@ agents/
 .gemini/
 .brain/
 .codewhale/
+.commandcode/
 .crush/
 .idea/
 .vscode/
 
-# Local-only files & archived development documents
+# Local-only files & internal development documents
 AGENTS.md
+TODO.md
+dev/
+scratch/
+.tmp/
 
 # Visual Studio files
 *.suo

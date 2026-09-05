@@ -72,4 +72,77 @@ describe("Layout Tree Parsing & Extraction (layoutTree.test.ts)", () => {
     expect(savedViewStates[0].id).toBe("leaf-tree-1");
     expect(savedViewStates[1].id).toBe("leaf-explicit-2");
   });
+
+  test("should ignore id-less legacy duplicates when the layout tree has leaves", () => {
+    const layout = {
+      id: "l-legacy-duplicates",
+      name: "Legacy duplicate leaves",
+      timestamp: Date.now(),
+      windowState: { size: { width: 800, height: 600 } },
+      workspace: {
+        layout: {
+          type: "split",
+          direction: "horizontal",
+          children: [
+            {
+              type: "tabs",
+              children: [
+                {
+                  id: "layout-canvas",
+                  type: "leaf",
+                  state: { type: "canvas", state: { file: "docs/Canvas.canvas" } },
+                },
+              ],
+            },
+            {
+              type: "tabs",
+              children: [
+                {
+                  id: "layout-markdown",
+                  type: "leaf",
+                  state: { type: "markdown", state: { file: "docs/advanced/architecture.md" } },
+                },
+              ],
+            },
+          ],
+        },
+        // This mirrors the legacy JSON shape observed in Note: these entries
+        // repeat the tree views but have no stable IDs.
+        leaves: [
+          { type: "canvas", state: { file: "docs/Canvas.canvas" } },
+          { type: "markdown", state: { file: "docs/advanced/architecture.md" } },
+        ],
+      },
+      metadata: { fileCount: 2, tabCount: 2, splitCount: 1 },
+    } as any;
+
+    const savedViewStates = (manager as any).getSavedViewStates(layout);
+
+    expect(savedViewStates).toHaveLength(2);
+    expect(savedViewStates.map((leaf: any) => leaf.type)).toEqual(["canvas", "markdown"]);
+    expect(savedViewStates.map((leaf: any) => leaf.state.file)).toEqual([
+      "docs/Canvas.canvas",
+      "docs/advanced/architecture.md",
+    ]);
+  });
+
+  test("should preserve explicit leaves when the layout tree is empty", () => {
+    const layout = {
+      id: "l-legacy-only-leaves",
+      name: "Legacy-only leaves",
+      timestamp: Date.now(),
+      windowState: { size: { width: 800, height: 600 } },
+      workspace: {
+        layout: {},
+        leaves: [
+          { type: "markdown", state: { file: "legacy.md" } },
+        ],
+      },
+      metadata: { fileCount: 1, tabCount: 1, splitCount: 0 },
+    } as any;
+
+    const savedViewStates = (manager as any).getSavedViewStates(layout);
+
+    expect(savedViewStates).toEqual(layout.workspace.leaves);
+  });
 });

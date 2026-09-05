@@ -28,7 +28,7 @@ Obsidian 靈活的佈局與強大的外掛生態，讓許多人將其視為終�
 
 | 🗺️ 獨立 Popout 視窗工作艙 | 🗂️ 側邊欄原生管理面板 | 📑 編輯區標籤頁管理模式 |
 | :---: | :---: | :---: |
-| ![獨立 Popout 工作艙](screenshots/multi-workspaces.png) | ![側邊欄面板](screenshots/sidebar.png) | ![標籤頁管理模式](screenshots/tab-panel.png) |
+| ![獨立 Popout 工作艙](assets/screenshots/multi-workspaces.png) | ![側邊欄面板](assets/screenshots/sidebar.png) | ![標籤頁管理模式](assets/screenshots/tab-panel.png) |
 | *Canvas 視覺畫布 + Markdown 雙欄分割與狀態列識別* | *整合式 Spaces 選擇器、啟用狀態提示與快速搜尋* | *在主編輯區分頁中進行完整工作空間管理與檢視* |
 
 ---
@@ -122,7 +122,7 @@ Window Spaces 與社群中許多強大且佔空間的外掛（如 **Excalidraw**
 
 詳細整合案例與多視窗工作流示範，請參閱：
 
-📖 **[完整使用手冊與外掛協同工作指南](doc/user-guide.md)**
+📖 **[完整使用手冊與外掛協同工作指南](docs/user-guide.zh-TW.md)**
 
 ---
 

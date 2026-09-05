@@ -28,7 +28,7 @@ With **focus interception technology** and **per-window layout lifecycle managem
 
 | 🗺️ Dedicated Popout Workbench | 🗂️ Native Sidebar Panel | 📑 Editor Tab Management |
 | :---: | :---: | :---: |
-| ![Dedicated Popout Workbench](screenshots/multi-workspaces.png) | ![Sidebar Panel](screenshots/sidebar.png) | ![Tab Panel Mode](screenshots/tab-panel.png) |
+| ![Dedicated Popout Workbench](assets/screenshots/multi-workspaces.png) | ![Sidebar Panel](assets/screenshots/sidebar.png) | ![Tab Panel Mode](assets/screenshots/tab-panel.png) |
 | *Visual Canvas + Markdown Split with Status Bar indicator* | *Unified Spaces Picker with Active indicators & Quick Search* | *Full-page Workspace Management inside Editor Tabs* |
 
 ---
@@ -120,7 +120,7 @@ Each Space acts as a specialized **work cabin** tailored to your tasks:
 
 Window Spaces works harmoniously with heavy and canvas-like community plugins. For detailed integration patterns with **Excalidraw**, **Excalibrain**, **Canvas**, **Dataview**, and **Notebook Navigator**, check out our community guide:
 
-📖 **[Full User Guide & Plugin Synergy Walkthrough](doc/user-guide.md)**
+📖 **[Full User Guide & Plugin Synergy Walkthrough](docs/user-guide.md)**
 
 ---
 

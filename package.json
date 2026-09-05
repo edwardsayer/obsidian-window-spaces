@@ -11,16 +11,16 @@
 		"lint": "eslint src --ext .ts",
 		"format": "prettier --write src/**/*.ts",
 		"check": "tsc --noEmit",
+		"check:project": "node scripts/check-project.mjs",
 		"test": "vitest run",
 		"test:watch": "vitest",
-		"test:build": "node src/tools/test-build.js",
-		"install:vault": "node src/tools/install.js",
+		"test:build": "node scripts/test-build.mjs",
 		"deploy": "node scripts/deploy.mjs",
-		"obsidian:debug": "node src/tools/obsidian-debug.js",
-		"probe": "node .agents/skills/obsidian-runtime-inspection/scripts/probe.mjs",
-		"extract-asar": "node .agents/skills/obsidian-internals/scripts/extract-asar.mjs",
-		"new-log": "node .agents/skills/obsidian-session-log/scripts/new-log.mjs",
-		"orca-send": "node .agents/skills/orca-collaboration/scripts/orca-send.mjs"
+		"obsidian:debug": "node scripts/obsidian-debug.mjs",
+		"probe": "node ../tools/probe.mjs",
+		"extract-asar": "node ../tools/extract-asar.mjs",
+		"new-log": "node ../.agents/skills/obsidian-session-log/scripts/new-log.mjs",
+		"orca-send": "node ../.agents/skills/orca-collaboration/scripts/orca-send.mjs"
 	},
 	"keywords": [
 		"obsidian",

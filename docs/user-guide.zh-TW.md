@@ -1,5 +1,7 @@
 # Window Spaces 使用者手冊與外掛協同工作指南
 
+Language: [English](user-guide.md) | **繁體中文** | [简体中文](user-guide.zh-CN.md)
+
 > **Window Spaces** 旨在為 Obsidian「萬物筆記庫（Everything Notebook）」的使用者提供一套無干擾、輕量且高效的多視窗管理架構。透過獨立的 Popout 視窗工作艙（Spaces），你可以將重量級外掛與繁複的排版分離至獨立視窗，徹底釋放擁擠的主畫面。
 
 ---

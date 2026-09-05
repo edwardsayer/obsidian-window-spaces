@@ -205,7 +205,7 @@ var en = {
     autoSaveInterval: "Auto-save interval",
     minutes: "minutes",
     resetSettings: "Reset Settings",
-    resetSettingsDescription: "Reset all settings to default values.",
+    resetSettingsDescription: "Reset plugin options to factory defaults. Saved Spaces are kept.",
     resetButton: "Reset Settings",
     resetConfirmTitle: "Confirm Reset",
     resetConfirmMessage: "Are you sure you want to reset all settings? This will not delete your saved spaces.",
@@ -230,6 +230,10 @@ var en = {
     defaultFoldedCornerDesc: "Show the folded-corner decoration in the top-left of Popout windows",
     defaultActivityBarVisibility: "Show this Activity Bar by default for new Spaces",
     defaultActivityBarVisibilityDesc: "Controls whether the entire Activity Bar is shown",
+    importFromHost: "Import from main sidebar",
+    importFromHostDesc: "Replace this side's default list with views currently open in the main window",
+    importFromHostSuccess: "Imported views from the main sidebar",
+    importFromHostEmpty: "No views found in this side of the main sidebar",
     dragToReorder: "Drag to reorder",
     keepOneActivityBarView: "Keep at least one Activity Bar view button when another view is available",
     popoutAccentsTitle: "Popout Space Theme Accents",
@@ -441,7 +445,7 @@ var zhTW = {
     autoSaveInterval: "\u81EA\u52D5\u5132\u5B58\u9593\u9694",
     minutes: "\u5206\u9418",
     resetSettings: "\u91CD\u8A2D\u8A2D\u5B9A",
-    resetSettingsDescription: "\u5C07\u6240\u6709\u8A2D\u5B9A\u91CD\u8A2D\u70BA\u9810\u8A2D\u503C\u3002",
+    resetSettingsDescription: "\u5C07\u5916\u639B\u9078\u9805\u91CD\u8A2D\u70BA\u51FA\u5EE0\u9810\u8A2D\u503C\uFF0C\u4E26\u4FDD\u7559\u5DF2\u5132\u5B58\u7684 Spaces\u3002",
     resetButton: "\u91CD\u8A2D\u8A2D\u5B9A",
     resetConfirmTitle: "\u78BA\u8A8D\u91CD\u8A2D",
     resetConfirmMessage: "\u60A8\u78BA\u5B9A\u8981\u91CD\u8A2D\u6240\u6709\u8A2D\u5B9A\u55CE\uFF1F\u9019\u4E0D\u6703\u522A\u9664\u60A8\u5DF2\u5132\u5B58\u7684\u7A7A\u9593\u3002",
@@ -466,6 +470,10 @@ var zhTW = {
     defaultFoldedCornerDesc: "\u5728 Popout \u8996\u7A97\u5DE6\u4E0A\u89D2\u986F\u793A\u6298\u9801\u88DD\u98FE",
     defaultActivityBarVisibility: "\u65B0\u5EFA Window Space \u6642\u9810\u8A2D\u986F\u793A\u6B64 Activity Bar",
     defaultActivityBarVisibilityDesc: "\u63A7\u5236\u662F\u5426\u986F\u793A\u6574\u500B Activity Bar",
+    importFromHost: "\u5F9E\u4E3B\u8996\u7A97\u5074\u6B04\u532F\u5165",
+    importFromHostDesc: "\u4EE5\u4E3B\u8996\u7A97\u6B64\u5074\u76EE\u524D\u958B\u555F\u7684 View \u53D6\u4EE3\u9810\u8A2D\u6E05\u55AE",
+    importFromHostSuccess: "\u5DF2\u5F9E\u4E3B\u8996\u7A97\u5074\u6B04\u532F\u5165 View",
+    importFromHostEmpty: "\u4E3B\u8996\u7A97\u6B64\u5074\u6B04\u6C92\u6709\u53EF\u532F\u5165\u7684 View",
     dragToReorder: "\u62D6\u66F3\u6392\u5E8F",
     keepOneActivityBarView: "\u4ECD\u6709\u5176\u4ED6\u53EF\u7528 View \u6642\uFF0CActivity Bar \u81F3\u5C11\u8981\u4FDD\u7559\u4E00\u500B\u6309\u9215",
     popoutAccentsTitle: "Popout \u7A7A\u9593\u4E3B\u984C\u88DD\u98FE\u589E\u5F37",
@@ -677,7 +685,7 @@ var zhCN = {
     autoSaveInterval: "\u81EA\u52A8\u4FDD\u5B58\u95F4\u9694",
     minutes: "\u5206\u949F",
     resetSettings: "\u91CD\u7F6E\u8BBE\u7F6E",
-    resetSettingsDescription: "\u5C06\u6240\u6709\u8BBE\u7F6E\u91CD\u7F6E\u4E3A\u9ED8\u8BA4\u503C\u3002",
+    resetSettingsDescription: "\u5C06\u63D2\u4EF6\u9009\u9879\u91CD\u7F6E\u4E3A\u51FA\u5382\u9ED8\u8BA4\u503C\uFF0C\u5E76\u4FDD\u7559\u5DF2\u4FDD\u5B58\u7684 Spaces\u3002",
     resetButton: "\u91CD\u7F6E\u8BBE\u7F6E",
     resetConfirmTitle: "\u786E\u8BA4\u91CD\u7F6E",
     resetConfirmMessage: "\u60A8\u786E\u5B9A\u8981\u91CD\u7F6E\u6240\u6709\u8BBE\u7F6E\u5417\uFF1F\u8FD9\u4E0D\u4F1A\u5220\u9664\u60A8\u5DF2\u4FDD\u5B58\u7684\u7A7A\u95F4\u3002",
@@ -702,6 +710,10 @@ var zhCN = {
     defaultFoldedCornerDesc: "\u5728 Popout \u7A97\u53E3\u5DE6\u4E0A\u89D2\u663E\u793A\u6298\u9875\u88C5\u9970",
     defaultActivityBarVisibility: "\u65B0\u5EFA Window Space \u65F6\u9ED8\u8BA4\u663E\u793A\u6B64 Activity Bar",
     defaultActivityBarVisibilityDesc: "\u63A7\u5236\u662F\u5426\u663E\u793A\u6574\u4E2A Activity Bar",
+    importFromHost: "\u4ECE\u4E3B\u7A97\u53E3\u4FA7\u680F\u5BFC\u5165",
+    importFromHostDesc: "\u7528\u4E3B\u7A97\u53E3\u6B64\u4FA7\u5F53\u524D\u6253\u5F00\u7684 View \u66FF\u6362\u9ED8\u8BA4\u5217\u8868",
+    importFromHostSuccess: "\u5DF2\u4ECE\u4E3B\u7A97\u53E3\u4FA7\u680F\u5BFC\u5165 View",
+    importFromHostEmpty: "\u4E3B\u7A97\u53E3\u6B64\u4FA7\u680F\u6CA1\u6709\u53EF\u5BFC\u5165\u7684 View",
     dragToReorder: "\u62D6\u653E\u6392\u5E8F",
     keepOneActivityBarView: "\u4ECD\u6709\u5176\u4ED6\u53EF\u7528 View \u65F6\uFF0CActivity Bar \u81F3\u5C11\u8981\u4FDD\u7559\u4E00\u4E2A\u6309\u94AE",
     popoutAccentsTitle: "Popout \u7A7A\u95F4\u4E3B\u9898\u88C5\u9970\u589E\u5F3A",
@@ -936,16 +948,43 @@ var import_obsidian2 = require("obsidian");
 // src/popout/viewRegistry.ts
 var import_obsidian = require("obsidian");
 var BUILTIN_SIDEBAR_VIEWS = [
-  { viewType: "file-explorer", label: "File explorer", icon: "folder", side: "left" },
+  // Left Sidedock (導覽、檔案與空間管理)
+  { viewType: "file-explorer", label: "File explorer", icon: "folder-closed", side: "left" },
   { viewType: "search", label: "Search", icon: "search", side: "left" },
-  { viewType: "outline", label: "Outline", icon: "list-tree", side: "left" },
+  { viewType: "bookmarks", label: "Bookmarks", icon: "bookmark", side: "left" },
   { viewType: "window-spaces-layouts", label: "Window Spaces", icon: "layout", side: "left" },
-  { viewType: "bookmarks", label: "Bookmarks", icon: "bookmark", side: "right" },
-  { viewType: "backlink", label: "Backlinks", icon: "link", side: "right" },
-  { viewType: "tag", label: "Tags", icon: "tag", side: "right" },
-  { viewType: "all-properties", label: "Properties", icon: "list", side: "right" },
-  { viewType: "canvas", label: "Canvas", icon: "frame", side: "right" }
+  // Right Sidedock (內容資訊、大綱與關聯)
+  { viewType: "outline", label: "Outline", icon: "list", side: "right" },
+  { viewType: "all-properties", label: "Properties", icon: "archive", side: "right" },
+  { viewType: "tag", label: "Tags", icon: "tags", side: "right" },
+  { viewType: "backlink", label: "Backlinks", icon: "links-coming-in", side: "right" }
 ];
+function getDefaultActivityBarItems(side) {
+  return BUILTIN_SIDEBAR_VIEWS.filter((item) => item.side === side).map((item) => ({ ...item }));
+}
+var KNOWN_PLUGIN_VIEW_ICONS = {
+  "outgoing-link": "arrow-up-right",
+  "folder-spaces-explorer": "folders",
+  "recent-files": "clock",
+  "notebook-navigator": "notebook-navigator",
+  "omnisearch": "search",
+  "graph": "git-fork",
+  "localgraph": "git-fork",
+  "sync": "refresh-cw",
+  "canvas": "frame",
+  "command-palette": "terminal",
+  "calendar": "calendar",
+  "dataview": "table",
+  "excalidraw": "pen-tool"
+};
+var KNOWN_PLUGIN_VIEW_LABELS = {
+  "outgoing-link": "Outgoing links",
+  "recent-files": "Recent files",
+  "notebook-navigator": "Notebook Navigator",
+  "omnisearch": "Omnisearch",
+  "localgraph": "Local graph",
+  "graph": "Graph view"
+};
 var EXCLUDED_VIEW_TYPES = /* @__PURE__ */ new Set([
   "empty",
   "markdown",
@@ -987,13 +1026,19 @@ var FILE_VIEW_ICONS = {
   video: "video",
   canvas: "frame"
 };
-function resolveViewIcon(_app, viewType) {
+function getStaticViewIcon(viewType) {
   const fixedFileIcon = FILE_VIEW_ICONS[viewType];
   if (fixedFileIcon) return fixedFileIcon;
   const cached = iconCache.get(viewType);
   if (cached?.icon) return cached.icon;
-  const builtin = BUILTIN_SIDEBAR_VIEWS.find((item) => item.viewType === viewType);
-  const icon = builtin?.icon ?? null;
+  return KNOWN_PLUGIN_VIEW_ICONS[viewType] ?? BUILTIN_SIDEBAR_VIEWS.find((item) => item.viewType === viewType)?.icon ?? null;
+}
+function shouldValidateKnownPluginIcon(viewType) {
+  return Boolean(KNOWN_PLUGIN_VIEW_ICONS[viewType]) && !FILE_VIEW_ICONS[viewType] && !BUILTIN_SIDEBAR_VIEWS.some((item) => item.viewType === viewType);
+}
+function resolveViewIcon(_app, viewType) {
+  const cached = iconCache.get(viewType);
+  const icon = getStaticViewIcon(viewType);
   iconCache.set(viewType, { icon, dynamicAttempted: cached?.dynamicAttempted ?? false });
   return icon ?? "layout";
 }
@@ -1001,14 +1046,14 @@ function applyViewIcon(btn, app, viewType, opts) {
   const fixedFileIcon = FILE_VIEW_ICONS[viewType];
   if (fixedFileIcon && setIconWithCheck(btn, fixedFileIcon)) return;
   const cached = iconCache.get(viewType);
-  const icon = cached?.icon ?? BUILTIN_SIDEBAR_VIEWS.find((item) => item.viewType === viewType)?.icon ?? null;
+  const icon = getStaticViewIcon(viewType);
   if (icon) {
     setIconWithCheck(btn, icon);
   } else {
     (0, import_obsidian.setIcon)(btn, "layout");
   }
-  if (!icon && opts?.allowDynamicIcon && !cached?.dynamicAttempted) {
-    iconCache.set(viewType, { icon: null, dynamicAttempted: true });
+  if (opts?.allowDynamicIcon && !cached?.dynamicAttempted && (!icon || shouldValidateKnownPluginIcon(viewType))) {
+    iconCache.set(viewType, { icon, dynamicAttempted: true });
     void detectViewIcon(app, viewType).then((dynamicIcon) => {
       if (!dynamicIcon) return;
       iconCache.set(viewType, { icon: dynamicIcon, dynamicAttempted: true });
@@ -1140,10 +1185,13 @@ async function detectViewIcon(app, viewType) {
 }
 async function ensureViewIcon(app, viewType) {
   const cached = iconCache.get(viewType);
-  if (cached?.icon) return cached.icon;
+  if (cached?.icon && (!shouldValidateKnownPluginIcon(viewType) || cached.dynamicAttempted)) {
+    return cached.icon;
+  }
   const icon = await detectViewIcon(app, viewType);
-  iconCache.set(viewType, { icon, dynamicAttempted: true });
-  return icon;
+  const resolvedIcon = icon || cached?.icon || null;
+  iconCache.set(viewType, { icon: resolvedIcon, dynamicAttempted: true });
+  return resolvedIcon;
 }
 var ICON_CHOICES = [
   "folder",
@@ -1153,6 +1201,10 @@ var ICON_CHOICES = [
   "link",
   "tag",
   "list",
+  "folder-closed",
+  "archive",
+  "tags",
+  "links-coming-in",
   "layout",
   "frame",
   "canvas",
@@ -1166,6 +1218,12 @@ var ICON_CHOICES = [
   "calendar",
   "mail",
   "message-square",
+  "arrow-up-right",
+  "book-open",
+  "clock",
+  "git-fork",
+  "table",
+  "pen-tool",
   "command",
   "terminal",
   "code",
@@ -1218,6 +1276,8 @@ function resolveViewLabel(app, viewType) {
     if (label) return label;
   } catch {
   }
+  const knownLabel = KNOWN_PLUGIN_VIEW_LABELS[viewType];
+  if (knownLabel) return knownLabel;
   const builtin = BUILTIN_SIDEBAR_VIEWS.find((item) => item.viewType === viewType);
   if (builtin?.label) return builtin.label;
   return formatViewTypeId(viewType);
@@ -1253,6 +1313,84 @@ function enumerateAvailableViews(app) {
     }
   }
   return { left, right };
+}
+function getViewsFromHostSplit(app, side) {
+  const ws = app?.workspace;
+  if (!ws || typeof ws !== "object") {
+    console.warn("[Window Spaces] Host workspace sidebar API is unavailable");
+    return [];
+  }
+  const splitKey = side === "left" ? "leftSplit" : "rightSplit";
+  if (!(splitKey in ws)) {
+    console.warn(`[Window Spaces] Host workspace ${splitKey} API is unavailable`);
+    return [];
+  }
+  const split = ws[splitKey];
+  if (!split) return [];
+  if (typeof split !== "object") {
+    console.warn(`[Window Spaces] Host workspace ${splitKey} has an unexpected shape`);
+    return [];
+  }
+  const imported = /* @__PURE__ */ new Map();
+  const visited = /* @__PURE__ */ new WeakSet();
+  const walk = (node) => {
+    if (!node || typeof node !== "object") return;
+    if (visited.has(node)) return;
+    visited.add(node);
+    const n = node;
+    let type;
+    try {
+      type = (typeof n.view?.getViewType === "function" ? n.view.getViewType() : void 0) || (typeof n.getViewType === "function" ? n.getViewType() : void 0) || (typeof n.getViewState === "function" ? n.getViewState()?.type : void 0);
+    } catch {
+    }
+    if (type && typeof type === "string" && !EXCLUDED_VIEW_TYPES.has(type)) {
+      const existing = imported.get(type);
+      const view = n.view;
+      let icon;
+      let label;
+      try {
+        const candidateIcon = view?.getIcon?.();
+        if (typeof candidateIcon === "string" && candidateIcon.trim()) icon = candidateIcon;
+        const candidateLabel = view?.getDisplayText?.();
+        if (typeof candidateLabel === "string" && candidateLabel.trim()) label = candidateLabel;
+      } catch {
+      }
+      if (existing) {
+        if (!existing.icon && icon) existing.icon = icon;
+        if (!existing.label && label) existing.label = label;
+      } else {
+        imported.set(type, {
+          viewType: type,
+          side,
+          ...label ? { label } : {},
+          ...icon ? { icon } : {}
+        });
+      }
+    }
+    if (Array.isArray(n.children)) {
+      n.children.forEach(walk);
+    }
+  };
+  walk(split);
+  return Array.from(imported.values());
+}
+function prewarmViewIcons(app) {
+  try {
+    const types = /* @__PURE__ */ new Set([
+      ...BUILTIN_SIDEBAR_VIEWS.map((item) => item.viewType),
+      ...getRegistryViewTypes(app)
+    ]);
+    for (const viewType of types) {
+      if (!iconCache.has(viewType)) {
+        const fixed = getStaticViewIcon(viewType) || getIconFromRegistryEntry(app, viewType);
+        if (fixed) {
+          iconCache.set(viewType, { icon: fixed, dynamicAttempted: false });
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("[Window Spaces] Prewarm view icons failed:", err);
+  }
 }
 
 // src/modals/restoreModal.ts
@@ -5088,7 +5226,11 @@ var WindowLayoutManager = class {
   getSavedViewStates(layout) {
     const fromLayout = this.extractLeavesFromLayout(layout.workspace?.layout);
     const explicitLeaves = Array.isArray(layout.workspace?.leaves) ? layout.workspace.leaves : [];
-    const explicitById = new Map(explicitLeaves.map((leaf) => [leaf.id, leaf]));
+    if (fromLayout.length === 0) return explicitLeaves;
+    const explicitLeavesWithStableIds = explicitLeaves.filter(
+      (leaf) => typeof leaf?.id === "string" && leaf.id.trim().length > 0
+    );
+    const explicitById = new Map(explicitLeavesWithStableIds.map((leaf) => [leaf.id, leaf]));
     const result = fromLayout.map((leaf) => {
       const explicit = explicitById.get(leaf.id);
       if (!explicit) return leaf;
@@ -5099,8 +5241,10 @@ var WindowLayoutManager = class {
       };
     });
     const resultIds = new Set(result.map((leaf) => leaf.id));
-    explicitLeaves.forEach((leaf) => {
-      if (!resultIds.has(leaf.id)) result.push(leaf);
+    explicitLeavesWithStableIds.forEach((leaf) => {
+      if (resultIds.has(leaf.id)) return;
+      result.push(leaf);
+      resultIds.add(leaf.id);
     });
     return result;
   }
@@ -5889,8 +6033,21 @@ var WindowSpacesSettingTab = class extends import_obsidian4.PluginSettingTab {
             t("settings.resetConfirmTitle")
           );
           if (confirmed) {
-            this.plugin.settings.spaces = [];
-            await this.plugin.saveSettings();
+            try {
+              await this.plugin.resetSettingsPreservingSpaces();
+            } catch (error) {
+              const message = error instanceof Error ? error.message : String(error);
+              console.warn("Failed to reset Window Spaces settings:", error);
+              new import_obsidian4.Notice(`${t("errors.failedToSave")}: ${message}`);
+              return;
+            }
+            this.removeAutoSave();
+            this.plugin.refreshRibbonIcons();
+            if (this.plugin.workspaceInterceptor) {
+              this.plugin.workspaceInterceptor.enabled = this.plugin.settings.workspaceInterceptorEnabled !== false;
+            }
+            this.plugin.manager?.refreshLayoutLabels();
+            this.plugin.activityBars?.refreshAll();
             this.display();
             new import_obsidian4.Notice(t("settings.resetSuccess"));
           }
@@ -6001,6 +6158,33 @@ var WindowSpacesSettingTab = class extends import_obsidian4.PluginSettingTab {
   renderActivityBarSide(section, side, heading) {
     new import_obsidian4.Setting(section).setName(heading).setHeading();
     const group = this.createGroup(section) ?? section;
+    let refreshSelect = () => void 0;
+    let renderItemRows = () => void 0;
+    this.createSettingIn(group, (s) => {
+      s.setName(t("settings.importFromHost"));
+      s.setDesc(t("settings.importFromHostDesc"));
+      s.addButton((button) => {
+        button.setButtonText(t("settings.importFromHost")).onClick(async () => {
+          const imported = getViewsFromHostSplit(this.app, side);
+          if (imported.length === 0) {
+            new import_obsidian4.Notice(t("settings.importFromHostEmpty"));
+            return;
+          }
+          const previousActivityBars = this.plugin.settings.activityBars;
+          this.plugin.settings.activityBars = this.plugin.settings.activityBars ?? { left: [], right: [] };
+          this.plugin.settings.activityBars[side] = imported;
+          try {
+            await this.plugin.saveSettings();
+            this.plugin.activityBars.refreshAll();
+            renderItemRows();
+            new import_obsidian4.Notice(t("settings.importFromHostSuccess"));
+          } catch (error) {
+            this.plugin.settings.activityBars = previousActivityBars;
+            console.warn("Failed to import Activity Bar views from host sidebar:", error);
+          }
+        });
+      });
+    });
     this.createSettingIn(group, (s) => {
       s.setName(t("settings.defaultActivityBarVisibility"));
       s.setDesc(t("settings.defaultActivityBarVisibilityDesc"));
@@ -6064,8 +6248,8 @@ var WindowSpacesSettingTab = class extends import_obsidian4.PluginSettingTab {
         });
       });
     });
-    const refreshSelect = () => this.rebuildViewSelect(selectEl, side);
-    const renderItemRows = () => {
+    refreshSelect = () => this.rebuildViewSelect(selectEl, side);
+    renderItemRows = () => {
       const current = this.plugin.settings.activityBars?.[side];
       const items2 = Array.isArray(current) ? current : [];
       const validItems = items2.filter(isActivityBarItem2);
@@ -9829,38 +10013,41 @@ var WorkspaceInterceptor = class {
 };
 
 // src/main.ts
-var DEFAULT_SETTINGS = {
-  spaces: [],
-  autoSave: false,
-  showNotifications: false,
-  version: "1.0.0",
-  showLayoutStatusBar: true,
-  layoutStatusBarDefaultApplied: false,
-  showWindowLayoutsRibbonIcon: true,
-  sortBy: "updated-desc",
-  sectionsOrder: [],
-  groupBySection: true,
-  showArchived: false,
-  defaultIcon: DEFAULT_SPACE_ICON,
-  colorPresets: DEFAULT_COLOR_PRESETS,
-  defaultBorderInset: 1,
-  visualDefaultsVersion: 1,
-  defaultShowFoldedCorner: true,
-  activityBars: {
-    left: BUILTIN_SIDEBAR_VIEWS.filter((item) => item.side === "left"),
-    right: BUILTIN_SIDEBAR_VIEWS.filter((item) => item.side === "right")
-  },
-  activityBarDefaults: {
-    left: true,
-    right: true
-  },
-  popoutAccents: {
-    enabled: true,
-    splitter: true,
-    activityBar: true
-  },
-  workspaceInterceptorEnabled: true
-};
+function createDefaultSettings() {
+  return {
+    spaces: [],
+    autoSave: false,
+    showNotifications: false,
+    version: "1.0.0",
+    showLayoutStatusBar: true,
+    layoutStatusBarDefaultApplied: false,
+    showWindowLayoutsRibbonIcon: true,
+    sortBy: "updated-desc",
+    sectionsOrder: [],
+    groupBySection: true,
+    showArchived: false,
+    defaultIcon: DEFAULT_SPACE_ICON,
+    colorPresets: [...DEFAULT_COLOR_PRESETS],
+    defaultBorderInset: 1,
+    visualDefaultsVersion: 1,
+    defaultShowFoldedCorner: true,
+    activityBars: {
+      left: getDefaultActivityBarItems("left"),
+      right: getDefaultActivityBarItems("right")
+    },
+    activityBarDefaults: {
+      left: true,
+      right: true
+    },
+    popoutAccents: {
+      enabled: true,
+      splitter: true,
+      activityBar: true
+    },
+    workspaceInterceptorEnabled: true
+  };
+}
+var DEFAULT_SETTINGS = createDefaultSettings();
 var WindowSpacesPlugin = class extends import_obsidian8.Plugin {
   manager;
   windowLayoutsRibbonEl = null;
@@ -9896,6 +10083,7 @@ var WindowSpacesPlugin = class extends import_obsidian8.Plugin {
       WINDOW_LAYOUTS_VIEW_TYPE,
       (leaf) => new WindowLayoutsView(leaf, this)
     );
+    prewarmViewIcons(this.app);
     this.registerCommands();
     this.refreshRibbonIcons();
     this.addSettingTab(new WindowSpacesSettingTab(this.app, this));
@@ -9935,11 +10123,7 @@ var WindowSpacesPlugin = class extends import_obsidian8.Plugin {
   }
   async loadSettings() {
     const savedSettings = await this.loadData();
-    if (savedSettings && savedSettings.layouts && !savedSettings.spaces) {
-      savedSettings.spaces = savedSettings.layouts;
-      delete savedSettings.layouts;
-    }
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, savedSettings);
+    this.settings = Object.assign(createDefaultSettings(), savedSettings);
     if (savedSettings?.visualDefaultsVersion !== 1) {
       if (savedSettings?.defaultBorderInset === 3) {
         this.settings.defaultBorderInset = 1;
@@ -9963,6 +10147,23 @@ var WindowSpacesPlugin = class extends import_obsidian8.Plugin {
   }
   async saveSettings() {
     await this.saveData(this.settings);
+  }
+  /**
+   * Restore every plugin option to its factory value while retaining the
+   * user's saved Spaces verbatim. The caller is responsible for refreshing
+   * UI/runtime effects after the save succeeds.
+   */
+  async resetSettingsPreservingSpaces() {
+    const previousSettings = this.settings;
+    const spaces = Array.isArray(previousSettings?.spaces) ? previousSettings.spaces : [];
+    this.settings = createDefaultSettings();
+    this.settings.spaces = spaces;
+    try {
+      await this.saveSettings();
+    } catch (error) {
+      this.settings = previousSettings;
+      throw error;
+    }
   }
   registerCommands() {
     this.addCommand({
