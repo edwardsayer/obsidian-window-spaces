@@ -8020,7 +8020,7 @@ function releasePopoutLayoutEngine(id) {
 // src/shared/sharedVersion.ts
 var SHARED_API_VERSION = 6;
 var SHARED_COMPATIBLE_FROM_VERSION = 1;
-var SHARED_IMPLEMENTATION_REVISION = "2026-09-05T15:00:00Z";
+var SHARED_IMPLEMENTATION_REVISION = "2026-09-05T17:30:00Z";
 
 // src/popout/activityBar.ts
 var import_obsidian7 = require("obsidian");
@@ -9624,7 +9624,15 @@ var WindowActiveFileTracker = class {
    */
   getActiveFileForWindow(win) {
     if (!win) {
-      return this.app?.workspace?.getActiveFile?.() ?? null;
+      const file2 = this.state.lastActiveWindow ? this.state.windowActiveFiles.get(this.state.lastActiveWindow) : null;
+      if (file2) return file2;
+      const activeLeaf2 = this.app?.workspace ? this.app.workspace.activeLeaf : null;
+      const view = activeLeaf2?.view;
+      const leafFile = view?.file;
+      if (leafFile && typeof leafFile === "object" && "path" in leafFile) {
+        return leafFile;
+      }
+      return null;
     }
     const file = this.state.windowActiveFiles.get(win);
     if (file !== void 0) {
@@ -9632,7 +9640,12 @@ var WindowActiveFileTracker = class {
     }
     const activeLeaf = this.app?.workspace ? this.app.workspace.activeLeaf : null;
     if (activeLeaf && getWindowOfLeaf(activeLeaf) === win) {
-      return this.app.workspace.getActiveFile?.() ?? null;
+      const view = activeLeaf.view;
+      const leafFile = view?.file;
+      if (leafFile && typeof leafFile === "object" && "path" in leafFile) {
+        return leafFile;
+      }
+      return null;
     }
     return null;
   }
@@ -9948,14 +9961,24 @@ function install(state) {
       return original.apply(this, [subscription, args]);
     }
   };
+  let isResolvingActiveFile = false;
   workspace.getActiveFile = function() {
-    const activeWindow2 = getActivePopoutWindow(state);
-    if (activeWindow2) {
-      const winFile = state.tracker.getActiveFileForWindow(activeWindow2);
-      if (winFile) return winFile;
+    if (isResolvingActiveFile) {
+      const original = state.originalMethods?.getActiveFile.value;
+      return original ? original.call(workspace) : null;
     }
-    const original = state.originalMethods?.getActiveFile.value;
-    return original ? original.call(workspace) : null;
+    isResolvingActiveFile = true;
+    try {
+      const activeWindow2 = getActivePopoutWindow(state);
+      if (activeWindow2) {
+        const winFile = state.tracker.getActiveFileForWindow(activeWindow2);
+        if (winFile) return winFile;
+      }
+      const original = state.originalMethods?.getActiveFile.value;
+      return original ? original.call(workspace) : null;
+    } finally {
+      isResolvingActiveFile = false;
+    }
   };
   const ws = state.app.workspace;
   if (ws && typeof ws.on === "function") {
