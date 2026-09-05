@@ -7032,7 +7032,7 @@ function getWindowOfLeaf(leaf) {
 }
 function getPaneRect(tabs) {
   const container = tabs?.containerEl;
-  if (container instanceof HTMLElement) {
+  if (isHTMLElement(container)) {
     const rect = container.getBoundingClientRect();
     if (rect.width > 0 && rect.height > 0) return rect;
   }
@@ -7040,7 +7040,7 @@ function getPaneRect(tabs) {
   for (const leaf of children) {
     const extLeaf = leaf;
     const leafContainer = extLeaf.containerEl || leaf.view?.containerEl;
-    if (leafContainer instanceof HTMLElement) {
+    if (isHTMLElement(leafContainer)) {
       const rect = leafContainer.getBoundingClientRect();
       if (rect.width > 0 && rect.height > 0) return rect;
     }
@@ -7075,10 +7075,13 @@ function getDirectChildOf(root, element) {
   }
   return current && current.parentElement === root ? current : null;
 }
+function isHTMLElement(el) {
+  return !!(el && typeof el.instanceOf === "function" && el.instanceOf(HTMLElement));
+}
 function getPaneContainerElement(leaf) {
   const extLeaf = leaf;
   const container = extLeaf.containerEl || leaf.view?.containerEl;
-  if (!(container instanceof HTMLElement)) return null;
+  if (!isHTMLElement(container)) return null;
   let current = container;
   while (current && current.parentElement) {
     if (current.parentElement.classList.contains("workspace-split")) {
@@ -7114,7 +7117,7 @@ function setElementCssStyles(el, styles) {
 function getViewContainer(leaf) {
   const extLeaf = leaf;
   const container = extLeaf.containerEl || leaf.view?.containerEl;
-  return container instanceof HTMLElement ? container : null;
+  return isHTMLElement(container) ? container : null;
 }
 function getDirectSplitChild(split, element) {
   let current = element;
@@ -7260,7 +7263,7 @@ var PopoutLayoutEngine = class {
       if (getWindowOfLeaf(leaf) !== win || leaf.getViewState()?.type !== viewType) return;
       const extLeaf = leaf;
       const container = extLeaf.containerEl || leaf.view?.containerEl;
-      if (container instanceof HTMLElement && columnEl.contains(container)) {
+      if (isHTMLElement(container) && columnEl.contains(container)) {
         found = leaf;
       }
     });
@@ -7379,14 +7382,14 @@ var PopoutLayoutEngine = class {
     if (getWindowOfLeaf(leaf) !== win) return null;
     const extLeaf = leaf;
     const container = extLeaf.containerEl || leaf.view?.containerEl;
-    if (container instanceof HTMLElement && columnEl.contains(container)) {
+    if (isHTMLElement(container) && columnEl.contains(container)) {
       return extLeaf.parent ?? null;
     }
     return null;
   }
   /** 判斷記憶中的 tabs 群組是否仍存在於指定 sidebar column。 */
   isTabsInColumn(win, columnEl, tabs) {
-    if (tabs.containerEl instanceof HTMLElement && columnEl.contains(tabs.containerEl)) {
+    if (isHTMLElement(tabs.containerEl) && columnEl.contains(tabs.containerEl)) {
       return true;
     }
     let found = false;
@@ -7395,7 +7398,7 @@ var PopoutLayoutEngine = class {
       const extLeaf = leaf;
       if (extLeaf.parent !== tabs) return;
       const container = extLeaf.containerEl || leaf.view?.containerEl;
-      if (container instanceof HTMLElement && columnEl.contains(container)) {
+      if (isHTMLElement(container) && columnEl.contains(container)) {
         found = true;
       }
     });
@@ -7450,7 +7453,7 @@ var PopoutLayoutEngine = class {
     if (getWindowOfLeaf(leaf) !== win) return null;
     const extLeaf = leaf;
     const container = extLeaf.containerEl || leaf.view?.containerEl;
-    if (!(container instanceof HTMLElement)) return null;
+    if (!isHTMLElement(container)) return null;
     const column = this.getTopLevelColumnForContainer(container);
     if (!isSidebarColumnElement(column)) return null;
     if (column?.classList.contains("mod-left-split")) return "left";
@@ -7541,7 +7544,7 @@ var PopoutLayoutEngine = class {
     if (!leaf || getWindowOfLeaf(leaf) !== win) return false;
     const extLeaf = leaf;
     const container = extLeaf.containerEl || leaf.view?.containerEl;
-    if (!(container instanceof HTMLElement)) return false;
+    if (!isHTMLElement(container)) return false;
     return isSidebarColumnElement(this.getTopLevelColumnForContainer(container));
   }
   /** 回傳 container 所在的頂層欄位元素（root split 的 direct child）。 */
@@ -7560,14 +7563,14 @@ var PopoutLayoutEngine = class {
     const centerPanes = panes.filter((pane) => {
       const tabs = pane.tabs;
       const container = tabs.containerEl;
-      if (container instanceof HTMLElement) {
+      if (isHTMLElement(container)) {
         if (isSidebarColumnElement(this.getTopLevelColumnForContainer(container))) return false;
       }
       const children = tabs.children ?? [];
       for (const leaf of children) {
         const extLeaf = leaf;
         const leafContainer = extLeaf.containerEl || leaf.view?.containerEl;
-        if (leafContainer instanceof HTMLElement) {
+        if (isHTMLElement(leafContainer)) {
           if (isSidebarColumnElement(this.getTopLevelColumnForContainer(leafContainer))) return false;
         }
       }
@@ -7579,7 +7582,7 @@ var PopoutLayoutEngine = class {
   isLeafVisibleInPane(leaf) {
     const extLeaf = leaf;
     const container = extLeaf.containerEl || leaf.view?.containerEl;
-    if (!(container instanceof HTMLElement)) return false;
+    if (!isHTMLElement(container)) return false;
     return container.offsetParent !== null;
   }
   /** 以目前 active leaf 或最後記錄的 pane 決定 content-area 目標。 */
@@ -7713,17 +7716,17 @@ var PopoutLayoutEngine = class {
     const leaf = leaves[0];
     if (!leaf) return [];
     const container = leaf.containerEl || leaf.view?.containerEl;
-    if (!(container instanceof HTMLElement)) return [];
+    if (!isHTMLElement(container)) return [];
     const rootEl = findRootSplitElement(container);
     if (!rootEl) return [];
     let topEls = Array.from(rootEl.children).filter((el) => {
-      if (!(el instanceof HTMLElement)) return false;
+      if (!isHTMLElement(el)) return false;
       return el.classList.contains("workspace-tabs") || el.classList.contains("workspace-split");
     });
     const popoutColumnContainer = topEls.length === 1 ? topEls[0] : void 0;
     if (isPopoutWindow(win) && popoutColumnContainer && popoutColumnContainer.classList.contains("workspace-split")) {
       const containerChildren = Array.from(popoutColumnContainer.children).filter((el) => {
-        if (!(el instanceof HTMLElement)) return false;
+        if (!isHTMLElement(el)) return false;
         return el.classList.contains("workspace-tabs") || el.classList.contains("workspace-split");
       });
       if (containerChildren.length > 0) {
@@ -8017,7 +8020,7 @@ function releasePopoutLayoutEngine(id) {
 // src/shared/sharedVersion.ts
 var SHARED_API_VERSION = 6;
 var SHARED_COMPATIBLE_FROM_VERSION = 1;
-var SHARED_IMPLEMENTATION_REVISION = "2026-08-31T15:30:35Z";
+var SHARED_IMPLEMENTATION_REVISION = "2026-09-05T15:00:00Z";
 
 // src/popout/activityBar.ts
 var import_obsidian7 = require("obsidian");
@@ -9574,7 +9577,7 @@ function isWindowObject(val) {
   if (anyVal.isMockWindow) return true;
   return anyVal.window === val && typeof anyVal.document === "object";
 }
-function isHTMLElement(val) {
+function isHTMLElement2(val) {
   if (!val || typeof val !== "object") return false;
   const anyVal = val;
   return anyVal.nodeType === 1 && typeof anyVal.ownerDocument === "object";
@@ -9662,7 +9665,7 @@ var WindowActiveFileTracker = class {
     let viewWindow = null;
     if (isWindowObject(viewLeafOrWindowOrEl)) {
       viewWindow = viewLeafOrWindowOrEl;
-    } else if (isHTMLElement(viewLeafOrWindowOrEl)) {
+    } else if (isHTMLElement2(viewLeafOrWindowOrEl)) {
       viewWindow = viewLeafOrWindowOrEl.ownerDocument?.defaultView ?? null;
     } else {
       viewWindow = getWindowOfLeaf(viewLeafOrWindowOrEl);
