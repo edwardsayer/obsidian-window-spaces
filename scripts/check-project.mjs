@@ -70,10 +70,13 @@ const requiredPaths = [
   "docs/user-guide.md",
   "docs/user-guide.zh-TW.md",
   "docs/user-guide.zh-CN.md",
-  "assets/screenshots/multi-workspaces.png",
-  "assets/screenshots/popup.png",
-  "assets/screenshots/sidebar.png",
-  "assets/screenshots/tab-panel.png",
+  "assets/screenshots/01-hero-showcase.png",
+  "assets/screenshots/02-folder-scoped-cabin.png",
+  "assets/screenshots/03-popout-activity-bar.png",
+  "assets/screenshots/04-layout-guardrails.png",
+  "assets/screenshots/05-settings-activity-bar.png",
+  "assets/screenshots/06-space-appearance-modal.png",
+  "assets/screenshots/07-unified-panels.png",
 ];
 
 for (const p of requiredPaths) {

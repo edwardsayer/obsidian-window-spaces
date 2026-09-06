@@ -9,9 +9,16 @@ Language: [English](user-guide.md) | **繁體中文** | [简体中文](user-guid
 ## 目錄
 
 1. [核心架構與設計哲學](#1-核心架構與設計哲學)
-2. [介面入口與三大模式](#2-介面入口與三大模式)
+2. [介面入口與四大互動模式](#2-介面入口與四大互動模式)
+   - [2.1 側邊欄模式（Sidebar Panel）](#21-側邊欄模式sidebar-panel)
+   - [2.2 標籤頁模式（Tab Panel）](#22-標籤頁模式tab-panel)
+   - [2.3 快速彈出式對話框（Quick Popup Modal）](#23-快速彈出式對話框quick-popup-modal)
+   - [2.4 Popout 彈出式視窗活動列與右鍵視圖管理](#24-popout-彈出式視窗活動列與右鍵視圖管理)
 3. [焦點攔截與全鍵盤操作流](#3-焦點攔截與全鍵盤操作流)
-4. [Per-Window 獨立自動儲存機制](#4-per-window-獨立自動儲存機制)
+4. [Per-Window 自動儲存與雙重版面防坍塌保護](#4-per-window-自動儲存與雙重版面防坍塌保護)
+   - [4.1 獨立自動儲存（5 秒防抖 + 關閉即存）](#41-獨立自動儲存5-秒防抖--關閉即存)
+   - [4.2 雙重版面崩塌防護網（Dual Layout Collapse Guardrails）](#42-雙重版面崩塌防護網dual-layout-collapse-guardrails)
+   - [4.3 不可導航視圖與 Pinned 分頁智慧開檔](#43-不可導航視圖與-pinned-分頁智慧開檔)
 5. [社群重量級外掛協同工作流示範](#5-社群重量級外掛協同工作流示範)
    - [5.1 Folder Spaces 子目錄聚焦工作艙（雙層語境隔離）](#51-folder-spaces-子目錄聚焦工作艙雙層語境隔離)
    - [5.2 Excalidraw 視覺構思工作艙](#52-excalidraw-視覺構思工作艙)
@@ -35,15 +42,21 @@ Obsidian 的生態極為蓬勃，但當我們開啟愈來愈多功能時，主�
 
 Window Spaces 的定位是 **Obsidian 的自然擴展**：它專注於管理每一個獨立 Popout 彈出式視窗（Popout Window）的佈局生命週期，不干擾主視窗，讓每個視窗成為專屬的「工作艙」。
 
+![Quartz Studio 主展示工作艙](../assets/screenshots/01-hero-showcase.png)
+*Quartz Studio 以翠綠主題邊框、Canvas、架構筆記與即時狀態徽章組成完整的 Popout 工作艙。*
+
 ---
 
-## 2. 介面入口與三大模式
+## 2. 介面入口與四大互動模式
 
-Window Spaces 提供三種高度整合且一致的操作介面：
+Window Spaces 提供高度整合且一致的操作介面：
 
 ### 2.1 側邊欄模式（Sidebar Panel）
 - **開啟方式**：在指令面板執行 `Window Spaces: Open in left sidebar` 或 `Open in right sidebar`。
 - **特點**：常駐於側邊欄，緊貼檔案清單，隨時點擊切換不同工作空間。
+
+![統一 Window Spaces 面板與切換器](../assets/screenshots/07-unified-panels.png)
+*統一示範中，左側是 Folder Space Explorer，中間與右側皆可使用 Window Spaces 面板。*
 
 ### 2.2 標籤頁模式（Tab Panel）
 - **開啟方式**：執行 `Window Spaces: Open as tab panel`。
@@ -52,6 +65,20 @@ Window Spaces 提供三種高度整合且一致的操作介面：
 ### 2.3 快速彈出式對話框（Quick Popup Modal）
 - **開啟方式**：點擊左側功能列的 Ribbon 圖示（版面圖標），或自訂快捷鍵觸發 `Window Spaces: Open as popup window`。
 - **特點**：輕量級浮動視窗，支援鍵盤快速搜尋，用完即走。
+
+*統一示範前景的切換器提供七個 Space，並依 Project、Research、Writing 分組，適合快速鍵盤檢索。*
+
+### 2.4 Popout 彈出式視窗活動列與右鍵視圖管理
+Window Spaces 為每一個獨立的 Popout 彈出式視窗注入了原生級活動列與側邊欄引擎：
+- **可折疊雙側欄與平滑調整**：點擊活動列頂部的折疊按鈕或使用快捷鍵即可展開/收合左右側邊欄；調整寬度時採用 `borderBoxSize` 精準測量與 1px 變動防護閥值，徹底解決拖曳回彈與邊框縮水。
+- **活動列右鍵上下文選單**：直接在活動列圖示上按滑鼠右鍵，即可呼出選單快速切換/啟用/停用各個 View，或控制左右側欄與活動列的可見度。
+- **設定頁一鍵匯入與安全重設**：在外掛設定中可透過拖曳手柄（Drag-to-Reorder）調整活動列順序，並支援點擊「從主視窗側欄匯入」一鍵同步主視窗側欄佈局；「重設設定」僅還原設定選項為原廠預設值，完整保留使用者已儲存的所有 Spaces。
+
+![Popout 活動列右鍵選單](../assets/screenshots/03-popout-activity-bar.png)
+*在 Popout 活動列圖示按右鍵，即可使用原生風格的 View 與側欄控制。*
+
+![活動列設定](../assets/screenshots/05-settings-activity-bar.png)
+*設定頁提供拖曳排序與一鍵從主視窗匯入的控制項。*
 
 ---
 
@@ -70,13 +97,28 @@ Window Spaces 採用**精確焦點攔截技術**，讓你在完全不使用滑�
 
 ---
 
-## 4. Per-Window 獨立自動儲存機制
+## 4. Per-Window 自動儲存與雙重版面防坍塌保護
 
+### 4.1 獨立自動儲存（5 秒防抖 + 關閉即存）
 每一個 Space 都可以獨立設定是否開啟 **`🔄 自動儲存（Auto-Save）`**：
-
 1. **5 秒防抖（Debounce）更新**：當你在工作艙內開啟新分頁、調整垂直/水平分割比例時，Window Spaces 會在背景自動記錄最新狀態。
 2. **關閉視窗即時快照**：當你關閉 Popout 彈出式視窗時，系統會立即進行最後一次狀態快照，確保任何細微調整都不會遺失。
 3. **手動模式保護**：若某些 Space 是固定的標準範本（例如：每日審查樣板），可關閉自動儲存，避免臨時的操作改動了範本。
+
+### 4.2 雙重版面崩塌防護網（Dual Layout Collapse Guardrails）
+在複雜的多分欄或側邊欄環境下，Obsidian 原生機制容易因為分頁關閉而連帶摧毀容器，導致版面崩塌。Window Spaces 深度研發了雙重攔截防護機制：
+- **中央內容區最後分頁原地轉換為 New Tab (`empty` view)**：
+  在中央內容區中，若某個分割窗格只剩最後一個分頁，當使用者點擊關閉分頁（或透過快捷鍵關閉）時，Window Spaces 會攔截 `WorkspaceLeaf.prototype.detach`，在該分頁原地將其 view 替換為 Obsidian 原生的 New Tab（空白分頁），完整保留該分欄的 `WorkspaceTabs` 容器與分割比例，防止整個分欄或相鄰佈局崩塌。
+- **側邊欄最後頁籤防刪保護**：
+  在 Popout 側邊欄（Left / Right Sidebar）中，若使用者嘗試關閉最後一個頁籤，系統會攔截 `detach` 動作並主動阻止關閉，同時在畫面右上角彈出原生 Notice 提示：**「側邊欄上最後一個頁籤不可刪除」**，徹底杜絕側欄容器被銷毀造成佈局結構異常。
+
+![雙重版面防護](../assets/screenshots/04-layout-guardrails.png)
+*同一個三欄 Popout 中，中央最後分頁轉為原生 New Tab，右側側欄保持完整並顯示防刪 Notice。*
+
+### 4.3 不可導航視圖與 Pinned 分頁智慧開檔
+在彈出式視窗的側邊欄（如 File Explorer、Bookmarks 或 Folder Spaces Explorer）點擊檔案時，Window Spaces 會執行智慧開檔路由：
+- **中央編輯區優先**：點選筆記永遠精準導向至中央內容區，永不覆蓋或破壞側邊欄既有的功能視圖。
+- **不可導航與釘選保護（Navigation Fallback）**：若中央作用中的分頁為**不可導航視圖**（如 Outline 大綱、Canvas 畫布、Graph 圖譜等）或是已被**釘選（Pinned）**的筆記分頁，直接在其上載入檔案會導致導航失敗或畫面被洗掉。Window Spaces 會自動偵測並於中央編輯區**新建獨立分頁（New Tab）**開啟檔案，兼顧操作流暢性與畫面安全。
 
 ---
 
@@ -91,7 +133,10 @@ Window Spaces 採用**精確焦點攔截技術**，讓你在完全不使用滑�
   - 命名為 `🚀 Apollo Project`，挑選翠綠色邊框與火箭 Emoji，並開啟自動儲存。
 - **協同優勢**：
   - **雙層語境隔離**：視窗層級獨立排版，檔案層級僅呈現該專案所需的目錄樹。
-  - **智慧開檔路由**：在 Folder Space 樹狀清單中點擊任何檔案，皆會自動於中央編輯區開啟，絕不替換或打亂側欄視圖。
+   - **智慧開檔路由**：在 Folder Space 樹狀清單中點擊任何檔案，皆會自動於中央編輯區開啟，絕不替換或打亂側欄視圖。
+
+![子目錄聚焦專案工作艙](../assets/screenshots/02-folder-scoped-cabin.png)
+*Folder Space Explorer 將可見檔案樹縮限至 Apollo 專案，同時保留 Window Spaces 的完整工作艙佈局。*
 
 ### 5.2 Excalidraw 視覺構思工作艙
 - **痛點**：Excalidraw 需要寬廣的畫布，若與筆記擠在主視窗，筆記閱讀區會被壓縮得極小。
@@ -133,6 +178,9 @@ Window Spaces 採用**精確焦點攔截技術**，讓你在完全不使用滑�
 - **分類與標籤（Tags / Folders）**：可將 Spaces 依照專案、日常、研究等分類歸納。
 - **6 種維度排序**：透過齒輪選單（⚙️）可依自訂順序、名稱（A-Z / Z-A）、分頁數量、建立時間等維度即時排序。
 
+![Space 外觀設定對話框](../assets/screenshots/06-space-appearance-modal.png)
+*外觀對話框將 Space 名稱、圖示、主題色與即時預覽集中在同一處。*
+
 ---
 
 ## 7. 備份、匯出與跨裝置同步
@@ -153,3 +201,12 @@ Window Spaces 採用**精確焦點攔截技術**，讓你在完全不使用滑�
 
 ### Q3: 空白分頁（Empty Tab）的作用是什麼？
 **A**: 若某個 Space 包含的檔案被移動或更名，Window Spaces 會以 Obsidian 原生空白分頁佔位，保留原本精心設計的分欄佈局架構，避免版面直接崩塌。
+
+### Q4: 為什麼關閉中央編輯區的最後一個分頁時，會原地變成 New Tab 而不是直接關閉分欄？
+**A**: 這是 Window Spaces 的版面防坍塌保護機制（Central Tab Guard）。Obsidian 原生架構在關閉分欄中最後一個分頁時，會直接銷毀整個 `WorkspaceTabs` 容器，導致原本精心調校的多欄分割排版瞬間瓦解。Window Spaces 攔截 detach 並原地轉換為乾淨的 New Tab，完整保全視窗佈局結構。
+
+### Q5: 為什麼在側邊欄嘗試關閉最後一個頁籤時會提示「側邊欄上最後一個頁籤不可刪除」？
+**A**: 這是側邊欄防刪保護（Sidebar Guard）。Obsidian 原生側邊欄若被移除了所有 Leaf，側欄容器可能陷入無效狀態。Window Spaces 透過主動攔截保護側欄容器的完整性。若暫時不需要側邊欄，只需點擊頂部活動列的折疊按鈕收合即可。
+
+### Q6: 為什麼在 Outline 大綱或 Canvas 畫布作用中時，點選側欄檔案會自動開新分頁？
+**A**: 像 Outline、Canvas 或已 Pin（釘選）的分頁屬於「不可導航或受保護」的視圖，原生直接在其中導航檔案可能會失敗或破壞當前的工作畫面。Window Spaces 會自動辨識並智慧引導至中央內容區新開分頁。

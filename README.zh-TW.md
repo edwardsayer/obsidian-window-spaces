@@ -33,30 +33,39 @@ Obsidian 靈活的佈局與強大的外掛生態，讓許多人將其視為終�
 ## ⚖️ Obsidian 原生 Workspaces vs. Window Spaces
 
 | 比較維度 | Obsidian 原生 Workspaces | Window Spaces |
-| :--- | :---: | :---: |
+| :--- | :--- | :--- |
 | **排版控管範圍** | 全域覆蓋（連同主視窗全部替換） | **Per-Window（獨立管理每一個 Popout 彈出式視窗）** |
 | **Popout 側邊欄與活動列** | ❌ 無（僅為陽春分頁視窗） | **✅ 完整原生級左右垂直活動列與折疊側邊欄** |
 | **視窗視覺識別** | ❌ 所有視窗外觀一致無區別 | **✅ 4 邊沉浸式主題邊框、自訂 Logo 與狀態列徽章** |
 | **目錄脈絡隔離** | ❌ 顯示全庫上萬篇雜亂檔案樹 | **✅ 深度整合 [Folder Spaces](https://github.com/edwardsayer/obsidian-folder-spaces) 鎖定特定子目錄** |
+| **開檔路由保護** | 無，主視窗／彈出式視窗的檔案分頁與功能檢視互相影響 | **✅ 視窗鎖定路由技術：開檔智慧導向中央區；內建（Outline / Backlinks）與社群 View（如 Grid Explorer）多實體獨立共存、互不干擾** |
+| **雙重版面防坍塌保護** | ❌ 關閉最後分頁或頁籤時容器立即被銷毀導致版面崩塌 | **✅ 雙重版面防護網：中央關閉最後分頁原地轉 New Tab 保留分欄；側欄最後頁籤防刪保護** |
 | **自動儲存粒度** | 僅支援手動儲存快照 | **✅ 獨立 Per-Space Auto-Save（5 秒防抖 + 關閉即存）** |
 | **多螢幕幾何座標** | 多 DPI 環境易位移跑位 | **✅ 像素級精確還原座標，內建螢幕拔除防溢出保護** |
-| **視窗鎖定與路由隔離** | 無，主視窗／彈出式視窗的檔案分頁與功能檢視互相影響 | **✅ 視窗鎖定路由技術：開檔智慧導向中央區；內建（Outline / Backlinks）與社群 View（如 Grid Explorer）多實體獨立共存、互不干擾** |
 
 ---
 
 ## 🖼️ 介面預覽
 
-| 🗺️ 獨立 Popout 彈出式視窗工作艙 | 🗂️ 側邊欄原生管理面板 |
+| 🗺️ Quartz Studio 工作艙 | 📁 子目錄聚焦專案工作艙 |
 | :---: | :---: |
-| ![獨立 Popout 工作艙](assets/screenshots/multi-workspaces.png) | ![側邊欄面板](assets/screenshots/sidebar.png) |
-| *Canvas 視覺畫布 + Markdown 雙欄分割與狀態列識別* | *整合式 Spaces 選擇器、啟用狀態提示與快速搜尋* |
+| ![Quartz Studio 主展示工作艙](assets/screenshots/01-hero-showcase.png) | ![子目錄聚焦專案工作艙](assets/screenshots/02-folder-scoped-cabin.png) |
+| *翠綠主題邊框、Canvas、架構筆記與即時狀態徽章的 Popout 工作艙* | *Folder Space Explorer 將 Apollo 專案檔案樹鎖定在專屬工作艙內* |
 
-| 📑 編輯區標籤頁管理模式 | ⚡ 快速彈出對話框 |
+| 🧭 Popout 活動列 | 🛡️ 雙重版面防護 |
 | :---: | :---: |
-| ![標籤頁管理模式](assets/screenshots/tab-panel.png) | ![快速彈出對話框](assets/screenshots/popup.png) |
-| *在主編輯區分頁中進行完整工作空間管理與檢視* | *輕量級浮動切換視窗，支援全鍵盤高速瀏覽* |
+| ![Popout 活動列右鍵選單](assets/screenshots/03-popout-activity-bar.png) | ![雙重版面防護](assets/screenshots/04-layout-guardrails.png) |
+| *專屬 Popout 中的原生風格活動列與 View 上下文選單* | *三欄佈局完整保留：中央最後分頁轉為 New Tab，側欄顯示防刪 Notice* |
 
-> 📷 *如需查看規劃中的全新視覺資產（包含 Popout 活動列、側欄折疊與主題邊框），請參閱 [視覺展示截圖規劃指南](docs/screenshot-guide.zh-TW.md)。*
+| ⚙️ 活動列設定 | 🎨 Space 外觀 |
+| :---: | :---: |
+| ![活動列設定](assets/screenshots/05-settings-activity-bar.png) | ![Space 外觀設定對話框](assets/screenshots/06-space-appearance-modal.png) |
+| *拖曳排序控制與一鍵從主視窗匯入* | *名稱、圖示、主題色與即時預覽，一次建立清晰的 Space 身分* |
+
+| 🧩 統一面板與切換器 |
+| :---: |
+| ![統一 Window Spaces 面板與切換器](assets/screenshots/07-unified-panels.png) |
+| *左側 Folder Space Explorer、中間與右側 Window Spaces 面板，以及依 Project／Research／Writing 分組的七個 Space 切換器* |
 
 ---
 
@@ -65,9 +74,10 @@ Obsidian 靈活的佈局與強大的外掛生態，讓許多人將其視為終�
 ### 🪟 1. Popout 彈出式視窗專屬活動列與雙側欄引擎 *(v1.1+ 重磅)*
 Obsidian 原生 Popout 彈出式視窗完全沒有側邊欄。Window Spaces 為彈出式視窗注入了**原生級左右垂直活動列（Activity Bar）與折疊側邊欄容器**：
 - **可折疊雙側欄**：透過頂部原生風格工具列按鈕或快捷鍵，自由展開/收合左右側邊欄。
-- **動態視圖探索**：直接在 Popout 側欄嵌入 File Explorer、Bookmarks（書籤）、Outline（大綱）、Search（搜尋）或第三方外掛視圖。
-- **設定頁拖曳排序**：在外掛設定中透過直覺的拖曳手柄（Drag-to-Reorder）自訂按鈕順序。
-- **一鍵側欄同步**：支援從主視窗側邊欄一鍵匯入常用視圖配置。
+- **右鍵視圖上下文選單**：直接在活動列按鈕上按右鍵，可呼出原生右鍵選單快速切換/啟用/停用各個 View，或切換側欄與活動列的可見度。
+- **動態視圖探索與預熱**：直接在 Popout 側欄嵌入 File Explorer、Bookmarks（書籤）、Outline（大綱）、Search（搜尋）或第三方外掛視圖。
+- **極致平滑的側欄調整**：採用精確的 `borderBoxSize` 測量與 1px 變動防護閥值，徹底消除側邊欄拖曳時的回彈與邊框縮水現象。
+- **設定頁拖曳排序與一鍵匯入**：在外掛設定中透過直覺的拖曳手柄（Drag-to-Reorder）自訂按鈕順序，支援從主視窗側邊欄一鍵匯入常用視圖配置；重設設定時安全保留所有已儲存的 Spaces。
 
 ### 🚀 2. 深度生態協同：與 Folder Spaces 聯手打造子目錄聚焦工作艙
 將 Window Spaces 與姊妹外掛 **[Folder Spaces](https://github.com/edwardsayer/obsidian-folder-spaces)** 搭配，實現極致的**「雙層語境隔離（Double Context Isolation）」**：
@@ -83,11 +93,14 @@ Obsidian 原生 Popout 彈出式視窗完全沒有側邊欄。Window Spaces 為�
 - **狀態列空間徽章**：於 Popout 左下角即時顯示目前空間名稱與快速存檔狀態。
 - **氛圍增強**：窗格調整分隔條帶有主題色微光，左右活動列注入柔和底色。
 
-### 🎯 4. 視窗鎖定路由與多實體視圖隔離（Window-Locked Routing & View Isolation）*(v1.2+ 核心技術)*
-Obsidian 原生架構以單一主視窗為中心，當在彈出式視窗中開啟 Outline、Backlinks 或第三方外掛檢視（如 Grid Explorer、Notebook Navigator）時，往往會因為全域檢索（`getLeavesOfType`）而跳回主視窗、搶奪焦點或互相覆蓋。Window Spaces 深度研發了**視窗鎖定路由與 Leaf 攔截技術（Window-Locked Routing）**：
+### 🎯 4. 視窗鎖定路由與雙重防坍塌保護（Window-Locked Routing & Dual Guardrails）*(v1.2+ 核心技術)*
+Obsidian 原生架構以單一主視窗為中心，當在彈出式視窗中開啟 Outline、Backlinks 或第三方外掛檢視（如 Grid Explorer、Notebook Navigator）時，往往會因為全域檢索（`getLeavesOfType`）而跳回主視窗、搶奪焦點或互相覆蓋。Window Spaces 深度研發了**視窗鎖定路由與 Leaf 攔截技術（Window-Locked Routing）**，並加入全方位的版面防坍塌保護：
 - **內建與社群 View 多實體獨立共存**：突破官方單例限制，讓原生核心視圖（Outline 大綱、Backlinks 反向連結、Tags 標籤、Search 搜尋）與社群外掛視圖（如 Grid Explorer、Notebook Navigator 等）在主視窗與多個彈出式視窗中**同時存在多個獨立實體（Multi-Instance Concurrency）**，各自運作、永不搶焦。
 - **事件廣播與作用檔案視窗感知**：精確攔截 `file-open` 事件傳遞與 `workspace.getActiveFile()`。視窗 A 的大綱與反鏈只追蹤視窗 A 當前閱讀的筆記，視窗 B 只追蹤視窗 B，徹底解決官方跨視窗連動錯亂與畫面跳動的陳年痛點。
-- **中央編輯區智慧開檔**：從側邊欄點選檔案，永遠智慧導向至該視窗的中央編輯區，新開分頁自動導向最後作用之內容窗格，不覆蓋側欄視圖。
+- **雙重版面崩塌防護網（Dual Layout Collapse Guardrails）**：
+  - **中央最後分頁原地轉 New Tab**：當關閉中央編輯區最後一個分頁時，Window Spaces 會攔截 `detach`，原地將其轉換為 Obsidian 原生 New Tab (`empty` view)，防止所屬的 `WorkspaceTabs` 容器被銷毀導致分欄崩塌或視窗結構失衡。
+  - **側邊欄最後頁籤防刪保護**：嘗試關閉側邊欄上的最後一個頁籤時，自動阻止關閉並彈出「側邊欄上最後一個頁籤不可刪除」原生提示，杜絕側邊欄被意外銷毀。
+- **不可導航視圖與 Pinned 分頁智慧開檔**：中央分頁為不可導航視圖（如 Outline 大綱、Canvas 畫布、Graph 等）或已 Pin（釘選）時，點擊檔案自動於中央開啟新分頁，避免覆蓋既有畫面或導航失敗。
 - **版面邊界防崩塌**：分頁拖曳防護機制防止分頁在拖曳時誤入活動列而破壞結構；即便特定檔案被移動或更名，仍會以原生空白分頁佔位，保留精心設計的分欄比例。
 
 ### ⚡ 5. 零抖動還原與多螢幕記憶 *(v1.2+ 效能)*

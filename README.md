@@ -33,30 +33,39 @@ With **focus interception technology**, **popout activity bar engines**, and **p
 ## ⚖️ Obsidian Core Workspaces vs. Window Spaces
 
 | Feature | Obsidian Native Workspaces | Window Spaces |
-| :--- | :---: | :---: |
+| :--- | :--- | :--- |
 | **Scope of Layout** | Global (replaces main window & all splits) | **Per-Window (isolates independent popout cabins)** |
 | **Popout Sidebar & Activity Bar** | ❌ None (bare popout windows only) | **✅ Full Native-like Left & Right Activity Bars** |
 | **Visual Window Identity** | ❌ Generic, indistinguishable windows | **✅ 4-Side Accent Frames, Logos, & Status Badges** |
 | **Filesystem Context Isolation** | ❌ Shows full vault file tree | **✅ Pairs with [Folder Spaces](https://github.com/edwardsayer/obsidian-folder-spaces) for directory scoping** |
+| **File Routing Protection** | None; tabs and views across main/popout windows interfere with each other | **✅ Window-Locked Routing: Routes file opens to center editor; core views (Outline, Backlinks) & community views (Grid Explorer) co-exist as independent multi-instances without interference** |
+| **Dual Layout Collapse Guardrails** | ❌ Closing the last tab destroys container and breaks split layout | **✅ Dual Guardrails: Closing last central tab converts in-place to New Tab; sidebar last tab deletion prevention** |
 | **Auto-Save Granularity** | Manual snapshot only | **✅ Per-Space Auto-Save (5s debounce + close snapshot)** |
 | **Multi-Monitor Geometry** | Prone to multi-DPI shifts | **✅ Pixel-precise restoration with off-screen protection** |
-| **Window-Locked Routing & View Isolation** | None; tabs and views across main/popout windows interfere with each other | **✅ Window-Locked Routing: Routes file opens to center editor; core views (Outline, Backlinks) & community views (Grid Explorer) co-exist as independent multi-instances without interference** |
 
 ---
 
 ## 🖼️ Visual Showcase
 
-| 🗺️ Dedicated Popout Workbench | 🗂️ Native Sidebar Panel |
+| 🗺️ Quartz Studio Work Cabin | 📁 Folder-Scoped Project Cabin |
 | :---: | :---: |
-| ![Dedicated Popout Workbench](assets/screenshots/multi-workspaces.png) | ![Sidebar Panel](assets/screenshots/sidebar.png) |
-| *Visual Canvas + Markdown Split with Status Bar indicator* | *Unified Spaces Picker with Active indicators & Quick Search* |
+| ![Quartz Studio flagship work cabin](assets/screenshots/01-hero-showcase.png) | ![Folder-scoped project cabin](assets/screenshots/02-folder-scoped-cabin.png) |
+| *Emerald-accented popout with Canvas, architecture notes, and a live status badge* | *Folder Space Explorer keeps the Apollo project tree focused inside its own cabin* |
 
-| 📑 Full Tab Management | ⚡ Quick Popup Switcher |
+| 🧭 Popout Activity Bar | 🛡️ Dual Layout Guardrails |
 | :---: | :---: |
-| ![Tab Panel Mode](assets/screenshots/tab-panel.png) | ![Quick Popup Modal](assets/screenshots/popup.png) |
-| *Full-page Workspace Management inside Editor Tabs* | *Floating Quick-Popup Modal with Keyboard Navigation* |
+| ![Popout Activity Bar context menu](assets/screenshots/03-popout-activity-bar.png) | ![Dual layout guardrails](assets/screenshots/04-layout-guardrails.png) |
+| *Native-style activity bar and view context menu in a dedicated popout* | *Three-column layout preserved: central last tab becomes New Tab while the sidebar shows its protection Notice* |
 
-> 📷 *Looking for planned visual assets (Popout Activity Bar, Collapsible Sidebars, and Theme Frames)? See our [Visual Asset & Screenshot Guide](docs/screenshot-guide.md).*
+| ⚙️ Activity Bar Settings | 🎨 Space Appearance |
+| :---: | :---: |
+| ![Activity Bar settings](assets/screenshots/05-settings-activity-bar.png) | ![Space appearance modal](assets/screenshots/06-space-appearance-modal.png) |
+| *Drag-to-reorder controls and one-click import from the main window* | *Name, icon, accent color, and live preview for a distinctive Space identity* |
+
+| 🧩 Unified Panels & Switcher |
+| :---: |
+| ![Unified Window Spaces panels and switcher](assets/screenshots/07-unified-panels.png) |
+| *Folder Space Explorer on the left, Window Spaces panels in the center and right, plus a seven-space Project / Research / Writing switcher* |
 
 ---
 
@@ -65,9 +74,10 @@ With **focus interception technology**, **popout activity bar engines**, and **p
 ### 🪟 1. Popout Activity Bar & Sidebar Engine *(New in v1.1+)*
 Obsidian popout windows natively lack sidebars. Window Spaces injects a **true, native-like Activity Bar & Collapsible Sidebar engine** directly into popout windows:
 - **Collapsible Sidebars**: Toggle left/right sidebars using native-styled toolbar buttons or customizable hotkeys.
-- **Dynamic View Discovery**: Embed File Explorer, Bookmarks, Search, Outline, or third-party views directly in popouts.
-- **Drag-to-Reorder in Settings**: Rearrange popout activity bar buttons with intuitive drag-and-drop.
-- **One-Click Sync**: Import your current main window sidebar layout with a single click.
+- **Right-Click Context Menu**: Right-click directly on any Activity Bar icon to toggle view visibility, switch sidebars, or hide/show the activity bar and sidebar.
+- **Dynamic View Discovery & Prewarming**: Embed File Explorer, Bookmarks, Search, Outline, or third-party views directly in popouts.
+- **Ultra-Smooth Sidebar Resizing**: Uses exact `borderBoxSize` measurements with a 1px change-threshold guard to eliminate sidebar jitter, bounce-back, and slow border shrinkage.
+- **Drag-to-Reorder & One-Click Import in Settings**: Rearrange popout activity bar buttons with intuitive drag-and-drop, and import your current main window sidebar layout with a single click; resetting settings safely preserves your saved spaces.
 
 ### 🚀 2. Folder Spaces Synergy: Scoped Project Cabins
 Pair Window Spaces with **[Folder Spaces](https://github.com/edwardsayer/obsidian-folder-spaces)** to achieve **Double Context Isolation**:
@@ -83,11 +93,14 @@ Never lose track of your open cabins across multiple displays:
 - **Status Bar Badge**: Displays the active space name and quick-save status at the bottom of the popout.
 - **Atmospheric Accents**: Subtle theme glows on pane splitters and soft background tints on activity bars.
 
-### 🎯 4. Window-Locked Routing & Multi-Instance View Isolation *(New in v1.2+)*
-Obsidian's architecture is natively designed around a single main window. Opening an Outline, Backlinks, or community views (such as Grid Explorer or Notebook Navigator) in a popout window frequently causes views to jump back to the main window, steal focus, or overwrite each other due to global `getLeavesOfType` lookups. Window Spaces introduces **Window-Locked Routing & Deep Leaf Interception**:
+### 🎯 4. Window-Locked Routing & Dual Layout Guardrails *(New in v1.2+)*
+Obsidian's architecture is natively designed around a single main window. Opening an Outline, Backlinks, or community views (such as Grid Explorer or Notebook Navigator) in a popout window frequently causes views to jump back to the main window, steal focus, or overwrite each other due to global `getLeavesOfType` lookups. Window Spaces introduces **Window-Locked Routing & Deep Leaf Interception**, paired with comprehensive layout collapse defenses:
 - **Multi-Instance Concurrency for Core & Community Views**: Breaks Obsidian's singleton limitations. Native core views (Outline, Backlinks, Tags, Search, Bookmarks) and community plugin views (e.g. Grid Explorer, Notebook Navigator) can now **co-exist as multiple independent instances across different windows simultaneously** without stealing focus or colliding.
 - **Per-Window Event Gating & Active File Tracking**: Intercepts `file-open` event broadcasts and `workspace.getActiveFile()`. An Outline in Window A strictly tracks the note active in Window A, while an Outline in Window B tracks Window B — completely eliminating cross-window context bleeding.
-- **Center Editor Routing Guard**: Opening notes from the popout sidebar automatically targets the central editor area instead of displacing sidebar panes. New tabs seamlessly route to the last active content pane.
+- **Dual Layout Collapse Guardrails**:
+  - **In-Place New Tab Conversion**: When closing the last remaining tab in the central content area, Window Spaces intercepts `detach` and converts the view in-place into an Obsidian native New Tab (`empty` view), preventing container destruction and split collapse.
+  - **Sidebar Tab Protection**: Attempting to close the sole remaining tab in a popout sidebar is cleanly blocked with a native notice (*"The last tab in the sidebar cannot be closed"*), safeguarding the sidebar container.
+- **Non-Navigable & Pinned Tab Safe Routing**: When the active center leaf contains a non-navigable view (e.g., Outline, Canvas, Graph) or a pinned tab, clicking a file from the sidebar automatically opens a new tab in the central area rather than failing navigation or overwriting the view.
 - **Layout Structure Guardrails**: Drop boundaries prevent tabs from accidentally breaking activity bars; missing or renamed files are safely held by native empty tab placeholders.
 
 ### ⚡ 5. Zero-Flicker Restore & Multi-Monitor Geometry *(New in v1.2+)*
