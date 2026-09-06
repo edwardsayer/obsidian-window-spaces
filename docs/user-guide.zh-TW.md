@@ -2,7 +2,7 @@
 
 Language: [English](user-guide.md) | **繁體中文** | [简体中文](user-guide.zh-CN.md)
 
-> **Window Spaces** 旨在為 Obsidian「萬物筆記庫（Everything Notebook）」的使用者提供一套無干擾、輕量且高效的多視窗管理架構。透過獨立的 Popout 視窗工作艙（Spaces），你可以將重量級外掛與繁複的排版分離至獨立視窗，徹底釋放擁擠的主畫面。
+> **Window Spaces** 旨在為 Obsidian「萬物筆記庫（Everything Notebook）」的使用者提供一套無干擾、輕量且高效的多視窗管理架構。透過獨立的 Popout 彈出式視窗工作艙（Spaces），你可以將重量級外掛與繁複的排版分離至獨立視窗，徹底釋放擁擠的主畫面。
 
 ---
 
@@ -13,11 +13,12 @@ Language: [English](user-guide.md) | **繁體中文** | [简体中文](user-guid
 3. [焦點攔截與全鍵盤操作流](#3-焦點攔截與全鍵盤操作流)
 4. [Per-Window 獨立自動儲存機制](#4-per-window-獨立自動儲存機制)
 5. [社群重量級外掛協同工作流示範](#5-社群重量級外掛協同工作流示範)
-   - [5.1 Excalidraw 視覺構思工作艙](#51-excalidraw-視覺構思工作艙)
-   - [5.2 Excalibrain 互動式知識圖譜工作艙](#52-excalibrain-互動式知識圖譜工作艙)
-   - [5.3 Obsidian Canvas 專案看板與白板](#53-obsidian-canvas-專案看板與白板)
-   - [5.4 Dataview / Projects 數據儀表板](#54-dataview--projects-數據儀表板)
-   - [5.5 Notebook Navigator / GridExplorer 結構化導航](#55-notebook-navigator--gridexplorer-結構化導航)
+   - [5.1 Folder Spaces 子目錄聚焦工作艙（雙層語境隔離）](#51-folder-spaces-子目錄聚焦工作艙雙層語境隔離)
+   - [5.2 Excalidraw 視覺構思工作艙](#52-excalidraw-視覺構思工作艙)
+   - [5.3 Excalibrain 互動式知識圖譜工作艙](#53-excalibrain-互動式知識圖譜工作艙)
+   - [5.4 Obsidian Canvas 專案看板與白板](#54-obsidian-canvas-專案看板與白板)
+   - [5.5 Dataview / Projects 數據儀表板](#55-dataview--projects-數據儀表板)
+   - [5.6 Notebook Navigator / GridExplorer 結構化導航](#56-notebook-navigator--gridexplorer-結構化導航)
 6. [空間自訂、視覺標籤與排序](#6-空間自訂視覺標籤與排序)
 7. [備份、匯出與跨裝置同步](#7-備份匯出與跨裝置同步)
 8. [常見問題與故障排除（FAQ）](#8-常見問題與故障排除faq)
@@ -32,7 +33,7 @@ Obsidian 的生態極為蓬勃，但當我們開啟愈來愈多功能時，主�
 - **情境切換干擾**：在研究、寫作、專案管理之間切換時，往往必須重新排列視窗與分頁。
 - **多螢幕浪費**：多螢幕環境下，缺乏一套能將不同視窗的獨立佈局各自持久保存與快速切換的機制。
 
-Window Spaces 的定位是 **Obsidian 的自然擴展**：它專注於管理每一個獨立彈出視窗（Popout Window）的佈局生命週期，不干擾主視窗，讓每個視窗成為專屬的「工作艙」。
+Window Spaces 的定位是 **Obsidian 的自然擴展**：它專注於管理每一個獨立 Popout 彈出式視窗（Popout Window）的佈局生命週期，不干擾主視窗，讓每個視窗成為專屬的「工作艙」。
 
 ---
 
@@ -48,7 +49,7 @@ Window Spaces 提供三種高度整合且一致的操作介面：
 - **開啟方式**：執行 `Window Spaces: Open as tab panel`。
 - **特點**：在主編輯區以一個獨立標籤頁展開，適合大螢幕綜覽所有已儲存的 Spaces、進行批次整理與重新命名。
 
-### 2.3 快速彈出對話框（Quick Popup Modal）
+### 2.3 快速彈出式對話框（Quick Popup Modal）
 - **開啟方式**：點擊左側功能列的 Ribbon 圖示（版面圖標），或自訂快捷鍵觸發 `Window Spaces: Open as popup window`。
 - **特點**：輕量級浮動視窗，支援鍵盤快速搜尋，用完即走。
 
@@ -61,7 +62,7 @@ Window Spaces 採用**精確焦點攔截技術**，讓你在完全不使用滑�
 | 按鍵 | 操作效果 | 說明 |
 | :--- | :--- | :--- |
 | `↑` / `↓` | 移動選取項目 | 在工作空間清單中快速上下遊走 |
-| `Enter` | **於新視窗開啟** | 將選取的 Space 於全新的 Popout 視窗中展開 |
+| `Enter` | **於新視窗開啟** | 將選取的 Space 於全新的 Popout 彈出式視窗中展開 |
 | `Shift + Enter` | **套用至目前視窗** | 將選取的 Space 直接載入至目前的視窗中 |
 | `Esc` | 關閉面板 / 退出焦點 | 關閉浮動視窗或退出搜尋焦點 |
 
@@ -74,40 +75,51 @@ Window Spaces 採用**精確焦點攔截技術**，讓你在完全不使用滑�
 每一個 Space 都可以獨立設定是否開啟 **`🔄 自動儲存（Auto-Save）`**：
 
 1. **5 秒防抖（Debounce）更新**：當你在工作艙內開啟新分頁、調整垂直/水平分割比例時，Window Spaces 會在背景自動記錄最新狀態。
-2. **關閉視窗即時快照**：當你關閉 Popout 視窗時，系統會立即進行最後一次狀態快照，確保任何細微調整都不會遺失。
+2. **關閉視窗即時快照**：當你關閉 Popout 彈出式視窗時，系統會立即進行最後一次狀態快照，確保任何細微調整都不會遺失。
 3. **手動模式保護**：若某些 Space 是固定的標準範本（例如：每日審查樣板），可關閉自動儲存，避免臨時的操作改動了範本。
 
 ---
 
 ## 5. 社群重量級外掛協同工作流示範
 
-### 5.1 Excalidraw 視覺構思工作艙
+### 5.1 Folder Spaces 子目錄聚焦工作艙（雙層語境隔離）
+- **痛點**：即使將筆記拖至 Popout 彈出式視窗，左側的原生 File Explorer 依然充斥著整個筆記庫數萬篇檔案與深層資料夾，極易造成視覺干擾與分心。
+- **工作流配置**：
+  - 安裝並啟用 **[Folder Spaces](https://github.com/edwardsayer/obsidian-folder-spaces)** 外掛。
+  - 在 Popout 彈出式視窗的 Left Activity Bar 中，將視圖設定為 `Folder Space Explorer`，並鎖定於特定專案子目錄（例如 `Projects/Apollo/`）。
+  - 中央編輯區排版為 Canvas 白板與 Markdown 規格筆記。
+  - 命名為 `🚀 Apollo Project`，挑選翠綠色邊框與火箭 Emoji，並開啟自動儲存。
+- **協同優勢**：
+  - **雙層語境隔離**：視窗層級獨立排版，檔案層級僅呈現該專案所需的目錄樹。
+  - **智慧開檔路由**：在 Folder Space 樹狀清單中點擊任何檔案，皆會自動於中央編輯區開啟，絕不替換或打亂側欄視圖。
+
+### 5.2 Excalidraw 視覺構思工作艙
 - **痛點**：Excalidraw 需要寬廣的畫布，若與筆記擠在主視窗，筆記閱讀區會被壓縮得極小。
 - **工作流配置**：
   - 建立一個名為 `🎨 Sketch & Brainstorm` 的 Popout Space。
   - 左側 60% 開啟 Excalidraw 畫布，右側 40% 分割為文字筆記。
   - 畫布上繪製架構圖，右側直接記錄關聯想法與雙向連結。
 
-### 5.2 Excalibrain 互動式知識圖譜工作艙
+### 5.3 Excalibrain 互動式知識圖譜工作艙
 - **痛點**：Excalibrain 在導航龐大關聯時需要動態渲染全局與局部關係圖，佔用大量主視窗面板。
 - **工作流配置**：
   - 建立 `🧠 Excalibrain — Knowledge Graph` 獨立視窗。
   - 將其放置於副螢幕，隨著主視窗聚焦不同筆記，副螢幕的工作艙即時呈現周邊脈絡。
 
-### 5.3 Obsidian Canvas 專案看板與白板
+### 5.4 Obsidian Canvas 專案看板與白板
 - **痛點**：Canvas 包含大量卡片與連接線，頻繁放大縮小容易打亂工作節奏。
 - **工作流配置**：
   - 建立 `🗺️ Project — Map & Workbench` 工作艙。
   - 左側釘選 Canvas（包含需求分組、顏色標籤、任務卡片），右側開啟正在執行的具體規格筆記。
   - 透過釘選（Pin）保護 Canvas 分頁，在右側點擊卡片連結時，永遠在右側分頁開啟，不覆蓋畫布。
 
-### 5.4 Dataview / Projects 數據儀表板
+### 5.5 Dataview / Projects 數據儀表板
 - **痛點**：複雜的 Dataview 表格或 Projects 看板需要較大寬度才能完整展示欄位。
 - **工作流配置**：
   - 建立 `📊 Dashboard — Metrics & Triage` 視窗。
   - 上半部為 Dataview 待辦與進度查詢表，下半部為快速紀錄區。
 
-### 5.5 Notebook Navigator / GridExplorer 結構化導航
+### 5.6 Notebook Navigator / GridExplorer 結構化導航
 - **痛點**：多層級樹狀結構或網格目錄外掛在側邊欄往往過於擁擠。
 - **工作流配置**：
   - 建立專屬的導航工作空間，將導航檢索與深度內容閱讀雙欄並列。
@@ -134,7 +146,7 @@ Window Spaces 採用**精確焦點攔截技術**，讓你在完全不使用滑�
 ## 8. 常見問題與故障排除（FAQ）
 
 ### Q1: 為什麼點擊 Space 沒有開新視窗，而是跳轉到已有視窗？
-**A**: 這是 Window Spaces 的智慧防重複機制。若該 Space 已經在某個 Popout 視窗中開啟，再次點擊會直接聚焦至該視窗，避免在畫面上產生多個重複的工作視窗。
+**A**: 這是 Window Spaces 的智慧防重複機制。若該 Space 已經在某個 Popout 彈出式視窗中開啟，再次點擊會直接聚焦至該視窗，避免在畫面上產生多個重複的工作視窗。
 
 ### Q2: 如果我拔除外接螢幕，視窗會不會跑到螢幕外面去？
 **A**: 不會。Window Spaces 內建螢幕邊界安全校正演算法，當偵測到螢幕解析度改變或外接螢幕中斷時，會自動將視窗安全置中於主顯示器。

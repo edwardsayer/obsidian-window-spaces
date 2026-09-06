@@ -639,7 +639,7 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
           // Add view 動態取得 icon 後（item.icon 已更新），同步到既有列的
           // icon 按鈕，避免列上仍顯示 fallback "layout"。
           const existingIconBtn = existingRow.querySelector<HTMLElement>(
-            ".setting-item-control .clickable-icon"
+            ".setting-item-control button:first-of-type"
           );
           if (existingIconBtn) applyItemIcon(existingIconBtn, this.app, item);
           return;

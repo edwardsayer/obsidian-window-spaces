@@ -256,6 +256,7 @@ export interface TranslationStrings {
     leftSidebar: string;
     rightActivityBar: string;
     rightSidebar: string;
+    cannotDeleteLastSidebarTab: string;
   };
 }
 

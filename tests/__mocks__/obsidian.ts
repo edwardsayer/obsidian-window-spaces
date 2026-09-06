@@ -39,6 +39,10 @@ if (typeof (document as unknown as { createDiv?: unknown }).createDiv !== "funct
   docExt.createEl = obsidianDocumentCreateHelper("div");
 }
 
+export class WorkspaceLeaf {
+  detach() {}
+}
+
 export class TFile {
   path: string = "";
   name: string = "";

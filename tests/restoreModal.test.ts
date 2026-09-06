@@ -754,7 +754,7 @@ describe("WindowLayoutsModal restore target", () => {
 
     const rightLeaf = {
       setViewState: vi.fn().mockResolvedValue(undefined),
-      getViewState: () => ({ type: "markdown" }),
+      getViewState: () => ({ type: "file-properties" }),
       parent: rightTabs,
       containerEl: rightContentEl,
       view: { containerEl: rightContentEl },

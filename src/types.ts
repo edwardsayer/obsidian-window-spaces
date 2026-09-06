@@ -44,6 +44,11 @@ export interface WindowLayout {
   leafIdMarker?: string[];
   // 隱藏的側欄/分頁群組狀態（Activity Bar 與 Pane 隱藏功能持久化）
   hidden?: PopoutHiddenState;
+  /** 側欄欄位固定寬度（像素），確保視窗縮放或分頁增減時側欄大小維持不變。 */
+  sidebarWidths?: {
+    left?: number;
+    right?: number;
+  };
 }
 
 export interface WindowState {

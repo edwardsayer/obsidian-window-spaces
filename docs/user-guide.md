@@ -13,11 +13,12 @@ Language: **English** | [繁體中文](user-guide.zh-TW.md) | [简体中文](use
 3. [Focus Interception & Keyboard-First Navigation](#3-focus-interception--keyboard-first-navigation)
 4. [Per-Window Independent Auto-Save](#4-per-window-independent-auto-save)
 5. [Community Plugin Synergy Walkthroughs](#5-community-plugin-synergy-walkthroughs)
-   - [5.1 Excalidraw Visual Ideation Cabin](#51-excalidraw-visual-ideation-cabin)
-   - [5.2 Excalibrain Interactive Knowledge Graph Cabin](#52-excalibrain-interactive-knowledge-graph-cabin)
-   - [5.3 Obsidian Canvas Project Roadmap & Whiteboard](#53-obsidian-canvas-project-roadmap--whiteboard)
-   - [5.4 Dataview / Projects Data Dashboard](#54-dataview--projects-data-dashboard)
-   - [5.5 Notebook Navigator / GridExplorer Structured Navigation](#55-notebook-navigator--gridexplorer-structured-navigation)
+   - [5.1 Folder Spaces Scoped Project Cabin (Double Context Isolation)](#51-folder-spaces-scoped-project-cabin-double-context-isolation)
+   - [5.2 Excalidraw Visual Ideation Cabin](#52-excalidraw-visual-ideation-cabin)
+   - [5.3 Excalibrain Interactive Knowledge Graph Cabin](#53-excalibrain-interactive-knowledge-graph-cabin)
+   - [5.4 Obsidian Canvas Project Roadmap & Whiteboard](#54-obsidian-canvas-project-roadmap--whiteboard)
+   - [5.5 Dataview / Projects Data Dashboard](#55-dataview--projects-data-dashboard)
+   - [5.6 Notebook Navigator / GridExplorer Structured Navigation](#56-notebook-navigator--gridexplorer-structured-navigation)
 6. [Space Customization, Visual Badges & Sorting](#6-space-customization-visual-badges--sorting)
 7. [Backup, Export & Multi-Device Sync](#7-backup-export--multi-device-sync)
 8. [Frequently Asked Questions (FAQ)](#8-frequently-asked-questions-faq)
@@ -81,33 +82,44 @@ Each Space can independently configure **`🔄 Auto-Save`**:
 
 ## 5. Community Plugin Synergy Walkthroughs
 
-### 5.1 Excalidraw Visual Ideation Cabin
+### 5.1 Folder Spaces Scoped Project Cabin (Double Context Isolation)
+- **Challenge**: Even when notes are popped out into separate windows, the native File Explorer still presents thousands of vault notes and folders, causing mental friction and distraction.
+- **Workflow Setup**:
+  - Install and enable the **[Folder Spaces](https://github.com/edwardsayer/obsidian-folder-spaces)** plugin.
+  - In your Popout window's Left Activity Bar, add the `Folder Space Explorer` view and lock it to a project directory (e.g., `Projects/Apollo/`).
+  - Split the center editor area with a project Canvas roadmap and Markdown task specs.
+  - Name the space `🚀 Apollo Project`, pick an Emerald Green accent border, and enable Auto-Save.
+- **Synergy Benefits**:
+  - **Double Context Isolation**: Window layout is isolated from the main window; the filesystem tree is strictly scoped to the active project.
+  - **Smart Leaf Routing**: Clicking files in the Folder Space tree automatically opens them in the central editor, never displacing the scoped sidebar view.
+
+### 5.2 Excalidraw Visual Ideation Cabin
 - **Challenge**: Excalidraw benefits from large canvas dimensions; sharing space with markdown notes in the main window compresses text reading.
 - **Workflow Setup**:
   - Create a popout space named `🎨 Sketch & Brainstorm`.
   - Dedicate 60% of the left side to the Excalidraw view and 40% on the right to markdown notes.
   - Draw diagrams on the canvas while capturing insights and bi-directional links side-by-side.
 
-### 5.2 Excalibrain Interactive Knowledge Graph Cabin
+### 5.3 Excalibrain Interactive Knowledge Graph Cabin
 - **Challenge**: Exploring expansive relationship graphs requires dynamic full-panel rendering, hogging the primary workspace.
 - **Workflow Setup**:
   - Launch an `🧠 Excalibrain — Knowledge Graph` popout space on a secondary display.
   - As notes are focused in the main window, the auxiliary cabin displays surrounding context in real time.
 
-### 5.3 Obsidian Canvas Project Roadmap & Whiteboard
+### 5.4 Obsidian Canvas Project Roadmap & Whiteboard
 - **Challenge**: Canvases contain numerous cards and connection lines; frequent zooming disrupts deep writing flows.
 - **Workflow Setup**:
   - Configure a `🗺️ Project — Map & Workbench` space.
   - Pin the Canvas tab on the left and open implementation specs on the right.
   - Because the Canvas tab is pinned, clicking card links always opens the note on the right pane without overriding the whiteboard.
 
-### 5.4 Dataview / Projects Data Dashboard
+### 5.5 Dataview / Projects Data Dashboard
 - **Challenge**: Complex Dataview tables or Kanban projects require wide tables for legible columns.
 - **Workflow Setup**:
   - Set up a `📊 Dashboard — Metrics & Triage` window.
   - Top split hosts task queues and progress tables; bottom split hosts quick scratch capture.
 
-### 5.5 Notebook Navigator / GridExplorer Structured Navigation
+### 5.6 Notebook Navigator / GridExplorer Structured Navigation
 - **Challenge**: Deep hierarchical trees or grid browsers crowd narrow sidebars.
 - **Workflow Setup**:
   - Create a dedicated dual-pane cabin balancing broad navigation on the left with deep reading on the right.

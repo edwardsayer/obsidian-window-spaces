@@ -1469,25 +1469,38 @@ body.is-popout-window.has-window-space-folded-corner::before {
 }
 
 
-/* Popout 視窗 4 邊全方向自訂主題顏色邊框 (使用 fixed ::after 頂層 inset 覆蓋，動態適應各 OS/主題之視窗圓角) */
+/* Popout 視窗 4 邊全方向自訂主題顏色邊框 (使用 fixed ::after 頂層覆蓋，動態適應各 OS/主題之視窗圓角) */
 body.is-popout-window.has-window-space-border::after {
   content: "";
   position: fixed;
   inset: 0 !important;
   box-sizing: border-box !important;
-  border: var(--window-space-border-inset, 1px) solid var(--window-space-color) !important;
+  border: var(--window-space-border-inset, var(--border-width, 1px)) solid var(--window-space-color) !important;
   pointer-events: none !important;
   z-index: 999999 !important;
-  /* 視窗本身由 OS（Windows 11 DWM）套用圓角，若 ::after 維持直角會讓四個角落
-     的邊框被圓角裁切、角落看不到顏色。此處以相同圓角讓邊框沿角落弧線延伸。
-     預設 8px 對應 Windows 11 frameless 視窗圓角，可依 OS/主題調整。 */
-  border-radius: var(--window-space-corner-radius, 8px) !important;
+  /* 視窗本身由 OS（Windows 11 DWM 等）套用圓角，預設繼承 Obsidian 原生視窗/選單圓角 --radius-m (8px)，支援自訂覆寫 */
+  border-radius: var(--window-space-corner-radius, var(--radius-m, 8px)) !important;
   box-shadow: none !important;
 }
 
-/* 當視窗最大化或全螢幕時，Obsidian 原生取消視窗圓角，邊框同步取消圓角（折角維持顯示） */
+/* Windows 11/10 DWM Frameless 外框補償：
+   1. 僅在 Windows 無邊框且一般（非最大化、非全螢幕）狀態下生效，避免污染 macOS / Linux。
+   2. Windows DWM 於視窗外緣繪製 1 個物理像素的系統焦點外框，且 Chromium 視口右/下因次像素捨入產生裁切。
+   3. 透過 Obsidian 原生 --border-width 與 --zoom-factor 進行動態除法計算：
+      左/上內縮 1 個邊框單位、右/下內縮 2 個邊框單位，並除以 --zoom-factor 確保使用者調整視圖縮放時物理位移不變。 */
+body.mod-windows.is-frameless.is-popout-window:not(.is-maximized, .is-fullscreen).has-window-space-border::after {
+  top: calc(var(--border-width, 1px) / var(--zoom-factor, 1)) !important;
+  left: calc(var(--border-width, 1px) / var(--zoom-factor, 1)) !important;
+  right: calc(calc(var(--border-width, 1px) * 2) / var(--zoom-factor, 1)) !important;
+  bottom: calc(calc(var(--border-width, 1px) * 2) / var(--zoom-factor, 1)) !important;
+}
+
+/* 當視窗最大化或全螢幕時：
+   Windows 系統會將 sizing frame 移至工作區外並停用 DWM 外框，客戶區完全對齊螢幕。
+   四邊必須完整還原貼齊邊界（inset: 0），並取消圓角，避免露底或產生不對稱內縮空隙。 */
 body.is-popout-window.is-maximized.has-window-space-border::after,
 body.is-popout-window.is-fullscreen.has-window-space-border::after {
+  inset: 0 !important;
   border-radius: 0 !important;
 }
 
@@ -1881,12 +1894,26 @@ body.is-popout-window .workspace-tab-header-spacer {
 
 
 
+/* Popout 視窗頂層側欄固定寬度：不隨視窗縮放、最大化或分頁開關而等比例伸展，由中央內容欄位彈性吸收所有寬度變化 */
+body.is-popout-window .workspace-split.mod-root > .window-spaces-sidebar-column:not(.window-spaces-column-hidden) {
+  flex-grow: 0 !important;
+  flex-shrink: 0 !important;
+  flex-basis: auto !important;
+  width: var(--sidebar-width, 260px);
+  min-width: 180px;
+  max-width: 80vw;
+}
+
+/* 頂層中央內容區域彈性填滿其餘空間 */
+body.is-popout-window .workspace-split.mod-root > :not(.window-spaces-sidebar-column) {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
 /* 頂層欄位是巢狀 split（如側欄被分割成上下兩個 tab group）時，Obsidian 的
    `.workspace-split.mod-left-split/mod-right-split { flex: 0 0 auto }` 會把容器壓扁成
    width 0（sidebar 消失）。這裡用非 important 的 `flex: 1 1 0` 蓋過該規則
-   （相同 specificity、plugin 的 stylesheet 較晚載入 → 勝出），
-   同時保留 Obsidian 在 popout 中設定的 inline `flex-grow`（拖曳 resize 的機制），
-   因此不能使用 `!important`——否則會蓋掉 inline flex-grow，導致側欄無法拖寬。 */
+   （相同 specificity、plugin 的 stylesheet 較晚載入 → 勝出）。 */
 .window-spaces-sidebar-column.workspace-split {
   flex: 1 1 0;
   min-width: 0;

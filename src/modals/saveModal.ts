@@ -653,7 +653,7 @@ export class SaveLayoutModal extends Modal {
           addRow.settingEl.before(existing);
           // Add view 動態取得 icon 後同步到既有列的 icon 按鈕。
           const existingIconBtn = existing.querySelector<HTMLElement>(
-            ".setting-item-control .clickable-icon"
+            ".setting-item-control button:first-of-type"
           );
           if (existingIconBtn) applyItemIcon(existingIconBtn, this.app, item);
           return;
@@ -708,6 +708,10 @@ export class SaveLayoutModal extends Modal {
           button.onClick(() => {
             item.icon = undefined;
             iconButton?.setIcon(resolveViewIcon(this.app, item.viewType));
+            void ensureViewIcon(this.app, item.viewType).then((icon) => {
+              if (!icon || item.icon) return;
+              iconButton?.setIcon(icon);
+            });
           });
         });
         row.addButton((button) => {

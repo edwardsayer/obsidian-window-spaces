@@ -32,6 +32,45 @@ export function getDefaultActivityBarItems(side: "left" | "right"): ActivityBarI
     .map((item) => ({ ...item }));
 }
 
+/**
+ * 輔助側邊欄/非檔案型 View 的類型集合。
+ * 這些 View 雖然可能在 state.file 中記錄目前關聯或顯示的文件路徑（如 outline、backlink），
+ * 但它們絕非以 openFile 開啟的檔案內容頁籤，在空間存檔與還原時不得被當作一般檔案處理。
+ */
+export const NON_FILE_VIEW_TYPES = new Set([
+  "outline",
+  "backlink",
+  "backlinks",
+  "outgoing-link",
+  "tag",
+  "tags",
+  "search",
+  "bookmarks",
+  "file-explorer",
+  "folder-spaces-explorer",
+  "all-properties",
+  "file-properties",
+  "graph",
+  "localgraph",
+  "sync",
+  "release-notes",
+  "window-spaces-layouts",
+  "recent-files",
+  "style-settings",
+  "grid-view",
+  "agent-client-chat-view",
+  "agent-client-session-manager",
+  "notebook-navigator",
+  "notebook-navigator-folder-note-sidebar",
+  "explorer-view",
+  "empty",
+]);
+
+export function isNonFileViewType(type?: string): boolean {
+  if (!type || typeof type !== "string") return false;
+  return NON_FILE_VIEW_TYPES.has(type.toLowerCase());
+}
+
 /** 常見官方視圖與熱門社群外掛的靜態 Icon 對照表（加速解析，零閃爍）。 */
 export const KNOWN_PLUGIN_VIEW_ICONS: Record<string, string> = {
   "outgoing-link": "arrow-up-right",
@@ -289,10 +328,11 @@ async function getIconFromEphemeralView(app: App, viewType: string): Promise<str
   const creator = getViewCreatorForType(app, viewType);
   if (!creator) return null;
 
-  const host = document.createDiv();
+  const host = typeof document.body?.createDiv === "function"
+    ? document.body.createDiv()
+    : document.body.appendChild(document.createElement("div"));
   hideElement(host);
   try {
-    document.body.appendChild(host);
 
     // 提供完整點的 fake leaf（Obsidian View 建構子會讀 leaf.app / viewState / history 等）
     const leaf = {
@@ -334,7 +374,7 @@ async function getIconFromRealLeaf(app: App, viewType: string): Promise<string |
     leaf = workspace.getLeaf("tab");
     // 先隱藏 leaf 容器再開 view，避免 tab 開啟觸發版面計算（forced reflow）
     const container = (leaf as unknown as { containerEl?: HTMLElement }).containerEl;
-    if (container.instanceOf(HTMLElement)) {
+    if (container && (container instanceof HTMLElement || typeof (container as { instanceOf?: (cls: unknown) => boolean }).instanceOf === "function")) {
       hideElement(container);
     }
     await leaf.setViewState({ type: viewType, active: false, state: {} });
@@ -354,18 +394,30 @@ async function getIconFromRealLeaf(app: App, viewType: string): Promise<string |
   }
 }
 
+const inFlightDetections = new Map<string, Promise<string | null>>();
+
 /** 動態偵測 view icon：掃全部視窗 → registry entry → 不可見實體 → 真實 leaf 兜底。 */
 async function detectViewIcon(app: App, viewType: string): Promise<string | null> {
-  const openIcon = findIconFromOpenLeaves(app, viewType);
-  if (openIcon) return openIcon;
+  const inFlight = inFlightDetections.get(viewType);
+  if (inFlight) return inFlight;
 
-  const entryIcon = getIconFromRegistryEntry(app, viewType);
-  if (entryIcon) return entryIcon;
+  const promise = (async () => {
+    const openIcon = findIconFromOpenLeaves(app, viewType);
+    if (openIcon) return openIcon;
 
-  const ephemeralIcon = await getIconFromEphemeralView(app, viewType);
-  if (ephemeralIcon) return ephemeralIcon;
+    const entryIcon = getIconFromRegistryEntry(app, viewType);
+    if (entryIcon) return entryIcon;
 
-  return getIconFromRealLeaf(app, viewType);
+    const ephemeralIcon = await getIconFromEphemeralView(app, viewType);
+    if (ephemeralIcon) return ephemeralIcon;
+
+    return getIconFromRealLeaf(app, viewType);
+  })().finally(() => {
+    inFlightDetections.delete(viewType);
+  });
+
+  inFlightDetections.set(viewType, promise);
+  return promise;
 }
 
 /**

@@ -249,6 +249,7 @@ export const zhCN: TranslationStrings = {
     leftSidebar: "Left sidebar",
     rightActivityBar: "Right activity bar",
     rightSidebar: "Right sidebar",
+    cannotDeleteLastSidebarTab: "侧边栏上最后一个标签页不可删除",
   },
 };
 

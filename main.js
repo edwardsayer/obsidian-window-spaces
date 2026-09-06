@@ -288,7 +288,8 @@ var en = {
     leftActivityBar: "Left activity bar",
     leftSidebar: "Left sidebar",
     rightActivityBar: "Right activity bar",
-    rightSidebar: "Right sidebar"
+    rightSidebar: "Right sidebar",
+    cannotDeleteLastSidebarTab: "The last tab on the sidebar cannot be deleted"
   }
 };
 
@@ -528,7 +529,8 @@ var zhTW = {
     leftActivityBar: "Left activity bar",
     leftSidebar: "Left sidebar",
     rightActivityBar: "Right activity bar",
-    rightSidebar: "Right sidebar"
+    rightSidebar: "Right sidebar",
+    cannotDeleteLastSidebarTab: "\u6700\u5F8C\u4E00\u500B\u5074\u908A\u6B04\u4E0A\u7684\u9801\u7C64\u4E0D\u53EF\u522A\u9664"
   }
 };
 
@@ -768,7 +770,8 @@ var zhCN = {
     leftActivityBar: "Left activity bar",
     leftSidebar: "Left sidebar",
     rightActivityBar: "Right activity bar",
-    rightSidebar: "Right sidebar"
+    rightSidebar: "Right sidebar",
+    cannotDeleteLastSidebarTab: "\u6700\u540E\u4E00\u4E2A\u4FA7\u8FB9\u680F\u4E0A\u7684\u6807\u7B7E\u9875\u4E0D\u53EF\u5220\u9664"
   }
 };
 
@@ -942,9 +945,6 @@ function isSpaceEmoji(value) {
   return /\p{Extended_Pictographic}/u.test(value) || !/^[a-zA-Z0-9-]+$/.test(value);
 }
 
-// src/modals/restoreModal.ts
-var import_obsidian2 = require("obsidian");
-
 // src/popout/viewRegistry.ts
 var import_obsidian = require("obsidian");
 var BUILTIN_SIDEBAR_VIEWS = [
@@ -961,6 +961,38 @@ var BUILTIN_SIDEBAR_VIEWS = [
 ];
 function getDefaultActivityBarItems(side) {
   return BUILTIN_SIDEBAR_VIEWS.filter((item) => item.side === side).map((item) => ({ ...item }));
+}
+var NON_FILE_VIEW_TYPES = /* @__PURE__ */ new Set([
+  "outline",
+  "backlink",
+  "backlinks",
+  "outgoing-link",
+  "tag",
+  "tags",
+  "search",
+  "bookmarks",
+  "file-explorer",
+  "folder-spaces-explorer",
+  "all-properties",
+  "file-properties",
+  "graph",
+  "localgraph",
+  "sync",
+  "release-notes",
+  "window-spaces-layouts",
+  "recent-files",
+  "style-settings",
+  "grid-view",
+  "agent-client-chat-view",
+  "agent-client-session-manager",
+  "notebook-navigator",
+  "notebook-navigator-folder-note-sidebar",
+  "explorer-view",
+  "empty"
+]);
+function isNonFileViewType(type) {
+  if (!type || typeof type !== "string") return false;
+  return NON_FILE_VIEW_TYPES.has(type.toLowerCase());
 }
 var KNOWN_PLUGIN_VIEW_ICONS = {
   "outgoing-link": "arrow-up-right",
@@ -1131,10 +1163,9 @@ function hideElement(el) {
 async function getIconFromEphemeralView(app, viewType) {
   const creator = getViewCreatorForType(app, viewType);
   if (!creator) return null;
-  const host = document.createDiv();
+  const host = typeof document.body?.createDiv === "function" ? document.body.createDiv() : document.body.appendChild(document.createElement("div"));
   hideElement(host);
   try {
-    document.body.appendChild(host);
     const leaf = {
       app,
       containerEl: host,
@@ -1166,7 +1197,7 @@ async function getIconFromRealLeaf(app, viewType) {
   try {
     leaf = workspace.getLeaf("tab");
     const container = leaf.containerEl;
-    if (container.instanceOf(HTMLElement)) {
+    if (container && (container instanceof HTMLElement || typeof container.instanceOf === "function")) {
       hideElement(container);
     }
     await leaf.setViewState({ type: viewType, active: false, state: {} });
@@ -1184,14 +1215,23 @@ async function getIconFromRealLeaf(app, viewType) {
     }
   }
 }
+var inFlightDetections = /* @__PURE__ */ new Map();
 async function detectViewIcon(app, viewType) {
-  const openIcon = findIconFromOpenLeaves(app, viewType);
-  if (openIcon) return openIcon;
-  const entryIcon = getIconFromRegistryEntry(app, viewType);
-  if (entryIcon) return entryIcon;
-  const ephemeralIcon = await getIconFromEphemeralView(app, viewType);
-  if (ephemeralIcon) return ephemeralIcon;
-  return getIconFromRealLeaf(app, viewType);
+  const inFlight = inFlightDetections.get(viewType);
+  if (inFlight) return inFlight;
+  const promise = (async () => {
+    const openIcon = findIconFromOpenLeaves(app, viewType);
+    if (openIcon) return openIcon;
+    const entryIcon = getIconFromRegistryEntry(app, viewType);
+    if (entryIcon) return entryIcon;
+    const ephemeralIcon = await getIconFromEphemeralView(app, viewType);
+    if (ephemeralIcon) return ephemeralIcon;
+    return getIconFromRealLeaf(app, viewType);
+  })().finally(() => {
+    inFlightDetections.delete(viewType);
+  });
+  inFlightDetections.set(viewType, promise);
+  return promise;
 }
 async function ensureViewIcon(app, viewType) {
   const cached = iconCache.get(viewType);
@@ -1404,6 +1444,7 @@ function prewarmViewIcons(app) {
 }
 
 // src/modals/restoreModal.ts
+var import_obsidian2 = require("obsidian");
 var WindowLayoutsModal = class _WindowLayoutsModal extends import_obsidian2.Modal {
   plugin;
   targetWindow;
@@ -4096,6 +4137,14 @@ var WindowLayoutManager = class {
       } catch {
         capturedLayout.hidden = void 0;
       }
+      try {
+        const sidebarWidths = this.plugin.activityBars?.captureSidebarWidths?.(currentWin) || existingLayout?.sidebarWidths;
+        if (sidebarWidths) {
+          capturedLayout.sidebarWidths = sidebarWidths;
+        }
+      } catch {
+        capturedLayout.sidebarWidths = void 0;
+      }
       this.layoutWindows.set(capturedLayout, currentWin);
       return capturedLayout;
     } catch (error) {
@@ -4417,6 +4466,9 @@ var WindowLayoutManager = class {
         }
         if (layout.activityBars === void 0 && existing.activityBars !== void 0) {
           layout.activityBars = existing.activityBars;
+        }
+        if (layout.sidebarWidths === void 0 && existing.sidebarWidths !== void 0) {
+          layout.sidebarWidths = existing.sidebarWidths;
         }
         settings.spaces[existingIndex] = layout;
       } else {
@@ -4959,14 +5011,15 @@ var WindowLayoutManager = class {
    */
   async applyBuiltLeafState(leaf, node) {
     if (!leaf || !node) return;
+    const nodeState = node.state || {};
+    const viewType = nodeState.type || node.type;
     const filePath = this.getFilePathFromLeafState({
-      type: node.type,
-      state: node.state?.state || {}
+      type: viewType,
+      state: nodeState.state || {}
     });
     if (filePath) return;
-    const nodeState = node.state || {};
     await leaf.setViewState({
-      type: nodeState.type || node.type || "empty",
+      type: viewType || "empty",
       active: false,
       state: nodeState.state || {}
     });
@@ -5269,6 +5322,12 @@ var WindowLayoutManager = class {
     if (!leafState) return null;
     if (typeof leafState === "string") return leafState;
     const stateObj = leafState;
+    const rawType = typeof stateObj.type === "string" ? stateObj.type : "";
+    const nestedType = typeof stateObj.state?.type === "string" ? stateObj.state.type : "";
+    const viewType = (rawType && rawType !== "leaf" ? rawType : nestedType) || rawType;
+    if (viewType && isNonFileViewType(viewType)) {
+      return null;
+    }
     if (typeof stateObj.state?.file === "string") return stateObj.state.file;
     if (typeof stateObj.state?.state?.file === "string") return stateObj.state.state.file;
     if (typeof stateObj.file === "string") return stateObj.file;
@@ -6291,7 +6350,7 @@ var WindowSpacesSettingTab = class extends import_obsidian4.PluginSettingTab {
           existingRow.setAttr("data-drag-index", String(index));
           addRow.settingEl.before(existingRow);
           const existingIconBtn = existingRow.querySelector(
-            ".setting-item-control .clickable-icon"
+            ".setting-item-control button:first-of-type"
           );
           if (existingIconBtn) applyItemIcon(existingIconBtn, this.app, item);
           return;
@@ -6908,7 +6967,7 @@ var SaveLayoutModal = class extends import_obsidian5.Modal {
           existing.setAttr("data-drag-index", String(index));
           addRow.settingEl.before(existing);
           const existingIconBtn = existing.querySelector(
-            ".setting-item-control .clickable-icon"
+            ".setting-item-control button:first-of-type"
           );
           if (existingIconBtn) applyItemIcon(existingIconBtn, this.app, item);
           return;
@@ -6953,6 +7012,10 @@ var SaveLayoutModal = class extends import_obsidian5.Modal {
           button.onClick(() => {
             item.icon = void 0;
             iconButton?.setIcon(resolveViewIcon(this.app, item.viewType));
+            void ensureViewIcon(this.app, item.viewType).then((icon) => {
+              if (!icon || item.icon) return;
+              iconButton?.setIcon(icon);
+            });
           });
         });
         row.addButton((button) => {
@@ -7602,7 +7665,29 @@ var PopoutLayoutEngine = class {
     return this.pickCenterPopoutPane(panes, win);
   }
   /**
-   * 同步取得/建立位於 Popout 視窗「中央編輯區」的 WorkspaceLeaf。
+   * 判斷 leaf 是否可被一般檔案導航取代（未鎖定且 view 支援一般檔案導航）。
+   * 輔助視圖（如 outline, all-properties 等 navigation === false）不可被檔案開啟覆蓋。
+   */
+  canLeafAcceptNavigation(leaf) {
+    const isPinned = Boolean(
+      leaf.pinned || leaf.getViewState()?.pinned
+    );
+    if (isPinned) return false;
+    if (typeof leaf.canNavigate === "function") {
+      return leaf.canNavigate();
+    }
+    const view = leaf.view;
+    if (view && typeof view.navigation === "boolean") {
+      return view.navigation;
+    }
+    return true;
+  }
+  /**
+   * 取得 Popout 視窗非側欄的中央編輯區目標 Leaf。
+   * 優先順序：
+   * 1. 既有中央編輯區：若目前 active tab 未被 pin 且支援檔案導航，回傳該 leaf 覆蓋其內容；
+   *    若目前 active tab 被 pin 或為輔助視圖（如 outline），在該 tabs 開新 tab。
+   * 2. 無中央編輯區：在第一個 column 右側垂直 split 建立新的頂層欄位。
    * 用於避免側欄觸發開啟檔案時覆蓋側欄 View。
    */
   getCenterLeafSync(win, newLeaf) {
@@ -7614,13 +7699,8 @@ var PopoutLayoutEngine = class {
       if (!isNewTabRequested) {
         const children = targetPane.tabs.children ?? [];
         const visibleLeaf = children.find((leaf) => this.isLeafVisibleInPane(leaf));
-        if (visibleLeaf) {
-          const isPinned = Boolean(
-            visibleLeaf.pinned || visibleLeaf.getViewState()?.pinned
-          );
-          if (!isPinned) {
-            return visibleLeaf;
-          }
+        if (visibleLeaf && this.canLeafAcceptNavigation(visibleLeaf)) {
+          return visibleLeaf;
         }
       }
       return this.createLeafInTabs(targetPane.tabs);
@@ -7742,6 +7822,70 @@ var PopoutLayoutEngine = class {
     return side === "left" ? topEls[0] ?? null : topEls[topEls.length - 1] ?? null;
   }
   /**
+   * 判斷欄位內是否包含 editor 型 view（markdown / pdf / canvas 等內容 view）。
+   * 當頂層欄位數小於需求欄位數時，包含編輯器的欄位絕對是中央內容區，不可被誤判為側欄。
+   */
+  columnContainsEditor(win, columnEl) {
+    const editorViewTypes = /* @__PURE__ */ new Set(["markdown", "pdf", "canvas", "excalidraw", "image", "audio", "video"]);
+    const leaves = this.getLeavesForWindow(win);
+    for (const leaf of leaves) {
+      const extLeaf = leaf;
+      const container = extLeaf.containerEl || leaf.view?.containerEl;
+      if (container && typeof container.contains === "function" && columnEl.contains(container)) {
+        const type = leaf.getViewState?.()?.type;
+        if (type && editorViewTypes.has(type)) return true;
+      }
+    }
+    const match = columnEl.querySelector ? columnEl.querySelector(
+      ".markdown-source-view, .markdown-reading-view, .canvas-wrapper, .pdf-container, .excalidraw-wrapper"
+    ) : null;
+    return match !== null;
+  }
+  /**
+   * 判斷欄位內是否包含 sidebar 型 view（檔案樹、搜尋、書籤、大綱、屬性等輔助 view）。
+   */
+  columnContainsSidebarView(win, columnEl) {
+    const sidebarViewTypes = /* @__PURE__ */ new Set([
+      "file-explorer",
+      "folder-spaces-explorer",
+      "search",
+      "bookmarks",
+      "window-spaces-layouts",
+      "outline",
+      "all-properties",
+      "file-properties",
+      "tag",
+      "tags",
+      "backlink",
+      "backlinks",
+      "outgoing-link",
+      "graph",
+      "localgraph",
+      "sync",
+      "recent-files",
+      "notebook-navigator",
+      "notebook-navigator-folder-note-sidebar",
+      "agent-client-chat-view",
+      "agent-client-session-manager",
+      "explorer-view"
+    ]);
+    const leaves = this.getLeavesForWindow(win);
+    for (const leaf of leaves) {
+      const extLeaf = leaf;
+      const container = extLeaf.containerEl || leaf.view?.containerEl;
+      if (container && typeof container.contains === "function" && columnEl.contains(container)) {
+        const type = leaf.getViewState?.()?.type || leaf.getViewType?.();
+        if (type && sidebarViewTypes.has(type)) return true;
+      }
+    }
+    const leafContents = columnEl.querySelectorAll ? columnEl.querySelectorAll(".workspace-leaf-content") : [];
+    for (let i = 0; i < leafContents.length; i++) {
+      const dataType = leafContents[i].getAttribute("data-type");
+      if (dataType && sidebarViewTypes.has(dataType)) return true;
+    }
+    return false;
+  }
+  /**
    * 取得指定側的「物理側欄」頂層欄位元素（DOM 結構優先，display-independent）。
    *
    * 語意：主動/實體定位（open-in-sidebar、hide/show column、隱藏狀態 capture/apply）。
@@ -7776,10 +7920,31 @@ var PopoutLayoutEngine = class {
         const requiredColumns = configuredSides.originalCount + leftDelta + rightDelta;
         if (this.getTopLevelColumnElements(win).length < requiredColumns) return null;
       }
+      const topColumns = this.getTopLevelColumnElements(win);
+      const topCount = topColumns.length;
+      const activeBarCount = (configuredSides.left ? 1 : 0) + (configuredSides.right ? 1 : 0);
+      const minRequired = activeBarCount + 1;
+      if (topCount < minRequired) {
+        if (this.columnContainsEditor(win, edge) && !this.columnContainsSidebarView(win, edge)) return null;
+        if (side === "left") {
+          const isLeft = edge.classList.contains("mod-left-split") || !!edge.querySelector(".mod-left-split");
+          const otherEdge = topColumns[topCount - 1];
+          const otherIsRight = otherEdge && (otherEdge.classList.contains("mod-right-split") || !!otherEdge.querySelector(".mod-right-split"));
+          if (otherIsRight && !isLeft) return null;
+          if (isLeft) return edge;
+          return otherIsRight ? null : edge;
+        } else {
+          const isRight = edge.classList.contains("mod-right-split") || !!edge.querySelector(".mod-right-split");
+          const otherEdge = topColumns[0];
+          const otherIsLeft = otherEdge && (otherEdge.classList.contains("mod-left-split") || !!otherEdge.querySelector(".mod-left-split"));
+          if (otherIsLeft && !isRight) return null;
+          if (isRight) return edge;
+          return otherIsLeft ? null : edge;
+        }
+      }
       const isSidebarForSide = side === "left" ? edge.classList.contains("mod-left-split") || !!edge.querySelector(".mod-left-split") : edge.classList.contains("mod-right-split") || !!edge.querySelector(".mod-right-split");
       if (isSidebarForSide) return edge;
-      const topCount = this.getTopLevelColumnElements(win).length;
-      if (topCount >= 2) return edge;
+      if (topCount >= minRequired) return edge;
       return null;
     }
     return isSidebarColumnElement(edge) ? edge : null;
@@ -8020,7 +8185,7 @@ function releasePopoutLayoutEngine(id) {
 // src/shared/sharedVersion.ts
 var SHARED_API_VERSION = 6;
 var SHARED_COMPATIBLE_FROM_VERSION = 1;
-var SHARED_IMPLEMENTATION_REVISION = "2026-09-05T17:30:00Z";
+var SHARED_IMPLEMENTATION_REVISION = "2026-09-06T15:10:00Z";
 
 // src/popout/activityBar.ts
 var import_obsidian7 = require("obsidian");
@@ -8036,10 +8201,15 @@ var PopoutActivityBarManager = class {
   columnEnsurePromises = /* @__PURE__ */ new WeakMap();
   /** Preserve live column weights while one sidebar is temporarily hidden. */
   sidebarFlexSnapshots = /* @__PURE__ */ new WeakMap();
+  /** 側欄 ResizeObserver 實體記錄，即時捕捉並同步側欄拖曳寬度。 */
+  sidebarObservers = /* @__PURE__ */ new WeakMap();
+  originalDetach = null;
+  interceptedLeafProto = null;
   constructor(plugin, engine) {
     this.app = plugin.app;
     this.plugin = plugin;
     this.engine = engine;
+    this.installDetachGuard();
   }
   get settings() {
     return this.plugin.settings;
@@ -8640,6 +8810,7 @@ var PopoutActivityBarManager = class {
       this.cleanupWindow(win);
       return;
     }
+    this.installDetachGuard();
     const body = win.document?.body;
     if (!body) {
       this.cleanupWindow(win);
@@ -8655,19 +8826,24 @@ var PopoutActivityBarManager = class {
       return;
     }
     const spaceIdentity = body.createDiv({ cls: "window-spaces-space-identity" });
-    spaceIdentity.oncontextmenu = (evt) => {
-      evt.preventDefault();
-      evt.stopPropagation();
-      this.showVisibilityMenu(win, evt);
-    };
     const left = body.createDiv({ cls: "window-spaces-activity-bar window-spaces-activity-left" });
     const drag = left.createDiv({ cls: "window-spaces-activity-drag" });
     drag.oncontextmenu = (evt) => {
       evt.preventDefault();
       evt.stopPropagation();
-      this.showVisibilityMenu(win, evt);
+      this.showActivityBarContextMenu(win, evt, "left");
+    };
+    left.oncontextmenu = (evt) => {
+      evt.preventDefault();
+      evt.stopPropagation();
+      this.showActivityBarContextMenu(win, evt, "left");
     };
     const right = body.createDiv({ cls: "window-spaces-activity-bar window-spaces-activity-right" });
+    right.oncontextmenu = (evt) => {
+      evt.preventDefault();
+      evt.stopPropagation();
+      this.showActivityBarContextMenu(win, evt, "right");
+    };
     this.barsByWindow.set(win, {
       left,
       right,
@@ -8691,6 +8867,14 @@ var PopoutActivityBarManager = class {
     }
     this.barsByWindow.delete(win);
     this.injectedWindows.delete(win);
+    const cols = this.engine.getTopLevelColumnElements(win);
+    cols.forEach((col) => {
+      const observer = this.sidebarObservers.get(col);
+      if (observer) {
+        observer.disconnect();
+        this.sidebarObservers.delete(col);
+      }
+    });
     const body = win.document?.body;
     body?.classList.remove("window-spaces-has-left-activity");
     body?.classList.remove("window-spaces-has-right-activity");
@@ -8711,6 +8895,11 @@ var PopoutActivityBarManager = class {
   }
   /** 清理所有已注入的 Popout。 */
   cleanupAll() {
+    if (this.originalDetach && this.interceptedLeafProto) {
+      this.interceptedLeafProto.detach = this.originalDetach;
+      this.originalDetach = null;
+      this.interceptedLeafProto = null;
+    }
     Array.from(this.injectedWindows).forEach((win) => this.cleanupWindow(win));
   }
   /** 重新注入並渲染所有存活 Popout，並清理已關閉視窗的殘留（layout-change 時呼叫）。 */
@@ -8934,7 +9123,7 @@ var PopoutActivityBarManager = class {
     colBtn.oncontextmenu = (evt) => {
       evt.preventDefault();
       evt.stopPropagation();
-      this.showVisibilityMenu(win, evt, side);
+      this.showActivityBarContextMenu(win, evt, side);
     };
     const drag = bar.querySelector(".window-spaces-activity-drag");
     if (drag) {
@@ -9011,9 +9200,18 @@ var PopoutActivityBarManager = class {
     const last = columns.length - 1;
     const leftActivityVisible = this.isSideVisibleForWindow(win, "left");
     const rightActivityVisible = this.isSideVisibleForWindow(win, "right");
+    const activeBarCount = (leftActivityVisible ? 1 : 0) + (rightActivityVisible ? 1 : 0);
+    const requiredColumns = activeBarCount + 1;
     columns.forEach((el, index) => {
-      const isLeftSidebar = columns.length >= 2 && leftActivityVisible && index === 0;
-      const isRightSidebar = columns.length >= 2 && rightActivityVisible && index === last;
+      const isPureEditor = this.columnContainsEditor(win, el) && !this.columnContainsSidebarView(win, el);
+      let isLeftSidebar = columns.length >= 2 && leftActivityVisible && index === 0;
+      let isRightSidebar = columns.length >= 2 && rightActivityVisible && index === last;
+      if (columns.length < requiredColumns) {
+        if (isPureEditor) {
+          if (index === 0) isLeftSidebar = false;
+          if (index === last) isRightSidebar = false;
+        }
+      }
       const isSidebar = isLeftSidebar || isRightSidebar;
       el.classList.toggle("window-spaces-sidebar-column", isSidebar);
       el.classList.toggle("mod-sidedock", isSidebar);
@@ -9042,15 +9240,128 @@ var PopoutActivityBarManager = class {
         }
       });
       if (isSidebar) {
+        this.ensureSidebarWidth(win, el, isLeftSidebar ? "left" : "right");
         this.ensureSidebarFileTabIcons(win, el);
+      } else {
+        el.style.removeProperty("--sidebar-width");
       }
     });
   }
   /**
+   * 確保側欄具有正確的寬度設定（優先使用 Space 儲存的寬度，次之保留即時寬度，預設 260px），
+   * 並掛載 ResizeObserver 即時捕捉使用者拖曳邊框後的尺寸。
+   */
+  ensureSidebarWidth(win, el, side) {
+    const inlineW = parseInt(el.style.getPropertyValue("--sidebar-width") || el.style.width, 10);
+    const layout = this.getLayoutForWindow(win);
+    const savedWidth = layout?.sidebarWidths?.[side];
+    let width = inlineW >= 150 ? inlineW : savedWidth;
+    if (!width || width < 150) {
+      if (el.offsetWidth >= 150) {
+        width = el.offsetWidth;
+      } else {
+        width = 260;
+      }
+    }
+    el.style.setProperty("--sidebar-width", `${width}px`);
+    this.observeSidebarResize(win, el, side);
+  }
+  observeSidebarResize(win, el, side) {
+    if (this.sidebarObservers.has(el)) return;
+    const RO = win.ResizeObserver || (typeof ResizeObserver !== "undefined" ? ResizeObserver : void 0);
+    if (!RO) return;
+    const observer = new RO((entries) => {
+      for (const entry of entries) {
+        const borderBox = entry.borderBoxSize;
+        const borderBoxSize = Array.isArray(borderBox) ? borderBox[0] : borderBox;
+        const rawWidth = borderBoxSize?.inlineSize ?? (el.getBoundingClientRect().width || el.offsetWidth);
+        const w = Math.round(rawWidth);
+        const currentW = parseInt(el.style.getPropertyValue("--sidebar-width"), 10);
+        if (w >= 150 && !this.engine.isColumnHidden(win, side) && (isNaN(currentW) || Math.abs(w - currentW) >= 1)) {
+          el.style.setProperty("--sidebar-width", `${w}px`);
+          const layout = this.getLayoutForWindow(win);
+          if (layout) {
+            if (!layout.sidebarWidths) layout.sidebarWidths = {};
+            layout.sidebarWidths[side] = w;
+          }
+        }
+      }
+    });
+    observer.observe(el);
+    this.sidebarObservers.set(el, observer);
+  }
+  /**
+   * INTERNAL API: WorkspaceLeaf.prototype.detach - 攔截側欄最後一個分頁刪除，避免欄位結構被銷毀引發異常補欄。
+   */
+  installDetachGuard() {
+    if (this.originalDetach) return;
+    let leaf = this.app.workspace?.getMostRecentLeaf?.() || this.app.workspace?.activeLeaf || null;
+    if (!leaf && typeof this.engine?.workspace?.iterateAllLeaves === "function") {
+      this.engine.workspace.iterateAllLeaves((l) => {
+        if (!leaf && l) leaf = l;
+      });
+    }
+    const proto = import_obsidian7.WorkspaceLeaf?.prototype ?? (leaf ? Object.getPrototypeOf(leaf) : null);
+    if (!proto || typeof proto.detach !== "function") return;
+    this.originalDetach = proto.detach;
+    this.interceptedLeafProto = proto;
+    const self = this;
+    proto.detach = function(...args) {
+      if (self.isLastTabOnSidebar(this)) {
+        new import_obsidian7.Notice(t("activityBar.cannotDeleteLastSidebarTab"));
+        return;
+      }
+      return self.originalDetach?.apply(this, args);
+    };
+  }
+  /**
+   * 檢查指定 leaf 是否為 Popout 視窗左右側欄中的「最後一個分頁」。
+   * 若是最後一個分頁，則禁止關閉，避免整個側欄欄位被 Obsidian 銷毀並觸發非預期的補欄。
+   */
+  isLastTabOnSidebar(leaf) {
+    if (!leaf) return false;
+    const win = getWindowOfLeaf(leaf);
+    if (!win || win.closed || !isPopoutWindow(win)) return false;
+    const manager = this.plugin.manager;
+    if (manager?.isRestoringLayout || manager?.isRebuildingPopoutLayout) {
+      return false;
+    }
+    if (!this.engine.isLeafInSideColumn(win, leaf)) return false;
+    const extLeaf = leaf;
+    const container = extLeaf.containerEl || leaf.view?.containerEl;
+    if (!container) return false;
+    const column = this.engine.getTopLevelColumnForContainer(container);
+    if (!column) return false;
+    let count = 0;
+    this.engine.workspace.iterateAllLeaves((l) => {
+      if (getWindowOfLeaf(l) === win) {
+        const c = l.containerEl || l.view?.containerEl;
+        if (c && column.contains(c)) {
+          count++;
+        }
+      }
+    });
+    return count <= 1;
+  }
+  /**
+   * 捕獲視窗中兩側側欄的當前像素寬度，供 Space 存檔時持久化記錄。
+   */
+  captureSidebarWidths(win) {
+    if (!win || win.closed) return null;
+    const leftCol = this.engine.getColumnElement(win, "left");
+    const rightCol = this.engine.getColumnElement(win, "right");
+    const result = {};
+    if (leftCol && !this.engine.isColumnHidden(win, "left") && leftCol.offsetWidth >= 150) {
+      result.left = leftCol.offsetWidth;
+    }
+    if (rightCol && !this.engine.isColumnHidden(win, "right") && rightCol.offsetWidth >= 150) {
+      result.right = rightCol.offsetWidth;
+    }
+    return Object.keys(result).length > 0 ? result : null;
+  }
+  /**
    * 判斷欄位內是否包含 editor 型 view（markdown / pdf / canvas 等內容 view）。
-   *
-   * 已停用：sidebar 判定改為「activity bar 旁就是 sidebar」，不再依欄位內容。
-   * 保留定義以防外部引用；不再被調用。
+   * 當頂層欄位數不足時，包含編輯器的欄位絕對是中央內容區，不可被誤標為側欄。
    */
   columnContainsEditor(win, columnEl) {
     const editorViewTypes = /* @__PURE__ */ new Set(["markdown", "pdf", "canvas", "excalidraw", "image", "audio", "video"]);
@@ -9058,14 +9369,20 @@ var PopoutActivityBarManager = class {
     for (const leaf of leaves) {
       const extLeaf = leaf;
       const container = extLeaf.containerEl || leaf.view?.containerEl;
-      if (container.instanceOf(HTMLElement) && columnEl.contains(container)) {
-        const type = leaf.getViewState()?.type;
+      if (container && typeof columnEl.contains === "function" && columnEl.contains(container)) {
+        const type = leaf.getViewState?.()?.type;
         if (type && editorViewTypes.has(type)) return true;
       }
     }
     return columnEl.querySelector(
       ".markdown-source-view, .markdown-reading-view, .canvas-wrapper, .pdf-container, .excalidraw-wrapper"
     ) !== null;
+  }
+  /**
+   * 判斷欄位內是否包含 sidebar 型 view（檔案樹、搜尋、書籤、大綱、屬性等輔助 view）。
+   */
+  columnContainsSidebarView(win, columnEl) {
+    return this.engine.columnContainsSidebarView(win, columnEl);
   }
   /**
    * activity bar 隱藏時，該側欄位是 content area（不可隱藏）。
@@ -9247,12 +9564,15 @@ var PopoutActivityBarManager = class {
     const panelLeaf = workspace.createLeafBySplit(targetLeaf, "vertical", before);
     const viewType = this.getItemsForWindowSide(win, side)[0]?.viewType;
     if (panelLeaf && viewType && typeof panelLeaf.setViewState === "function") {
-      void panelLeaf.setViewState({ type: viewType, active: false, state: {} });
+      void panelLeaf.setViewState({ type: viewType, active: true, state: {} }).then(() => {
+        const deferredLeaf = panelLeaf;
+        deferredLeaf.loadIfDeferred?.();
+      });
     }
     const attempts = { ...lastAttempt || { left: 0, right: 0 }, [side]: now };
     this.columnFillAttempts.set(win, attempts);
     if (this.engine.getTopLevelColumnElements(win).length > topCountBefore) {
-      attempts[side] = now + 1e4;
+      attempts[side] = 0;
       this.columnFillAttempts.set(win, attempts);
     }
     return panelLeaf || null;
@@ -9284,7 +9604,8 @@ var PopoutActivityBarManager = class {
   ensureContentColumnPresent(win) {
     const leftVisible = this.isSideVisibleForWindow(win, "left");
     const rightVisible = this.isSideVisibleForWindow(win, "right");
-    const requiredColumns = leftVisible && rightVisible ? 2 : 1;
+    const activeBarCount = (leftVisible ? 1 : 0) + (rightVisible ? 1 : 0);
+    const requiredColumns = activeBarCount + 1;
     if (this.engine.getTopLevelColumnElements(win).length >= requiredColumns) return null;
     const now = Date.now();
     const lastAttempt = this.columnFillAttempts.get(win);
@@ -9301,7 +9622,7 @@ var PopoutActivityBarManager = class {
     const attempts = { ...lastAttempt || { left: 0, right: 0 }, content: now };
     this.columnFillAttempts.set(win, attempts);
     if (panelLeaf && this.engine.getTopLevelColumnElements(win).length > topCountBefore) {
-      attempts.content = now + 1e4;
+      attempts.content = 0;
       this.columnFillAttempts.set(win, attempts);
     }
     return panelLeaf || null;
@@ -9388,6 +9709,36 @@ var PopoutActivityBarManager = class {
    * - activity bar 打勾、sidebar 不打勾 = 顯示 activity bar，但隱藏 sidebar
    * - 變更打勾項目時，儲存對應的 space setting
    */
+  /**
+   * 為選單加入指定側的 Activity Bar 與 Sidebar visibility 切換項目。
+   * 左右側圖示（左 panel-left、右 panel-right）與 wording 嚴格保持一致。
+   */
+  addSideVisibilityMenuItems(menu, win, side) {
+    const isLeft = side === "left";
+    const barTitle = isLeft ? t("activityBar.leftActivityBar") : t("activityBar.rightActivityBar");
+    const sidebarTitle = isLeft ? t("activityBar.leftSidebar") : t("activityBar.rightSidebar");
+    const iconName = isLeft ? "panel-left" : "panel-right";
+    const isBarVisible = this.isSideVisibleForWindow(win, side);
+    const isSidebarHidden = this.engine.isColumnHidden(win, side);
+    const isSidebarVisible = !isSidebarHidden;
+    menu.addItem((item) => {
+      item.setTitle(barTitle).setIcon(iconName).setChecked(isBarVisible).onClick(() => {
+        void this.toggleSideActivityBar(win, side);
+      });
+    });
+    menu.addItem((item) => {
+      item.setTitle(sidebarTitle).setIcon(iconName);
+      if (!isBarVisible) {
+        item.setDisabled(true);
+        item.setChecked(true);
+      } else {
+        item.setChecked(isSidebarVisible);
+        item.onClick(() => {
+          void this.toggleSideSidebar(win, side);
+        });
+      }
+    });
+  }
   showVisibilityMenu(win, evt, targetSide) {
     const menu = new import_obsidian7.Menu();
     const sides = targetSide ? [targetSide] : ["left", "right"];
@@ -9395,31 +9746,90 @@ var PopoutActivityBarManager = class {
       if (idx > 0) {
         menu.addSeparator();
       }
-      const isLeft = side === "left";
-      const barTitle = isLeft ? t("activityBar.leftActivityBar") : t("activityBar.rightActivityBar");
-      const sidebarTitle = isLeft ? t("activityBar.leftSidebar") : t("activityBar.rightSidebar");
-      const isBarVisible = this.isSideVisibleForWindow(win, side);
-      const isSidebarHidden = this.engine.isColumnHidden(win, side);
-      const isSidebarVisible = !isSidebarHidden;
-      menu.addItem((item) => {
-        item.setTitle(barTitle).setChecked(isBarVisible).onClick(() => {
-          void this.toggleSideActivityBar(win, side);
-        });
-      });
-      menu.addItem((item) => {
-        item.setTitle(sidebarTitle);
-        if (!isBarVisible) {
-          item.setDisabled(true);
-          item.setChecked(true);
-        } else {
-          item.setChecked(isSidebarVisible);
-          item.onClick(() => {
-            void this.toggleSideSidebar(win, side);
-          });
-        }
-      });
+      this.addSideVisibilityMenuItems(menu, win, side);
     });
     menu.showAtMouseEvent(evt);
+  }
+  /**
+   * Popout Activity Bar 右鍵上下文選單（模擬 Obsidian 主視窗 Ribbon 右鍵選單行為）：
+   * 1. 顯示該側可使用的 view 及 icon，以 checkmark 標示是否啟用。
+   * 2. 最底下附加橫線及 toggle activity bar, sidebar 按鈕（wording 及 icon 與 Space Setting 右鍵選單一致）。
+   */
+  showActivityBarContextMenu(win, evt, side) {
+    const menu = new import_obsidian7.Menu();
+    const available = enumerateAvailableViews(this.app);
+    const allTypes = sortViewTypesByLabel(
+      this.app,
+      Array.from(new Set([...available.left, ...available.right].map((item) => item.viewType)))
+    );
+    const currentItems = this.getItemsForWindowSide(win, side);
+    const currentTypes = new Set(currentItems.map((item) => item.viewType));
+    allTypes.forEach((viewType) => {
+      const isChecked = currentTypes.has(viewType);
+      const label = resolveViewLabel(this.app, viewType);
+      const configuredItem = currentItems.find((item) => item.viewType === viewType);
+      const icon = configuredItem?.icon || resolveViewIcon(this.app, viewType);
+      menu.addItem((item) => {
+        item.setTitle(label).setIcon(icon).setChecked(isChecked).onClick(() => {
+          void this.toggleViewForWindowSide(win, side, viewType);
+        });
+      });
+    });
+    menu.addSeparator();
+    this.addSideVisibilityMenuItems(menu, win, side);
+    menu.showAtMouseEvent(evt);
+  }
+  /** 切換指定 Popout 視窗該側 Activity Bar 中的某個 view（勾選即新增，取消勾選即移除）。 */
+  async toggleViewForWindowSide(win, side, viewType) {
+    const layout = this.getLayoutForWindow(win);
+    let items;
+    if (layout) {
+      if (!layout.activityBars) {
+        layout.activityBars = {};
+      }
+      if (!layout.activityBars[side]) {
+        layout.activityBars[side] = {
+          show: this.isSideVisibleForWindow(win, side),
+          items: this.getItemsForSide(side).map((item) => ({ ...item }))
+        };
+      }
+      if (!layout.activityBars[side].items) {
+        layout.activityBars[side].items = this.getItemsForSide(side).map((item) => ({ ...item }));
+      }
+      items = layout.activityBars[side].items;
+    } else {
+      this.settings.activityBars = this.settings.activityBars ?? { left: [], right: [] };
+      if (!this.settings.activityBars[side]) {
+        this.settings.activityBars[side] = this.getItemsForSide(side).map((item) => ({ ...item }));
+      }
+      items = this.settings.activityBars[side];
+    }
+    const existingIndex = items.findIndex((item) => item.viewType === viewType);
+    if (existingIndex >= 0) {
+      const availableItems = enumerateAvailableViews(this.app)[side];
+      if (!canRemoveActivityBarItem(items, availableItems)) {
+        new import_obsidian7.Notice(t("settings.keepOneActivityBarView"));
+        return;
+      }
+      items.splice(existingIndex, 1);
+    } else {
+      const newItem = {
+        viewType,
+        side,
+        icon: resolveViewIcon(this.app, viewType),
+        label: resolveViewLabel(this.app, viewType)
+      };
+      items.push(newItem);
+      void ensureViewIcon(this.app, viewType).then((icon) => {
+        if (icon) {
+          newItem.icon = icon;
+          void this.plugin.saveSettings?.();
+          this.refreshAll();
+        }
+      });
+    }
+    await this.plugin.saveSettings?.();
+    this.refreshAll();
   }
   /** 切換指定側 Activity Bar 的顯示狀態，並持久化至 Space 設定。 */
   async toggleSideActivityBar(win, side) {

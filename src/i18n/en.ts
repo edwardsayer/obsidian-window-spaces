@@ -251,6 +251,7 @@ export const en: TranslationStrings = {
     leftSidebar: "Left sidebar",
     rightActivityBar: "Right activity bar",
     rightSidebar: "Right sidebar",
+    cannotDeleteLastSidebarTab: "The last tab on the sidebar cannot be deleted",
   },
 };
 

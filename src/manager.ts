@@ -13,6 +13,7 @@ import {
 } from "./types";
 import { t, tWithParams, getI18n } from "./i18n";
 import { resolveSpaceIcon, isSpaceEmoji } from "./spaceVisuals";
+import { isNonFileViewType } from "./popout/viewRegistry";
 import { WindowLayoutsModal } from "./modals/restoreModal";
 import WindowSpacesPlugin from "./main";
 
@@ -2137,6 +2138,17 @@ export class WindowLayoutManager {
         capturedLayout.hidden = undefined;
       }
 
+      // 紀錄該視窗目前側欄的固定寬度（像素），以在視窗縮放或分頁增減時保持不變
+      try {
+        const sidebarWidths = this.plugin.activityBars?.captureSidebarWidths?.(currentWin) ||
+          existingLayout?.sidebarWidths;
+        if (sidebarWidths) {
+          capturedLayout.sidebarWidths = sidebarWidths;
+        }
+      } catch {
+        capturedLayout.sidebarWidths = undefined;
+      }
+
       // 儲存對話框開啟後 activeWindow 可能已經切回主視窗，
       // 因此保存 capture 當下的 DOM Window，供 saveLayout 使用。
       this.layoutWindows.set(capturedLayout, currentWin);
@@ -2623,6 +2635,9 @@ export class WindowLayoutManager {
         }
         if (layout.activityBars === undefined && existing.activityBars !== undefined) {
           layout.activityBars = existing.activityBars;
+        }
+        if (layout.sidebarWidths === undefined && existing.sidebarWidths !== undefined) {
+          layout.sidebarWidths = existing.sidebarWidths;
         }
         settings.spaces[existingIndex] = layout;
       } else {
@@ -3352,15 +3367,16 @@ export class WindowLayoutManager {
    */
   private async applyBuiltLeafState(leaf: WorkspaceLeaf, node: any): Promise<void> {
     if (!leaf || !node) return;
+    const nodeState = (node.state as { type?: string; state?: Record<string, unknown> } | undefined) || {};
+    const viewType = nodeState.type || node.type;
     const filePath = this.getFilePathFromLeafState({
-      type: node.type,
-      state: (node.state as { state?: Record<string, unknown> } | undefined)?.state || {},
+      type: viewType,
+      state: nodeState.state || {},
     });
     if (filePath) return;
 
-    const nodeState = (node.state as { type?: string; state?: Record<string, unknown> } | undefined) || {};
     await leaf.setViewState({
-      type: nodeState.type || node.type || "empty",
+      type: viewType || "empty",
       active: false,
       state: nodeState.state || {},
     });
@@ -3748,7 +3764,27 @@ export class WindowLayoutManager {
   public getFilePathFromLeafState(leafState: unknown): string | null {
     if (!leafState) return null;
     if (typeof leafState === "string") return leafState;
-    const stateObj = leafState as { file?: unknown; state?: { file?: unknown; state?: { file?: unknown } } };
+    const stateObj = leafState as {
+      type?: unknown;
+      file?: unknown;
+      state?: {
+        type?: unknown;
+        file?: unknown;
+        state?: { file?: unknown };
+      };
+    };
+
+    // 排除非檔案型 view（outline / backlink / all-properties / search / tag 等）：
+    // 這些 view 雖然在 state.file 中記錄目前關聯檔案，但它們是輔助側邊欄 view，
+    // 絕非以 openFile 開啟的檔案內容頁籤。若回傳 filePath 會導致 restore 時
+    // 誤呼叫 leaf.openFile(file)，把 outline 等頁籤替換成 markdown 編輯器！
+    const rawType = typeof stateObj.type === "string" ? stateObj.type : "";
+    const nestedType = typeof stateObj.state?.type === "string" ? stateObj.state.type : "";
+    const viewType = (rawType && rawType !== "leaf" ? rawType : nestedType) || rawType;
+    if (viewType && isNonFileViewType(viewType)) {
+      return null;
+    }
+
     if (typeof stateObj.state?.file === "string") return stateObj.state.file;
     if (typeof stateObj.state?.state?.file === "string") return stateObj.state.state.file;
     if (typeof stateObj.file === "string") return stateObj.file;

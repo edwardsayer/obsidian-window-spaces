@@ -1,6 +1,10 @@
 import { describe, expect, test, vi } from "vitest";
+import { Notice, WorkspaceLeaf } from "obsidian";
+import { initI18n } from "../src/i18n";
 import { PopoutLayoutEngine } from "../src/popout/popoutLayout";
 import { PopoutActivityBarManager } from "../src/popout/activityBar";
+
+initI18n("zh-TW");
 
 /**
  * 佈局完整性守護測試：
@@ -134,7 +138,9 @@ function buildEnv(): MockEnv {
 }
 
 function teardown(env: MockEnv): void {
-  document.body.removeChild(env.rootEl);
+  if (env.rootEl.parentElement) {
+    env.rootEl.parentElement.removeChild(env.rootEl);
+  }
 }
 
 /** 建立三欄：[左(empty), 中(markdown), 右(search)] */
@@ -209,7 +215,7 @@ describe("layout integrity guard", () => {
     teardown(env);
   });
 
-  test("preserves 2-column layout [left sidebar, right sidebar] stably without duplicate column insertion", async () => {
+  test("restores missing column to strictly satisfy columns >= activeBarCount + 1", async () => {
     const env = buildEnv();
     const leftLeaf = {
       id: "left",
@@ -235,15 +241,13 @@ describe("layout integrity guard", () => {
 
     await (env.manager as any).ensureLayoutIntegrity(window);
 
-    expect(env.createLeafBySplit).not.toHaveBeenCalled();
+    expect(env.createLeafBySplit).toHaveBeenCalledTimes(1);
     const topEls = Array.from(env.rootEl.children).filter(
       (el): el is HTMLElement =>
         el instanceof HTMLElement &&
         (el.classList.contains("workspace-tabs") || el.classList.contains("workspace-split"))
     );
-    expect(topEls).toHaveLength(2);
-    expect(topEls[0].classList.contains("mod-left-split")).toBe(true);
-    expect(topEls[1].classList.contains("mod-right-split")).toBe(true);
+    expect(topEls).toHaveLength(3);
 
     teardown(env);
   });
@@ -395,11 +399,11 @@ describe("layout integrity guard", () => {
 
   test("does not retry a failed column fill within the guard window", async () => {
     const env = buildEnv();
-    // 頂層只有 1 欄且雙側皆開 → 需補 1 欄形成 2 欄 [L, R]
+    // 頂層 2 欄：[中, 右]，缺左欄；原始 3 欄 → 需補左欄
     env.engine.setSidebarSides(window, {
       left: true,
       right: true,
-      originalCount: 1,
+      originalCount: 3,
       initialLeft: true,
       initialRight: true,
     });
@@ -409,13 +413,23 @@ describe("layout integrity guard", () => {
       view: { containerEl: document.createElement("div") },
       getViewState: () => ({ type: "markdown" }),
     } as MockLeaf;
-    env.leaves.push(centerLeaf);
+    const rightLeaf = {
+      id: "right",
+      containerEl: document.createElement("div"),
+      view: { containerEl: document.createElement("div") },
+      getViewState: () => ({ type: "search" }),
+    } as MockLeaf;
+    env.leaves.push(centerLeaf, rightLeaf);
     const centerCol = document.createElement("div");
     centerCol.classList.add("workspace-tabs");
     centerCol.appendChild(centerLeaf.containerEl);
+    const rightCol = document.createElement("div");
+    rightCol.classList.add("workspace-tabs");
+    rightCol.appendChild(rightLeaf.containerEl);
     env.rootEl.appendChild(centerCol);
+    env.rootEl.appendChild(rightCol);
 
-    // 第一次：補欄（成功，欄位數 1 → 2）
+    // 第一次：補欄（成功，欄位數 2 → 3）
     await (env.manager as any).ensureLayoutIntegrity(window);
     expect(env.createLeafBySplit).toHaveBeenCalledTimes(1);
 
@@ -426,7 +440,7 @@ describe("layout integrity guard", () => {
     teardown(env);
   });
 
-  test("preserves professional-style [L, R] space without forcing a third content column", async () => {
+  test("enforces 3 columns when both activity bars are visible (columns >= activeBarCount + 1)", async () => {
     const env = buildEnv();
     env.engine.setSidebarSides(window, {
       left: true,
@@ -459,15 +473,13 @@ describe("layout integrity guard", () => {
 
     await (env.manager as any).ensureLayoutIntegrity(window);
 
-    expect(env.createLeafBySplit).not.toHaveBeenCalled();
+    expect(env.createLeafBySplit).toHaveBeenCalledTimes(1);
     const topEls = Array.from(env.rootEl.children).filter(
       (el): el is HTMLElement =>
         el instanceof HTMLElement &&
         (el.classList.contains("workspace-tabs") || el.classList.contains("workspace-split"))
     );
-    expect(topEls).toHaveLength(2);
-    expect(topEls[0].classList.contains("mod-left-split")).toBe(true);
-    expect(topEls[1].classList.contains("mod-right-split")).toBe(true);
+    expect(topEls).toHaveLength(3);
 
     teardown(env);
   });
@@ -636,7 +648,7 @@ describe("layout integrity guard", () => {
     teardown(env);
   });
 
-  test("preserves 2-column space stably when content is merged into sidebar splits", async () => {
+  test("enforces 3 columns when 2 sidebar columns exist without content column", async () => {
     const env = buildEnv();
     (env.manager as any).plugin.settings.activityBarDefaults = { left: true, right: true };
     env.engine.setSidebarSides(window, {
@@ -671,18 +683,20 @@ describe("layout integrity guard", () => {
 
     await (env.manager as any).ensureLayoutIntegrity(window);
 
-    expect(env.createLeafBySplit).not.toHaveBeenCalled();
+    // 嚴格遵守垂直 split 的欄位數 >= activity bar 個數 + 1
+    // 兩側 activity bar 皆開但只有 2 欄 sidebars → 補 content 欄達成 3 欄
+    expect(env.createLeafBySplit).toHaveBeenCalledTimes(1);
     const topEls = Array.from(env.rootEl.children).filter(
       (el): el is HTMLElement =>
         el instanceof HTMLElement &&
         (el.classList.contains("workspace-tabs") || el.classList.contains("workspace-split"))
     );
-    expect(topEls).toHaveLength(2);
+    expect(topEls).toHaveLength(3);
 
     teardown(env);
   });
 
-  test("preserves nested vertical splits in left sidebar (Column 0) when content is dragged below sidebar", async () => {
+  test("preserves nested vertical splits in left sidebar (Column 0) when 3 columns exist", async () => {
     const env = buildEnv();
     (env.manager as any).plugin.settings.activityBarDefaults = { left: true, right: true };
     env.engine.setSidebarSides(window, {
@@ -721,24 +735,36 @@ describe("layout integrity guard", () => {
     col0Split.appendChild(bottomTabs);
     env.rootEl.appendChild(col0Split);
 
-    // 建立 Column 1（workspace-tabs，Right Sidebar）
-    const rightCol = document.createElement("div");
-    rightCol.classList.add("workspace-tabs");
-    const rightLeaf = {
-      id: "right-editor",
+    // 建立 Column 1（workspace-tabs，Center Editor）
+    const centerCol = document.createElement("div");
+    centerCol.classList.add("workspace-tabs");
+    const centerLeaf = {
+      id: "center-editor",
       containerEl: document.createElement("div"),
       view: { containerEl: document.createElement("div") },
       getViewState: () => ({ type: "markdown" }),
     } as MockLeaf;
+    centerCol.appendChild(centerLeaf.containerEl);
+    env.rootEl.appendChild(centerCol);
+
+    // 建立 Column 2（workspace-tabs，Right Sidebar）
+    const rightCol = document.createElement("div");
+    rightCol.classList.add("workspace-tabs");
+    const rightLeaf = {
+      id: "right-sidebar",
+      containerEl: document.createElement("div"),
+      view: { containerEl: document.createElement("div") },
+      getViewState: () => ({ type: "search" }),
+    } as MockLeaf;
     rightCol.appendChild(rightLeaf.containerEl);
     env.rootEl.appendChild(rightCol);
 
-    env.leaves.push(topLeaf, bottomLeaf, rightLeaf);
+    env.leaves.push(topLeaf, bottomLeaf, centerLeaf, rightLeaf);
 
-    // 觸發完整性檢查（模擬 drop 後的 layout-change）
+    // 觸發完整性檢查
     await (env.manager as any).ensureLayoutIntegrity(window);
 
-    // 不應插入任何新欄位（不重複補 sidebar / content）
+    // 3 欄皆具備，不應插入任何新欄位
     expect(env.createLeafBySplit).not.toHaveBeenCalled();
 
     const topEls = Array.from(env.rootEl.children).filter(
@@ -746,9 +772,10 @@ describe("layout integrity guard", () => {
         el instanceof HTMLElement &&
         (el.classList.contains("workspace-tabs") || el.classList.contains("workspace-split"))
     );
-    expect(topEls).toHaveLength(2);
+    expect(topEls).toHaveLength(3);
     expect(topEls[0]).toBe(col0Split);
-    expect(topEls[1]).toBe(rightCol);
+    expect(topEls[1]).toBe(centerCol);
+    expect(topEls[2]).toBe(rightCol);
 
     // 驗證 Column 0 及其子 tabs 均獲得側欄 class
     expect(col0Split.classList.contains("window-spaces-sidebar-column")).toBe(true);
@@ -756,16 +783,20 @@ describe("layout integrity guard", () => {
     expect(topTabs.classList.contains("mod-left-split")).toBe(true);
     expect(bottomTabs.classList.contains("mod-left-split")).toBe(true);
 
-    // 驗證 Column 1 獲得右側欄 class
+    // 驗證 Column 2 獲得右側欄 class
     expect(rightCol.classList.contains("window-spaces-sidebar-column")).toBe(true);
     expect(rightCol.classList.contains("mod-right-split")).toBe(true);
 
     teardown(env);
   });
 
-  test("preserves 2-column [L, R] space with both bars on and marks both as sidebars", async () => {
+  test("restores 3rd column when right sidebar is closed", async () => {
     const env = buildEnv();
     (env.manager as any).plugin.settings.activityBarDefaults = { left: true, right: true };
+    (env.manager as any).plugin.settings.activityBars.right = [
+      { viewType: "outline", side: "right" },
+      { viewType: "all-properties", side: "right" },
+    ];
     env.engine.setSidebarSides(window, {
       left: true,
       right: true,
@@ -777,35 +808,34 @@ describe("layout integrity guard", () => {
       id: "left",
       containerEl: document.createElement("div"),
       view: { containerEl: document.createElement("div") },
-      getViewState: () => ({ type: "search" }),
+      getViewState: () => ({ type: "bookmarks" }),
     } as MockLeaf;
-    const rightLeaf = {
-      id: "right",
+    const centerLeaf = {
+      id: "center",
       containerEl: document.createElement("div"),
       view: { containerEl: document.createElement("div") },
-      getViewState: () => ({ type: "search" }),
+      getViewState: () => ({ type: "markdown" }),
     } as MockLeaf;
-    env.leaves.push(leftLeaf, rightLeaf);
+    env.leaves.push(leftLeaf, centerLeaf);
     const leftCol = document.createElement("div");
     leftCol.classList.add("workspace-tabs");
     leftCol.appendChild(leftLeaf.containerEl);
-    const rightCol = document.createElement("div");
-    rightCol.classList.add("workspace-tabs");
-    rightCol.appendChild(rightLeaf.containerEl);
+    const centerCol = document.createElement("div");
+    centerCol.classList.add("workspace-tabs");
+    centerCol.appendChild(centerLeaf.containerEl);
     env.rootEl.appendChild(leftCol);
-    env.rootEl.appendChild(rightCol);
+    env.rootEl.appendChild(centerCol);
 
     await (env.manager as any).ensureLayoutIntegrity(window);
 
-    expect(env.createLeafBySplit).not.toHaveBeenCalled();
+    // 關閉右側欄後頂層只有 2 欄 < 3，觸發補欄
+    expect(env.createLeafBySplit).toHaveBeenCalledTimes(1);
     const topEls = Array.from(env.rootEl.children).filter(
       (el): el is HTMLElement =>
         el instanceof HTMLElement &&
         (el.classList.contains("workspace-tabs") || el.classList.contains("workspace-split"))
     );
-    expect(topEls).toHaveLength(2);
-    expect(topEls[0].classList.contains("window-spaces-sidebar-column")).toBe(true);
-    expect(topEls[1].classList.contains("window-spaces-sidebar-column")).toBe(true);
+    expect(topEls).toHaveLength(3);
 
     teardown(env);
   });
@@ -871,3 +901,154 @@ describe("layout integrity guard", () => {
     teardown(env);
   });
 });
+
+describe("sidebar tab detach guard and navigation fallback", () => {
+  test("isLastTabOnSidebar returns true only when leaf is the sole tab in sidebar column of popout", () => {
+    const env = buildEnv();
+    const popoutDoc = document.implementation.createHTMLDocument("popout");
+    popoutDoc.body.classList.add("is-popout-window");
+    const popoutWin = {
+      document: popoutDoc,
+      closed: false,
+    } as unknown as Window;
+    Object.defineProperty(popoutDoc, "defaultView", { value: popoutWin });
+
+    // 建立 left sidebar 欄位，含 1 個 tab
+    const leftCol = popoutDoc.createElement("div");
+    leftCol.classList.add("workspace-tabs", "window-spaces-sidebar-column", "mod-left-split");
+    const leaf1 = {
+      id: "leaf1",
+      win: popoutWin,
+      containerEl: popoutDoc.createElement("div"),
+      view: { containerEl: popoutDoc.createElement("div") },
+      getViewState: () => ({ type: "file-explorer" }),
+    } as unknown as MockLeaf;
+    leftCol.appendChild(leaf1.containerEl);
+    popoutDoc.body.appendChild(env.rootEl);
+    env.rootEl.appendChild(leftCol);
+
+    // 建立 center 欄位，含 1 個 tab
+    const centerCol = popoutDoc.createElement("div");
+    centerCol.classList.add("workspace-tabs");
+    const centerLeaf = {
+      id: "center-leaf",
+      win: popoutWin,
+      containerEl: popoutDoc.createElement("div"),
+      view: { containerEl: popoutDoc.createElement("div") },
+      getViewState: () => ({ type: "markdown" }),
+    } as unknown as MockLeaf;
+    centerCol.appendChild(centerLeaf.containerEl);
+    env.rootEl.appendChild(centerCol);
+
+    env.leaves.push(leaf1, centerLeaf);
+
+    // 1. 只有 1 個 tab 的側欄 leaf → 是最後一個 tab
+    expect(env.manager.isLastTabOnSidebar(leaf1 as unknown as WorkspaceLeaf)).toBe(true);
+
+    // 2. 中央編輯區的 leaf → 不是側欄 tab
+    expect(env.manager.isLastTabOnSidebar(centerLeaf as unknown as WorkspaceLeaf)).toBe(false);
+
+    // 3. 在同一側欄欄位加入第 2 個 tab
+    const leaf2 = {
+      id: "leaf2",
+      win: popoutWin,
+      containerEl: popoutDoc.createElement("div"),
+      view: { containerEl: popoutDoc.createElement("div") },
+      getViewState: () => ({ type: "search" }),
+    } as unknown as MockLeaf;
+    leftCol.appendChild(leaf2.containerEl);
+    env.leaves.push(leaf2);
+
+    // 現在該側欄有 2 個 tab，任一 tab 都不再是「最後一個 tab」
+    expect(env.manager.isLastTabOnSidebar(leaf1 as unknown as WorkspaceLeaf)).toBe(false);
+    expect(env.manager.isLastTabOnSidebar(leaf2 as unknown as WorkspaceLeaf)).toBe(false);
+
+    teardown(env);
+  });
+
+  test("detach guard prevents closing the last sidebar tab and calls originalDetach when multiple tabs exist", () => {
+    const env = buildEnv();
+    const popoutDoc = document.implementation.createHTMLDocument("popout");
+    popoutDoc.body.classList.add("is-popout-window");
+    const popoutWin = {
+      document: popoutDoc,
+      closed: false,
+    } as unknown as Window;
+    Object.defineProperty(popoutDoc, "defaultView", { value: popoutWin });
+
+    const leftCol = popoutDoc.createElement("div");
+    leftCol.classList.add("workspace-tabs", "window-spaces-sidebar-column", "mod-left-split");
+    const leaf = Object.create(WorkspaceLeaf.prototype);
+    leaf.id = "sole-sidebar-leaf";
+    leaf.win = popoutWin;
+    leaf.containerEl = popoutDoc.createElement("div");
+    leaf.view = { containerEl: popoutDoc.createElement("div") };
+    leaf.getViewState = () => ({ type: "file-explorer" });
+
+    leftCol.appendChild(leaf.containerEl);
+    popoutDoc.body.appendChild(env.rootEl);
+    env.rootEl.appendChild(leftCol);
+    env.leaves.push(leaf);
+
+    const originalDetachSpy = vi.fn();
+    (env.manager as any).originalDetach = originalDetachSpy;
+
+    // 呼叫 detach
+    leaf.detach();
+
+    // 側欄只有 1 個 tab，不應呼叫 originalDetach
+    expect(originalDetachSpy).not.toHaveBeenCalled();
+
+    // 加進第 2 個 tab
+    const leaf2 = Object.create(WorkspaceLeaf.prototype);
+    leaf2.id = "leaf2";
+    leaf2.win = popoutWin;
+    leaf2.containerEl = popoutDoc.createElement("div");
+    leaf2.view = { containerEl: popoutDoc.createElement("div") };
+    leaf2.getViewState = () => ({ type: "search" });
+    leftCol.appendChild(leaf2.containerEl);
+    env.leaves.push(leaf2);
+
+    // 有 2 個 tab 時，呼叫 detach 應該正常執行
+    leaf.detach();
+    expect(originalDetachSpy).toHaveBeenCalledTimes(1);
+
+    teardown(env);
+  });
+
+  test("canLeafAcceptNavigation rejects navigation for outline/non-navigable/pinned views", () => {
+    const env = buildEnv();
+
+    // 1. Normal unpinned markdown view -> can accept navigation
+    const normalLeaf = {
+      getViewState: () => ({ type: "markdown", pinned: false }),
+      view: { navigation: true },
+    } as unknown as WorkspaceLeaf;
+    expect(env.engine.canLeafAcceptNavigation(normalLeaf)).toBe(true);
+
+    // 2. Pinned markdown view -> cannot accept navigation
+    const pinnedLeaf = {
+      getViewState: () => ({ type: "markdown", pinned: true }),
+      view: { navigation: true },
+    } as unknown as WorkspaceLeaf;
+    expect(env.engine.canLeafAcceptNavigation(pinnedLeaf)).toBe(false);
+
+    // 3. Outline view (navigation === false) -> cannot accept navigation
+    const outlineLeaf = {
+      getViewState: () => ({ type: "outline", pinned: false }),
+      view: { navigation: false },
+    } as unknown as WorkspaceLeaf;
+    expect(env.engine.canLeafAcceptNavigation(outlineLeaf)).toBe(false);
+
+    // 4. canNavigate() returns false
+    const nonNavLeaf = {
+      getViewState: () => ({ type: "outline" }),
+      canNavigate: () => false,
+      view: { navigation: true },
+    } as unknown as WorkspaceLeaf;
+    expect(env.engine.canLeafAcceptNavigation(nonNavLeaf)).toBe(false);
+
+    teardown(env);
+  });
+});
+
