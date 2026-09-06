@@ -215,7 +215,7 @@ describe("layout integrity guard", () => {
     teardown(env);
   });
 
-  test("restores missing column to strictly satisfy columns >= activeBarCount + 1", async () => {
+  test("does not perform reactive split during layout-change (protected by detach guard)", async () => {
     const env = buildEnv();
     const leftLeaf = {
       id: "left",
@@ -241,13 +241,13 @@ describe("layout integrity guard", () => {
 
     await (env.manager as any).ensureLayoutIntegrity(window);
 
-    expect(env.createLeafBySplit).toHaveBeenCalledTimes(1);
+    expect(env.createLeafBySplit).not.toHaveBeenCalled();
     const topEls = Array.from(env.rootEl.children).filter(
       (el): el is HTMLElement =>
         el instanceof HTMLElement &&
         (el.classList.contains("workspace-tabs") || el.classList.contains("workspace-split"))
     );
-    expect(topEls).toHaveLength(3);
+    expect(topEls).toHaveLength(2);
 
     teardown(env);
   });
@@ -276,8 +276,7 @@ describe("layout integrity guard", () => {
 
     await (env.manager as any).ensureLayoutIntegrity(window);
 
-    expect(env.createLeafBySplit).toHaveBeenCalledTimes(1);
-    expect(env.createLeafBySplit).toHaveBeenCalledWith(expect.anything(), "vertical", false);
+    expect(env.createLeafBySplit).not.toHaveBeenCalled();
 
     teardown(env);
   });
@@ -399,7 +398,7 @@ describe("layout integrity guard", () => {
 
   test("does not retry a failed column fill within the guard window", async () => {
     const env = buildEnv();
-    // 頂層 2 欄：[中, 右]，缺左欄；原始 3 欄 → 需補左欄
+    // 頂層 2 欄：[中, 右]，缺左欄；原始 3 欄
     env.engine.setSidebarSides(window, {
       left: true,
       right: true,
@@ -429,18 +428,14 @@ describe("layout integrity guard", () => {
     env.rootEl.appendChild(centerCol);
     env.rootEl.appendChild(rightCol);
 
-    // 第一次：補欄（成功，欄位數 2 → 3）
+    // ensureLayoutIntegrity 不再進行即時補欄（由 detach guard 於刪除時防護）
     await (env.manager as any).ensureLayoutIntegrity(window);
-    expect(env.createLeafBySplit).toHaveBeenCalledTimes(1);
-
-    // 第二次（模擬 layout-change 再次觸發）：欄位已存在 → 不再補
-    await (env.manager as any).ensureLayoutIntegrity(window);
-    expect(env.createLeafBySplit).toHaveBeenCalledTimes(1);
+    expect(env.createLeafBySplit).not.toHaveBeenCalled();
 
     teardown(env);
   });
 
-  test("enforces 3 columns when both activity bars are visible (columns >= activeBarCount + 1)", async () => {
+  test("preserves existing columns without reactive splitting during layout-change", async () => {
     const env = buildEnv();
     env.engine.setSidebarSides(window, {
       left: true,
@@ -473,13 +468,13 @@ describe("layout integrity guard", () => {
 
     await (env.manager as any).ensureLayoutIntegrity(window);
 
-    expect(env.createLeafBySplit).toHaveBeenCalledTimes(1);
+    expect(env.createLeafBySplit).not.toHaveBeenCalled();
     const topEls = Array.from(env.rootEl.children).filter(
       (el): el is HTMLElement =>
         el instanceof HTMLElement &&
         (el.classList.contains("workspace-tabs") || el.classList.contains("workspace-split"))
     );
-    expect(topEls).toHaveLength(3);
+    expect(topEls).toHaveLength(2);
 
     teardown(env);
   });
@@ -648,7 +643,7 @@ describe("layout integrity guard", () => {
     teardown(env);
   });
 
-  test("enforces 3 columns when 2 sidebar columns exist without content column", async () => {
+  test("preserves 2 sidebar columns stably without reactive splitting", async () => {
     const env = buildEnv();
     (env.manager as any).plugin.settings.activityBarDefaults = { left: true, right: true };
     env.engine.setSidebarSides(window, {
@@ -683,15 +678,13 @@ describe("layout integrity guard", () => {
 
     await (env.manager as any).ensureLayoutIntegrity(window);
 
-    // 嚴格遵守垂直 split 的欄位數 >= activity bar 個數 + 1
-    // 兩側 activity bar 皆開但只有 2 欄 sidebars → 補 content 欄達成 3 欄
-    expect(env.createLeafBySplit).toHaveBeenCalledTimes(1);
+    expect(env.createLeafBySplit).not.toHaveBeenCalled();
     const topEls = Array.from(env.rootEl.children).filter(
       (el): el is HTMLElement =>
         el instanceof HTMLElement &&
         (el.classList.contains("workspace-tabs") || el.classList.contains("workspace-split"))
     );
-    expect(topEls).toHaveLength(3);
+    expect(topEls).toHaveLength(2);
 
     teardown(env);
   });
@@ -790,7 +783,7 @@ describe("layout integrity guard", () => {
     teardown(env);
   });
 
-  test("restores 3rd column when right sidebar is closed", async () => {
+  test("does not perform reactive split when only 2 columns exist", async () => {
     const env = buildEnv();
     (env.manager as any).plugin.settings.activityBarDefaults = { left: true, right: true };
     (env.manager as any).plugin.settings.activityBars.right = [
@@ -828,14 +821,13 @@ describe("layout integrity guard", () => {
 
     await (env.manager as any).ensureLayoutIntegrity(window);
 
-    // 關閉右側欄後頂層只有 2 欄 < 3，觸發補欄
-    expect(env.createLeafBySplit).toHaveBeenCalledTimes(1);
+    expect(env.createLeafBySplit).not.toHaveBeenCalled();
     const topEls = Array.from(env.rootEl.children).filter(
       (el): el is HTMLElement =>
         el instanceof HTMLElement &&
         (el.classList.contains("workspace-tabs") || el.classList.contains("workspace-split"))
     );
-    expect(topEls).toHaveLength(3);
+    expect(topEls).toHaveLength(2);
 
     teardown(env);
   });
@@ -1047,6 +1039,111 @@ describe("sidebar tab detach guard and navigation fallback", () => {
       view: { navigation: true },
     } as unknown as WorkspaceLeaf;
     expect(env.engine.canLeafAcceptNavigation(nonNavLeaf)).toBe(false);
+
+    teardown(env);
+  });
+
+  test("isLastTabInCenter returns true only when leaf is the sole remaining tab in center area", () => {
+    const env = buildEnv();
+    const popoutDoc = document.implementation.createHTMLDocument("popout");
+    popoutDoc.body.classList.add("is-popout-window");
+    const popoutWin = {
+      document: popoutDoc,
+      closed: false,
+    } as unknown as Window;
+    Object.defineProperty(popoutDoc, "defaultView", { value: popoutWin });
+
+    // 建立 left sidebar 欄位，含 1 個 tab
+    const leftCol = popoutDoc.createElement("div");
+    leftCol.classList.add("workspace-tabs", "window-spaces-sidebar-column", "mod-left-split");
+    const sidebarLeaf = {
+      id: "sidebar-leaf",
+      win: popoutWin,
+      containerEl: popoutDoc.createElement("div"),
+      view: { containerEl: popoutDoc.createElement("div") },
+      getViewState: () => ({ type: "file-explorer" }),
+    } as unknown as MockLeaf;
+    leftCol.appendChild(sidebarLeaf.containerEl);
+    popoutDoc.body.appendChild(env.rootEl);
+    env.rootEl.appendChild(leftCol);
+
+    // 建立 center 欄位，含 1 個 tab
+    const centerCol = popoutDoc.createElement("div");
+    centerCol.classList.add("workspace-tabs");
+    const centerLeaf1 = {
+      id: "center-leaf1",
+      win: popoutWin,
+      containerEl: popoutDoc.createElement("div"),
+      view: { containerEl: popoutDoc.createElement("div") },
+      getViewState: () => ({ type: "markdown" }),
+    } as unknown as MockLeaf;
+    centerCol.appendChild(centerLeaf1.containerEl);
+    env.rootEl.appendChild(centerCol);
+
+    env.leaves.push(sidebarLeaf, centerLeaf1);
+
+    // 1. 側邊欄 leaf → 不是中央分頁
+    expect(env.manager.isLastTabInCenter(sidebarLeaf as unknown as WorkspaceLeaf)).toBe(false);
+
+    // 2. 只有 1 個中央分頁 → 是中央最後一個分頁
+    expect(env.manager.isLastTabInCenter(centerLeaf1 as unknown as WorkspaceLeaf)).toBe(true);
+
+    // 3. 增加第 2 個中央分頁
+    const centerLeaf2 = {
+      id: "center-leaf2",
+      win: popoutWin,
+      containerEl: popoutDoc.createElement("div"),
+      view: { containerEl: popoutDoc.createElement("div") },
+      getViewState: () => ({ type: "markdown" }),
+    } as unknown as MockLeaf;
+    centerCol.appendChild(centerLeaf2.containerEl);
+    env.leaves.push(centerLeaf2);
+
+    // 現在中央有 2 個分頁，任一分頁都不再是「最後一個分頁」
+    expect(env.manager.isLastTabInCenter(centerLeaf1 as unknown as WorkspaceLeaf)).toBe(false);
+    expect(env.manager.isLastTabInCenter(centerLeaf2 as unknown as WorkspaceLeaf)).toBe(false);
+
+    teardown(env);
+  });
+
+  test("detach guard replaces the last center tab with empty view in-place without detaching", async () => {
+    const env = buildEnv();
+    const popoutDoc = document.implementation.createHTMLDocument("popout");
+    popoutDoc.body.classList.add("is-popout-window");
+    const popoutWin = {
+      document: popoutDoc,
+      closed: false,
+    } as unknown as Window;
+    Object.defineProperty(popoutDoc, "defaultView", { value: popoutWin });
+
+    const centerCol = popoutDoc.createElement("div");
+    centerCol.classList.add("workspace-tabs");
+    const centerLeaf = Object.create(WorkspaceLeaf.prototype);
+    centerLeaf.id = "only-center-leaf";
+    centerLeaf.win = popoutWin;
+    centerLeaf.containerEl = popoutDoc.createElement("div");
+    centerLeaf.view = { containerEl: popoutDoc.createElement("div") };
+    let currentState = { type: "markdown" };
+    centerLeaf.getViewState = () => currentState;
+    centerLeaf.setViewState = vi.fn(async (state: any) => {
+      currentState = state;
+    });
+
+    centerCol.appendChild(centerLeaf.containerEl);
+    popoutDoc.body.appendChild(env.rootEl);
+    env.rootEl.appendChild(centerCol);
+    env.leaves.push(centerLeaf);
+
+    const originalDetachSpy = vi.fn();
+    (env.manager as any).originalDetach = originalDetachSpy;
+
+    // 呼叫 detach
+    centerLeaf.detach();
+
+    // 不應呼叫 originalDetach（阻止容器被銷毀）
+    expect(originalDetachSpy).not.toHaveBeenCalled();
+    // 應原地替換為 empty (New Tab)
+    expect(centerLeaf.setViewState).toHaveBeenCalledWith({ type: "empty", active: true, state: {} });
 
     teardown(env);
   });

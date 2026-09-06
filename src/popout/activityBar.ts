@@ -1507,6 +1507,14 @@ export class PopoutActivityBarManager {
         new Notice(t("activityBar.cannotDeleteLastSidebarTab"));
         return;
       }
+      if (self.isLastTabInCenter(this)) {
+        if (this.getViewState?.()?.type !== "empty") {
+          void this.setViewState({ type: "empty", active: true, state: {} }).then(() => {
+            self.app.workspace.setActiveLeaf(this, { focus: true });
+          });
+        }
+        return;
+      }
       return self.originalDetach?.apply(this, args);
     };
   }
@@ -1547,6 +1555,35 @@ export class PopoutActivityBarManager {
     });
 
     return count <= 1;
+  }
+
+  /**
+   * 檢查指定 leaf 是否為 Popout 視窗中央內容區中的「最後一個分頁」。
+   * 若是中央內容區最後一個分頁，關閉時不可 detach（否則所屬的 WorkspaceTabs 容器會被銷毀導致破版），
+   * 應原地將其內容重置為 Obsidian 預設的 New Tab（empty view）。
+   */
+  isLastTabInCenter(leaf: WorkspaceLeaf): boolean {
+    if (!leaf) return false;
+    const win = getWindowOfLeaf(leaf);
+    if (!win || win.closed || !isPopoutWindow(win)) return false;
+
+    const manager = (this.plugin as unknown as {
+      manager?: { isRestoringLayout?: boolean; isRebuildingPopoutLayout?: boolean };
+    }).manager;
+    if (manager?.isRestoringLayout || manager?.isRebuildingPopoutLayout) {
+      return false;
+    }
+
+    if (this.engine.isLeafInSideColumn(win, leaf)) return false;
+
+    let centerCount = 0;
+    this.engine.workspace.iterateAllLeaves((l: WorkspaceLeaf) => {
+      if (getWindowOfLeaf(l) === win && !this.engine.isLeafInSideColumn(win, l)) {
+        centerCount++;
+      }
+    });
+
+    return centerCount <= 1;
   }
 
   /**
@@ -1709,16 +1746,12 @@ export class PopoutActivityBarManager {
   }
 
   /**
-   * 檢查並修正 Popout 的頂層佈局結構，維持「activity bar 旁就是 sidebar」
-   * 的三欄語意：
-   *
-   * 1. 補足缺失的側欄欄位：兩側 activity bar 可見時，頂層必須有
-   *    [left sidebar, content, right sidebar] 三欄。側欄在 close all 後被
-   *    Obsidian 清空/移除時，補一個空的側欄欄位（New Tab），避免使用者
-   *    拖曳 tab 時 Obsidian 建立「大欄包小欄」的巢狀結構。
-   * 2. 藏起空的側欄：側欄欄位內只剩 New Tab（empty leaf）時藏起整個欄位
-   *    （模仿 Obsidian 主視窗：tabs 全被關掉 → 先藏起左邊欄）。使用者點
-   *    activity bar 的 toggle 按鈕時，再顯示空 panel 提醒開一個新的 view。
+   * 檢查並維護 Popout 的頂層佈局樣式與收合狀態：
+   * 1. 樣式同步：持續同步側欄欄位及其 tabs 容器的 mod-left-split / mod-right-split 標記。
+   * 2. 側欄收合狀態機：側欄欄位內只剩 New Tab（empty leaf）時自動藏起（模仿 Obsidian 主視窗行為）；
+   *    當使用者點擊 activity bar toggle 按鈕時顯示。
+   * 注意：依防護性架構設計，分頁刪除已於 WorkspaceLeaf.detach 進行攔截防護（側欄禁止刪除最後一頁、
+   * 中央原地重置為 New Tab），因此 layout-change 時不再進行事後自動補欄，杜絕 layout 錯位與破版。
    */
   private async ensureLayoutIntegrity(win: Window): Promise<void> {
     if (!win || win.closed) return;
@@ -1734,12 +1767,6 @@ export class PopoutActivityBarManager {
 
       const leftVisible = this.isSideVisibleForWindow(win, "left");
       const rightVisible = this.isSideVisibleForWindow(win, "right");
-
-      // 3. 補足側欄欄位（getColumnElement null → 補帶預設 view 的欄位）
-      this.ensureSideColumnPresent(win, "left", leftVisible);
-      this.ensureSideColumnPresent(win, "right", rightVisible);
-      // 維持最少欄位數（雙側皆開啟時 ≥ 2 欄；單側開啟時 ≥ 1 欄）
-      this.ensureContentColumnPresent(win);
 
       // 4. 欄位狀態整理（側欄收合狀態機）
       const blocked = this.autoHideBlockedUntil.get(win);
