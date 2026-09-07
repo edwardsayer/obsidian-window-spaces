@@ -58,7 +58,8 @@ const context = await esbuild.context({
   sourcemap: true,
   treeShaking: true,
   outfile: "main.js",
-  minify: false,
+  minify: prod,
+  keepNames: true,
 });
 
 if (prod) {
