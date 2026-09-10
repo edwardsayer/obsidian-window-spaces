@@ -1863,6 +1863,50 @@ describe("PopoutActivityBarManager toggle behavior", () => {
     expect(rightColEl.style.display).not.toBe("none");
     expect(workspace.revealLeaf).not.toHaveBeenCalled();
   });
+
+  test("Activity Bar view menu updates a fallback icon after dynamic detection", async () => {
+    initI18n({} as any);
+    const { manager, win } = buildManager();
+    const app = (manager as any).app;
+    app.viewRegistry = {
+      getDisplayText: (type: string) => type === "menu-community-view" ? "Community view" : type,
+      viewByType: {
+        "menu-community-view": () => ({ getIcon: () => "community-icon" }),
+      },
+    };
+
+    const menuItems: any[] = [];
+    const originalAddItem = Menu.prototype.addItem;
+    Menu.prototype.addItem = function (cb: any) {
+      const item: any = {
+        title: "",
+        icon: "",
+        setTitle(value: string) { item.title = value; return item; },
+        setIcon(value: string) { item.icon = value; return item; },
+        setChecked() { return item; },
+        setDisabled() { return item; },
+        onClick() { return item; },
+      };
+      cb(item);
+      menuItems.push(item);
+      return this;
+    };
+
+    try {
+      manager.showActivityBarContextMenu(win, {
+        clientX: 10,
+        clientY: 10,
+        preventDefault: () => {},
+        stopPropagation: () => {},
+      } as unknown as MouseEvent, "right");
+
+      const communityItem = menuItems.find((item) => item.title === "Community view");
+      expect(communityItem?.icon).toBe("layout");
+      await vi.waitFor(() => expect(communityItem?.icon).toBe("community-icon"));
+    } finally {
+      Menu.prototype.addItem = originalAddItem;
+    }
+  });
 });
 
 describe("view icon resolution", () => {

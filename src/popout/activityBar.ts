@@ -2130,6 +2130,14 @@ export class PopoutActivityBarManager {
           .onClick(() => {
             void this.toggleViewForWindowSide(win, side, viewType);
           });
+
+        // 與設定頁新增 view 相同，補做動態 icon 偵測，讓尚未快取的社群 view
+        // 在選單中也能顯示其實際 icon，而不是同步 fallback（例如 "layout"）。
+        if (!configuredItem?.icon) {
+          void ensureViewIcon(this.app, viewType).then((resolvedIcon) => {
+            if (resolvedIcon) item.setIcon(resolvedIcon);
+          });
+        }
       });
     });
 
