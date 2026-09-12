@@ -67,6 +67,12 @@ export class PopoutActivityBarManager {
   /** 初始化中的視窗：初始化期間暫停 syncSidebarColumnClasses，避免過渡狀態誤判。 */
   private initializingWindows = new Set<Window>();
   private sidebarHintsByWindow = new WeakMap<Window, SidebarSides>();
+  /**
+   * 尚未指派 Space 的新視窗（New Window / 未命名 popout）：該視窗的 activity bar
+   * 各側顯示狀態以 in-memory 覆寫記錄。這類視窗沒有 layout 可寫入 per-space 設定，
+   * 若不做覆寫，右鍵選單切換 activity bar 會無處可記而不生效。
+   */
+  private windowSideVisibility = new WeakMap<Window, { left: boolean; right: boolean }>();
   private columnEnsurePromises = new WeakMap<Window, Promise<void>>();
   /** Preserve live column weights while one sidebar is temporarily hidden. */
   private sidebarFlexSnapshots = new WeakMap<Window, SidebarFlexSnapshot>();
@@ -117,6 +123,9 @@ export class PopoutActivityBarManager {
    */
   async initializeNewWindow(win: Window): Promise<void> {
     if (!win || win.closed) return;
+    // shared openNewPopoutWindow 的 initializer 與 window-open 的補欄排程可能
+    // 同時觸發，重複初始化會多建側欄；以進行中集合做重入防護。
+    if (this.initializingWindows.has(win)) return;
 
     this.initializingWindows.add(win);
     try {
@@ -132,30 +141,66 @@ export class PopoutActivityBarManager {
     if (!win || win.closed) return;
 
     this.injectForWindow(win);
-    const leftVisible = this.settings.activityBarDefaults?.left !== false;
-    const rightVisible = this.settings.activityBarDefaults?.right !== false;
+    const leftVisible = this.isSideVisibleForWindow(win, "left");
+    const rightVisible = this.isSideVisibleForWindow(win, "right");
     const engineWithSidebarHints = this.engine as PopoutLayoutEngine & {
       setSidebarSides?: (targetWin: Window, sides: { left: boolean; right: boolean }) => void;
     };
     engineWithSidebarHints.setSidebarSides?.(win, { left: leftVisible, right: rightVisible });
 
+    // 建側欄前先記住原始中央 content leaf（全新視窗的 New Tab）。之後欄位變多、
+    // sidebar 標記尚未同步時，getCenterLeafSync 可能誤指側欄，故以建欄前的 leaf
+    // 為準，把 active leaf 還給中央。
+    const centerLeaf = this.engine.getCenterLeafSync(win);
+
+    // engine.ensureSideColumn 以 getColumnElement 判斷側欄是否存在；全新視窗只有
+    // 一個 content 欄位時，該判定在「欄位數不足 + 邊緣無 sidebar 標記」下會把同一
+    // 欄位同時回傳為左右側欄，導致側欄永遠不被建立。因此新視窗初始化一律改用
+    // ensureSideColumnPresent(force)，依實際欄位結構強制補出 [左側欄, 中央, 右側欄]。
     if (leftVisible) {
-      await this.engine.ensureSideColumn(win, "left", this.getItemsForSide("left")[0]?.viewType);
-    }
-    // ensureSideColumn focuses the newly-created sidebar leaf. Before creating
-    // the opposite sidebar, explicitly reactivate the center pane so the right
-    // split is made around content rather than around the left sidebar.
-    if (leftVisible && rightVisible) {
-      const centerLeaf = this.engine.getCenterLeafSync(win);
-      this.app.workspace.setActiveLeaf(centerLeaf, { focus: false });
+      this.ensureSideColumnPresent(win, "left", true, true);
     }
     if (rightVisible) {
-      await this.engine.ensureSideColumn(win, "right", this.getItemsForSide("right")[0]?.viewType);
+      this.ensureSideColumnPresent(win, "right", true, true);
     }
 
     await this.waitForLayoutFrame(win);
+    if (centerLeaf) {
+      const centerContainer = (centerLeaf as unknown as ExtendedWorkspaceLeaf).containerEl;
+      if (!centerContainer || (centerContainer.instanceOf(HTMLElement) && centerContainer.isConnected)) {
+        this.app.workspace.setActiveLeaf(centerLeaf, { focus: false });
+      }
+    }
     this.applyDefaultColumnSizing(win, leftVisible, rightVisible);
     this.renderWindow(win);
+  }
+
+  /**
+   * Obsidian 原生「New Window」建立的 Popout 不經過 shared openNewPopoutWindow
+   * 的 initializer，因此要在 window-open 後補上欄位初始化（activity bar 側欄 +
+   * 中央 content；欄位數 = 顯示的 activity bar 數 + 1）。
+   *
+   * 已由 shared initializer 或 Space 還原流程接手的視窗會被跳過，避免重複補欄。
+   */
+  scheduleNewWindowInitialization(win: Window): void {
+    if (!win || win.closed || !isPopoutWindow(win)) return;
+    win.setTimeout(() => {
+      if (win.closed || !this.barsByWindow.has(win)) return;
+      if (this.initializingWindows.has(win)) return;
+      const manager = (this.plugin as unknown as {
+        manager?: { isRestoringLayout?: boolean };
+      }).manager;
+      if (manager?.isRestoringLayout) return;
+      // Space 還原中的視窗由其還原流程負責；已指派 Space 者不在此初始化。
+      if (this.getLayoutForWindow(win)) return;
+
+      const leftVisible = this.isSideVisibleForWindow(win, "left");
+      const rightVisible = this.isSideVisibleForWindow(win, "right");
+      const requiredColumns = (leftVisible ? 1 : 0) + (rightVisible ? 1 : 0) + 1;
+      if (this.engine.getTopLevelColumnElements(win).length >= requiredColumns) return;
+
+      void this.initializeNewWindow(win);
+    }, 500);
   }
 
   /**
@@ -821,6 +866,9 @@ export class PopoutActivityBarManager {
     }
     // A legacy saved Space without per-side settings is intentionally hidden.
     if (layout) return false;
+    // 未指派 Space 的新視窗：以 in-memory 覆寫（右鍵選單切換）優先於全域預設。
+    const override = this.windowSideVisibility.get(win);
+    if (override) return override[side];
     return this.settings.activityBarDefaults?.[side] !== false;
   }
 
@@ -1768,6 +1816,15 @@ export class PopoutActivityBarManager {
       const leftVisible = this.isSideVisibleForWindow(win, "left");
       const rightVisible = this.isSideVisibleForWindow(win, "right");
 
+      // 結構尚未補齊（欄位數 < 顯示的 activity bar 數 + 1）時不做收合判斷：
+      // 新視窗在補欄前只有單一 content 欄位，getColumnElement 會把它同時誤判為
+      // 左右側欄；此時若執行「空側欄自動藏起」會把唯一的中央欄位隱藏。補欄完成
+      // 後的 layout-change 會再跑一次 integrity，屆時再依完整結構決定是否收合。
+      const activeBarCount = (leftVisible ? 1 : 0) + (rightVisible ? 1 : 0);
+      const requiredColumns = activeBarCount + 1;
+      const structurallyIncomplete =
+        this.engine.getTopLevelColumnElements(win).length < requiredColumns;
+
       // 4. 欄位狀態整理（側欄收合狀態機）
       const blocked = this.autoHideBlockedUntil.get(win);
       const now = Date.now();
@@ -1775,6 +1832,7 @@ export class PopoutActivityBarManager {
         const visible = side === "left" ? leftVisible : rightVisible;
         const columnEl = this.engine.getColumnElement(win, side);
         if (visible) {
+          if (structurallyIncomplete) continue;
           // 是 sidebar：只剩 New Tab（empty leaf）→ 藏起（模仿 Obsidian 主視窗
           // 的 close all 行為）；使用者點 toggle 可展開空 panel 開新 view
           if (blocked && blocked[side] > now) continue;
@@ -1810,10 +1868,17 @@ export class PopoutActivityBarManager {
    *
    * @returns 建立的 leaf（若建立成功），否則 null。
    */
-  private ensureSideColumnPresent(win: Window, side: PopoutSide, visible: boolean): WorkspaceLeaf | null {
+  private ensureSideColumnPresent(
+    win: Window,
+    side: PopoutSide,
+    visible: boolean,
+    force = false
+  ): WorkspaceLeaf | null {
     if (!visible) return null;
-    // 欄位已存在（無論是否藏起）→ 不需要補
-    if (this.engine.getColumnElement(win, side)) return null;
+    // 欄位已存在（無論是否藏起）→ 不需要補。
+    // force：新視窗初始化時 getColumnElement 可能把唯一的 content 欄位誤判為
+    // 側欄，故略過存在性檢查，直接依實際欄位結構補欄。
+    if (!force && this.engine.getColumnElement(win, side)) return null;
 
     // 補欄失敗防護：短時間內不重複嘗試（防止建欄在錯誤層級造成的無限循環）
     const now = Date.now();
@@ -2254,6 +2319,34 @@ export class PopoutActivityBarManager {
       }
 
       await this.plugin.saveSettings?.();
+    } else {
+      // 尚未指派 Space 的新視窗沒有 layout 可寫入 per-space 設定，改以 in-memory
+      // 覆寫記錄該側顯示狀態，並依需求補出該側 sidebar 欄位。
+      const override = this.windowSideVisibility.get(win) ?? {
+        left: this.settings.activityBarDefaults?.left !== false,
+        right: this.settings.activityBarDefaults?.right !== false,
+      };
+      override[side] = nextVisible;
+      this.windowSideVisibility.set(win, override);
+
+      // 以覆寫後的狀態重建 hints，讓 getColumnElement / syncSidebarColumnClasses
+      // 依新的可見性判定側欄（不變更全域預設）。
+      this.ensureSidebarHints(win);
+
+      if (nextVisible) {
+        const leftVisible = this.isSideVisibleForWindow(win, "left");
+        const rightVisible = this.isSideVisibleForWindow(win, "right");
+        const requiredColumns = (leftVisible ? 1 : 0) + (rightVisible ? 1 : 0) + 1;
+        if (this.engine.getTopLevelColumnElements(win).length < requiredColumns) {
+          this.ensureSideColumnPresent(win, side, true, true);
+          this.syncSidebarColumnClasses(win);
+        }
+        this.applyDefaultColumnSizingIfNeeded(win, true);
+      } else if (this.engine.isColumnHidden(win, side)) {
+        // 關閉 activity bar 時該側欄位視為 content，一律顯示
+        this.engine.showColumn(win, side);
+        this.markColumnAutoHideBlocked(win, side, 3000);
+      }
     }
 
     // B2：enable 一側且該側 sidebar 欄位缺失時，以「全新含 sidebar 的 layout」

@@ -499,6 +499,8 @@ export default class WindowSpacesPlugin extends Plugin {
         this.activityBars.injectForWindow(popoutWindow);
         // 新 Popout 建立後排程佈局完整性檢查（補足側欄 / 藏起空側欄）
         this.activityBars.scheduleLayoutIntegrityCheck(popoutWindow);
+        // Obsidian 原生 New Window 不經 shared initializer，補上欄位初始化
+        this.activityBars.scheduleNewWindowInitialization(popoutWindow);
         WindowLayoutsModal.renderAllInstances();
       })
     );
