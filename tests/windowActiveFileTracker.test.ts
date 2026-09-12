@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import { describe, it, beforeEach } from "vitest";
+import { describe, it, beforeEach, expect } from "vitest";
 import type { App, WorkspaceLeaf, TFile } from "obsidian";
 import {
   WindowActiveFileTracker,
@@ -11,6 +10,20 @@ import {
   getWorkspaceActiveFileTracker,
 } from "../src/shared/workspaceInterceptor";
 import { PopoutLayoutEngine } from "../src/shared/popoutLayout";
+
+/**
+ * `node:assert(/strict)` 在此 toolchain 匯出損毀（Vitest 1.6 + Node 24 的 CJS
+ * interop：default 與 namespace 皆取不到 equal / notEqual 等函式），故以 Vitest
+ * 的 expect 提供本測試所需的最小 assert 介面。
+ */
+const assert = {
+  equal: (actual: unknown, expected: unknown, message?: string): void => {
+    expect(actual, message).toBe(expected);
+  },
+  notEqual: (actual: unknown, expected: unknown, message?: string): void => {
+    expect(actual, message).not.toBe(expected);
+  },
+};
 
 function createMockWindow(id: string): Window {
   return { id, isMockWindow: true } as unknown as Window;
