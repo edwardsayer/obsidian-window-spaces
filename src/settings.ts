@@ -550,22 +550,14 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
 
     // 先建立 add-row（capture selectEl 供 callback 使用），最後再移到底部
     let selectEl!: HTMLSelectElement;
-    let customInput!: HTMLInputElement;
     const addRow = this.createSettingIn(group, (s) => {
       selectEl = s.controlEl.createEl("select", {
         cls: "dropdown",
       });
-      customInput = s.controlEl.createEl("input", {
-        type: "text",
-        placeholder: t("settings.viewTypePlaceholder"),
-      });
-      customInput.addClass("window-spaces-view-type-input");
 
       s.addButton((button) => {
         button.setButtonText(t("settings.addView")).onClick(() => {
-          const selected = selectEl.value.trim();
-          const custom = customInput.value.trim();
-          const viewType = custom || selected;
+          const viewType = selectEl.value.trim();
           if (!viewType) return;
 
           const current = this.plugin.settings.activityBars?.[side] ?? [];
@@ -586,7 +578,6 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
           void this.plugin.saveSettings().then(() => {
             this.plugin.activityBars.refreshAll();
             renderItemRows();
-            customInput.value = "";
 
             void ensureViewIcon(this.app, viewType).then((icon) => {
               if (!icon) return;

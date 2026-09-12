@@ -173,7 +173,6 @@ export const zhCN: TranslationStrings = {
     rightBar: "右侧 Activity Bar",
     addView: "添加 View",
     removeView: "移除",
-    viewTypePlaceholder: "View type（例如 file-explorer）",
     pickIcon: "选择 Logo",
     restoreDefaultButtons: "还原默认按钮",
     restoreDefaultIcon: "还原默认图标",

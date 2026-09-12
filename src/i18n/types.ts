@@ -174,7 +174,6 @@ export interface TranslationStrings {
     rightBar: string;
     addView: string;
     removeView: string;
-    viewTypePlaceholder: string;
     pickIcon: string;
     restoreDefaultButtons: string;
     restoreDefaultIcon: string;

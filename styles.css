@@ -1198,23 +1198,30 @@ button.mod-destructive:hover,
   background: var(--interactive-accent);
   color: var(--text-on-accent);
   padding: 2px 8px;
+  border: 1px solid transparent;
   border-radius: 12px;
   font-size: 12px;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
   cursor: pointer;
 }
-.space-section-pill-close {
-  opacity: 0.7;
+.space-section-pill:hover {
+  background: var(--interactive-accent-hover);
 }
 .space-section-pill-unselected {
-  background: var(--background-secondary);
-  color: var(--text-muted);
+  background: transparent;
+  color: var(--text-normal);
   padding: 2px 8px;
+  border: 1px solid var(--interactive-accent);
   border-radius: 12px;
   font-size: 12px;
+  display: inline-flex;
+  align-items: center;
   cursor: pointer;
+}
+.space-section-pill-unselected:hover {
+  background: var(--background-modifier-hover);
+  border-color: var(--interactive-accent-hover);
 }
 
 /* ===== Popout Activity Bars ===== */
@@ -2055,12 +2062,6 @@ body.is-popout-window .workspace-split.mod-root > :not(.window-spaces-sidebar-co
 }
 .setting-item.drag-over-bottom {
   border-bottom: 2px solid var(--interactive-accent) !important;
-}
-
-/* 設定頁：view type 輸入 */
-.window-spaces-view-type-input {
-  min-width: 0;
-  flex: 1 1 auto;
 }
 
 /* Icon 選擇器：多欄 + 垂直捲軸 */

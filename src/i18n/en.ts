@@ -175,7 +175,6 @@ export const en: TranslationStrings = {
     rightBar: "Right Activity Bar",
     addView: "Add view",
     removeView: "Remove",
-    viewTypePlaceholder: "View type (e.g. file-explorer)",
     pickIcon: "Choose logo",
     restoreDefaultButtons: "Restore default buttons",
     restoreDefaultIcon: "Restore default icon",

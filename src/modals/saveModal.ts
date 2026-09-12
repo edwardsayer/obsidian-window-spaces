@@ -196,10 +196,8 @@ export class SaveLayoutModal extends Modal {
       pillsContainer.empty();
       selectedSections.forEach((sec) => {
         const pill = pillsContainer.createDiv("space-section-pill");
-        pill.createSpan({ text: sec });
-        const closeSpan = pill.createSpan({ text: "✖", cls: "space-section-pill-close" });
-        closeSpan.onclick = (e) => {
-          e.stopPropagation();
+        pill.setText(sec);
+        pill.onclick = () => {
           selectedSections = selectedSections.filter((s) => s !== sec);
           renderPills();
         };
@@ -208,7 +206,7 @@ export class SaveLayoutModal extends Modal {
       existingSections.forEach((sec) => {
         if (selectedSections.includes(sec)) return;
         const unselectedPill = pillsContainer.createDiv("space-section-pill-unselected");
-        unselectedPill.setText(`+ ${sec}`);
+        unselectedPill.setText(sec);
         unselectedPill.onclick = () => {
           selectedSections.push(sec);
           renderPills();
@@ -295,10 +293,10 @@ export class SaveLayoutModal extends Modal {
       });
       if (currentColor) {
         const clearBtn = swatchesContainer.createEl("button", {
-          text: "✖",
           cls: "clickable-icon",
           attr: { title: t("saveModal.clearColor") },
         });
+        setIcon(clearBtn, "x");
         clearBtn.onclick = () => {
           currentColor = "";
           renderSwatches();
@@ -560,18 +558,12 @@ export class SaveLayoutModal extends Modal {
     });
 
     let selectEl!: HTMLSelectElement;
-    let customInput!: HTMLInputElement;
     const addRow = this.createSettingIn(activityGroup, (setting) => {
       selectEl = setting.controlEl.createEl("select", { cls: "dropdown" });
-      customInput = setting.controlEl.createEl("input", {
-        type: "text",
-        placeholder: t("settings.viewTypePlaceholder"),
-      });
-      customInput.addClass("window-spaces-view-type-input");
     });
     addRow.addButton((button) => {
       button.setButtonText(t("settings.addView")).onClick(() => {
-        const viewType = customInput.value.trim() || selectEl.value.trim();
+        const viewType = selectEl.value.trim();
         if (!viewType || draft.items?.some((item) => item.viewType === viewType)) return;
         draft.items = draft.items ?? [];
         // 不把 resolveViewIcon 的 fallback（"layout"）寫死進 item.icon——社群 view
@@ -581,7 +573,6 @@ export class SaveLayoutModal extends Modal {
         // ensureViewIcon 異步把正確 icon 寫回供持久化。
         const newItem: ActivityBarItem = { viewType, side, icon: undefined };
         draft.items.push(newItem);
-        customInput.value = "";
         renderItems();
         void ensureViewIcon(this.app, viewType).then((icon) => {
           if (!icon) return;
