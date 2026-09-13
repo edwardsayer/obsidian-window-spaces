@@ -1019,6 +1019,17 @@ export class WindowLayoutsModal extends Modal {
     }
 
     const actionsEl = layoutEl.createDiv("suggestion-aux qsp-aux layout-actions");
+    const moreButton = actionsEl.createEl("button", {
+      cls: "clickable-icon layout-more-btn",
+      attr: { "aria-label": t("manageModal.actions") },
+    });
+    setIcon(moreButton, "ellipsis-vertical");
+    setTooltip(moreButton, t("manageModal.actions"));
+    moreButton.onclick = (e: MouseEvent) => {
+      e.stopPropagation();
+      this.showLayoutItemMenu(e, layout);
+    };
+
     const restoreButton = actionsEl.createEl("button", {
       text: t("common.restore"),
       cls: "layout-restore-btn mod-cta",
@@ -1042,16 +1053,6 @@ export class WindowLayoutsModal extends Modal {
       if (isLongPress) return;
       const forceNewWindow = !e.shiftKey;
       void this.restoreLayout(layout, forceNewWindow);
-    };
-
-    const moreButton = actionsEl.createEl("button", {
-      cls: "layout-more-btn mod-cta",
-    });
-    setIcon(moreButton, "chevron-down");
-    setTooltip(moreButton, t("manageModal.actions"));
-    moreButton.onclick = (e: MouseEvent) => {
-      e.stopPropagation();
-      this.showLayoutItemMenu(e, layout);
     };
   }
 
