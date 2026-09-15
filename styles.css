@@ -816,10 +816,10 @@ button.mod-destructive:hover,
   min-width: var(--clickable-icon-size);
   height: var(--clickable-icon-size);
   padding: var(--size-2-2);
-  border: 0 !important;
-  background-color: transparent !important;
-  color: var(--text-muted) !important;
-  box-shadow: none;
+  background-color: var(--interactive-accent) !important;
+  color: var(--text-on-accent, #ffffff) !important;
+  border: 1px solid var(--interactive-accent) !important;
+  font-weight: var(--font-medium, 500);
 }
 
 .window-layouts-modal .layout-actions .layout-more-btn svg {
@@ -827,25 +827,17 @@ button.mod-destructive:hover,
   stroke: currentColor !important;
 }
 
-.window-layouts-modal .layout-actions .layout-restore-btn:hover {
+.window-layouts-modal .layout-actions .layout-restore-btn:hover,
+.window-layouts-modal .layout-actions .layout-more-btn:hover,
+.window-layouts-modal .layout-actions .layout-more-btn:focus-visible {
   background-color: var(--interactive-accent-hover, var(--interactive-accent)) !important;
   border-color: var(--interactive-accent-hover, var(--interactive-accent)) !important;
   color: var(--text-on-accent, #ffffff) !important;
   opacity: 0.92;
 }
 
-.window-layouts-modal .layout-actions .layout-more-btn:hover,
-.window-layouts-modal .layout-actions .layout-more-btn:focus-visible {
-  background-color: var(--background-modifier-hover) !important;
-  border-color: transparent !important;
-  color: var(--text-normal) !important;
-  opacity: 1;
-}
-
 .window-layouts-modal .layout-actions .layout-more-btn:focus:not(:focus-visible) {
   outline: none !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
 }
 
 .window-layouts-modal .layout-actions .layout-delete-btn {
