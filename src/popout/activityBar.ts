@@ -1558,21 +1558,27 @@ export class PopoutActivityBarManager {
 
     this.originalDetach = proto.detach;
     this.interceptedLeafProto = proto;
-    const self = this;
+    const isLastTabOnSidebar = (targetLeaf: WorkspaceLeaf): boolean =>
+      this.isLastTabOnSidebar(targetLeaf);
+    const isLastTabInCenter = (targetLeaf: WorkspaceLeaf): boolean =>
+      this.isLastTabInCenter(targetLeaf);
+    const app = this.app;
+    const getOriginalDetach = (): ((...args: unknown[]) => unknown) | null => this.originalDetach;
     proto.detach = function (this: WorkspaceLeaf, ...args: unknown[]) {
-      if (self.isLastTabOnSidebar(this)) {
+      if (isLastTabOnSidebar(this)) {
         new Notice(t("activityBar.cannotDeleteLastSidebarTab"));
         return;
       }
-      if (self.isLastTabInCenter(this)) {
+      if (isLastTabInCenter(this)) {
         if (this.getViewState?.()?.type !== "empty") {
           void this.setViewState({ type: "empty", active: true, state: {} }).then(() => {
-            self.app.workspace.setActiveLeaf(this, { focus: true });
+            app.workspace.setActiveLeaf(this, { focus: true });
           });
         }
         return;
       }
-      return self.originalDetach?.apply(this, args);
+      const originalDetach = getOriginalDetach();
+      return originalDetach ? Reflect.apply(originalDetach, this, args) : undefined;
     };
   }
 
