@@ -1,4 +1,4 @@
-import { App } from "obsidian";
+import { App, getLanguage } from "obsidian";
 import { TranslationStrings } from "./types";
 import { en } from "./en";
 import { zhTW } from "./zh-TW";
@@ -31,17 +31,18 @@ export class I18nManager {
    */
   public detectLocale(): SupportedLocale {
     try {
-      // 1. 優先讀取 window.localStorage.getItem("language") (Obsidian 官方語言切換儲存位置)
-      const langStorage = typeof window !== "undefined" ? window.localStorage.getItem("language") : null;
-
-      // 2. 讀取 Obsidian 內建 moment.locale()
-      const momentLocale = typeof window !== "undefined" && (window as any).moment?.locale ? (window as any).moment.locale() : null;
-
-      // 3. 讀取 app.vault.config
-      const vaultConfig = (this.app?.vault as any)?.config;
+      // 優先使用 Obsidian 公開語言 API；其餘來源僅作舊版／測試環境 fallback。
+      const configuredLocale = typeof getLanguage === "function" ? getLanguage() : null;
+      const namespace = typeof window !== "undefined"
+        ? window as unknown as { moment?: { locale?: () => string } }
+        : null;
+      const momentLocale = namespace?.moment?.locale?.() ?? null;
+      const vaultConfig = (this.app?.vault as unknown as {
+        config?: { locale?: string; userLanguage?: string };
+      })?.config;
       const vaultLocale = vaultConfig?.locale || vaultConfig?.userLanguage;
 
-      const rawLocale = String(langStorage || momentLocale || vaultLocale || "en").toLowerCase();
+      const rawLocale = String(configuredLocale || momentLocale || vaultLocale || "en").toLowerCase();
 
       if (rawLocale.startsWith("zh")) {
         if (
@@ -55,8 +56,8 @@ export class I18nManager {
         }
         return "zh-CN";
       }
-    } catch (e) {
-      console.warn("[Window Spaces] Failed to detect locale, fallback to en:", e);
+    } catch {
+      console.warn("[Window Spaces] Failed to detect locale, fallback to en");
     }
 
     return "en";
@@ -82,7 +83,7 @@ export class I18nManager {
   t(key: string): string {
     const activeLocale = this.detectLocale();
     const keys = key.split(".");
-    let value: any = this.translations[activeLocale];
+    let value: unknown = this.translations[activeLocale];
 
     for (const k of keys) {
       if (value && typeof value === "object" && k in value) {

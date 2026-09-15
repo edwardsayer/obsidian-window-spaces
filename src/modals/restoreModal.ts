@@ -1386,7 +1386,7 @@ export class WindowLayoutsModal extends Modal {
 
     if (this.initialFocusTimer !== undefined) {
       const timerWindow = this.modalEl?.ownerDocument?.defaultView || window;
-      timerWindow.clearTimeout(this.initialFocusTimer as number);
+      timerWindow.clearTimeout(this.initialFocusTimer);
       this.initialFocusTimer = undefined;
     }
 

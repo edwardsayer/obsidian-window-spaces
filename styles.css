@@ -302,21 +302,21 @@ body.is-popout-window.window-spaces-has-left-activity:not(.window-spaces-left-ac
   background-color: var(--background-modifier-hover);
 }
 
-button.mod-warning,
-button.mod-destructive,
-.layout-actions button.mod-warning {
-  background-color: var(--background-modifier-error, var(--color-red)) !important;
-  color: var(--text-on-accent, #ffffff) !important;
-  border: 1px solid transparent !important;
-  box-shadow: none !important;
+button.mod-warning.mod-warning,
+button.mod-destructive.mod-destructive,
+.layout-actions button.mod-warning.mod-warning {
+  background-color: var(--background-modifier-error, var(--color-red));
+  color: var(--text-on-accent, #ffffff);
+  border: 1px solid transparent;
+  box-shadow: none;
 }
 
-button.mod-warning:hover,
-button.mod-destructive:hover,
-.layout-actions button.mod-warning:hover {
-  background-color: var(--background-modifier-error-hover, var(--color-red-hover, #dc2626)) !important;
-  color: var(--text-on-accent, #ffffff) !important;
-  border-color: transparent !important;
+button.mod-warning.mod-warning:hover,
+button.mod-destructive.mod-destructive:hover,
+.layout-actions button.mod-warning.mod-warning:hover {
+  background-color: var(--background-modifier-error-hover, var(--color-red-hover, #dc2626));
+  color: var(--text-on-accent, #ffffff);
+  border-color: transparent;
 }
 
 /* Layout Stats */
@@ -802,9 +802,9 @@ button.mod-destructive:hover,
 }
 
 .window-layouts-modal .layout-actions .layout-restore-btn {
-  background-color: var(--interactive-accent) !important;
-  color: var(--text-on-accent, #ffffff) !important;
-  border: 1px solid var(--interactive-accent) !important;
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent, #ffffff);
+  border: 1px solid var(--interactive-accent);
   font-weight: var(--font-medium, 500);
 }
 
@@ -816,28 +816,28 @@ button.mod-destructive:hover,
   min-width: var(--clickable-icon-size);
   height: var(--clickable-icon-size);
   padding: var(--size-2-2);
-  background-color: var(--interactive-accent) !important;
-  color: var(--text-on-accent, #ffffff) !important;
-  border: 1px solid var(--interactive-accent) !important;
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent, #ffffff);
+  border: 1px solid var(--interactive-accent);
   font-weight: var(--font-medium, 500);
 }
 
-.window-layouts-modal .layout-actions .layout-more-btn svg {
-  color: currentColor !important;
-  stroke: currentColor !important;
+.window-layouts-modal .layout-actions .layout-more-btn.layout-more-btn svg {
+  color: currentColor;
+  stroke: currentColor;
 }
 
 .window-layouts-modal .layout-actions .layout-restore-btn:hover,
-.window-layouts-modal .layout-actions .layout-more-btn:hover,
-.window-layouts-modal .layout-actions .layout-more-btn:focus-visible {
-  background-color: var(--interactive-accent-hover, var(--interactive-accent)) !important;
-  border-color: var(--interactive-accent-hover, var(--interactive-accent)) !important;
-  color: var(--text-on-accent, #ffffff) !important;
+.window-layouts-modal .layout-actions .layout-more-btn.layout-more-btn:hover,
+.window-layouts-modal .layout-actions .layout-more-btn.layout-more-btn:focus-visible {
+  background-color: var(--interactive-accent-hover, var(--interactive-accent));
+  border-color: var(--interactive-accent-hover, var(--interactive-accent));
+  color: var(--text-on-accent, #ffffff);
   opacity: 0.92;
 }
 
-.window-layouts-modal .layout-actions .layout-more-btn:focus:not(:focus-visible) {
-  outline: none !important;
+.window-layouts-modal .layout-actions .layout-more-btn.layout-more-btn:focus:not(:focus-visible) {
+  outline: none;
 }
 
 .window-layouts-modal .layout-actions .layout-delete-btn {
@@ -977,35 +977,35 @@ button.mod-destructive:hover,
 }
 
 /* Full width input layout for Rename and Save modals */
-.window-spaces-setting-full-width {
+.window-spaces-setting-full-width.window-spaces-setting-full-width {
   display: flex;
   align-items: center;
   gap: 12px;
-  border-top: none !important;
-  padding: 8px 0 16px 0 !important;
+  border-top: none;
+  padding: 8px 0 16px 0;
 }
 
-.window-spaces-setting-full-width .setting-item-info {
-  flex: 0 0 auto !important;
+.window-spaces-setting-full-width.window-spaces-setting-full-width .setting-item-info {
+  flex: 0 0 auto;
   margin-right: 8px;
   min-width: 60px;
 }
 
-.window-spaces-setting-full-width .setting-item-control {
-  flex: 1 1 auto !important;
-  width: 100% !important;
-  justify-content: stretch !important;
+.window-spaces-setting-full-width.window-spaces-setting-full-width .setting-item-control {
+  flex: 1 1 auto;
+  width: 100%;
+  justify-content: stretch;
 }
 
-.window-spaces-setting-full-width .setting-item-control input[type="text"] {
-  width: 100% !important;
-  max-width: 100% !important;
+.window-spaces-setting-full-width.window-spaces-setting-full-width .setting-item-control input[type="text"] {
+  width: 100%;
+  max-width: 100%;
 }
 
 /* Tooltip text alignment (start-aligned for LTR/RTL multi-language support) */
-.tooltip {
-  text-align: start !important;
-  white-space: pre-line !important;
+.tooltip.tooltip {
+  text-align: start;
+  white-space: pre-line;
 }
 
 .layout-auto-save-badge {
@@ -1021,10 +1021,10 @@ button.mod-destructive:hover,
   height: 14px;
 }
 
-.layout-auto-save-btn.is-active,
-.window-spaces-layout-action.is-active {
-  color: var(--interactive-accent) !important;
-  opacity: 1 !important;
+.layout-auto-save-btn.is-active.is-active,
+.window-spaces-layout-action.is-active.is-active {
+  color: var(--interactive-accent);
+  opacity: 1;
 }
 
 /* ===== Dialog action rows (shared across modals) ===== */

@@ -279,7 +279,7 @@ function getViewCreatorForType(app: App, viewType: string): ViewCreatorFn | null
     const entry = (registry.viewByType ?? {})[viewType];
     // 情況 A：viewByType[type] 本身就是 view creator function
     if (typeof entry === "function") {
-      creator = entry as ViewCreatorFn;
+      creator = entry;
     } else if (entry && typeof entry === "object") {
       // 情況 B：entry 物件內含 creator 欄位
       for (const key of ["creator", "view", "viewCreator"] as const) {
@@ -347,7 +347,7 @@ async function getIconFromEphemeralView(app: App, viewType: string): Promise<str
       detach: () => undefined,
     } as unknown as WorkspaceLeaf;
 
-    const view = creator(leaf) as { getIcon?: () => string };
+    const view = creator(leaf);
     (leaf as { view?: unknown }).view = view;
 
     const icon = typeof view.getIcon === "function" ? view.getIcon() : "";

@@ -64,6 +64,11 @@ interface LayoutWorkspaceItem extends WorkspaceItem {
   setDimension?: (value: number) => void;
 }
 
+type DocumentTitleGetter = () => string;
+type DocumentTitleSetter = (title: string) => void;
+type NativeDocumentTitleGetter = (this: Document) => string;
+type NativeDocumentTitleSetter = (this: Document, title: string) => void;
+
 function cloneJsonValue<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as unknown as T;
 }
@@ -462,8 +467,21 @@ export class WindowLayoutManager {
         Object.getOwnPropertyDescriptor(targetDoc, "title");
 
       if (originalDescriptor && originalDescriptor.set) {
-        const originalSet = originalDescriptor.set;
-        const originalGet = originalDescriptor.get;
+        const descriptorSetter: unknown = originalDescriptor.set;
+        const descriptorGetter: unknown = originalDescriptor.get;
+        const originalSet: DocumentTitleSetter | undefined =
+          typeof descriptorSetter === "function"
+            ? (title: string) => {
+                (descriptorSetter as unknown as NativeDocumentTitleSetter).call(targetDoc, title);
+              }
+            : undefined;
+        const originalGet: DocumentTitleGetter | undefined =
+          typeof descriptorGetter === "function"
+            ? () => {
+                const value = (descriptorGetter as unknown as NativeDocumentTitleGetter).call(targetDoc) as unknown;
+                return typeof value === "string" ? value : "";
+              }
+            : undefined;
         docRecord._hasWindowSpacesTitlePatch = true;
         docRecord._originalTitleSet = originalSet;
 
@@ -472,7 +490,7 @@ export class WindowLayoutManager {
           enumerable: true,
           get: () => {
             try {
-              return invokeManagerMethod<string>(originalGet, targetDoc, []) ?? "";
+              return originalGet ? originalGet() : "";
             } catch {
               return "";
             }
@@ -486,9 +504,9 @@ export class WindowLayoutManager {
               } else if (!newTitle) {
                 formattedTitle = spaceName;
               }
-              invokeManagerMethod<void>(originalSet, targetDoc, [formattedTitle]);
+              originalSet?.(formattedTitle);
             } else {
-              invokeManagerMethod<void>(originalSet, targetDoc, [newTitle]);
+              originalSet?.(newTitle);
             }
           },
         });
@@ -558,14 +576,19 @@ export class WindowLayoutManager {
         configurable: true,
         enumerable: true,
         get() {
-          return invokeManagerMethod<string>(
-            Object.getOwnPropertyDescriptor(Document.prototype, "title")?.get,
-            targetDoc,
-            []
-          ) ?? "";
+          const titleDescriptor = Object.getOwnPropertyDescriptor(Document.prototype, "title");
+          const descriptorGetter: unknown = titleDescriptor?.get;
+          const titleGetter: DocumentTitleGetter | undefined =
+            typeof descriptorGetter === "function"
+              ? () => {
+                  const value = (descriptorGetter as unknown as NativeDocumentTitleGetter).call(targetDoc) as unknown;
+                  return typeof value === "string" ? value : "";
+                }
+              : undefined;
+          return titleGetter ? titleGetter() : "";
         },
         set(newTitle: string) {
-          invokeManagerMethod<void>(originalSet, targetDoc, [newTitle]);
+          originalSet(newTitle);
         },
       });
     }
@@ -1842,10 +1865,7 @@ export class WindowLayoutManager {
   /** 確認 Popout 仍持有原生焦點，避免延遲重試搶回主視窗焦點。 */
   private isWindowFocused(targetWin: Window): boolean {
     try {
-      const hasFocus = targetWin.document?.hasFocus;
-      return typeof hasFocus === "function"
-        ? invokeManagerMethod<boolean>(hasFocus, targetWin.document, []) ?? true
-        : true;
+      return targetWin.document?.hasFocus?.() ?? true;
     } catch {
       return true;
     }
@@ -1854,10 +1874,7 @@ export class WindowLayoutManager {
   /** 確認主視窗 (plugin realm) 是否持有原生焦點。 */
   private isMainWindowFocused(): boolean {
     try {
-      const hasFocus = window.document?.hasFocus;
-      return typeof hasFocus === "function"
-        ? invokeManagerMethod<boolean>(hasFocus, window.document, []) ?? true
-        : true;
+      return window.document?.hasFocus?.() ?? true;
     } catch {
       return true;
     }
@@ -2131,7 +2148,7 @@ export class WindowLayoutManager {
             options.includePosition !== false ? windowInfo.position : undefined,
         },
         workspace: {
-          layout: floatingLayout as Record<string, unknown>,
+          layout: floatingLayout,
           activeFile: (activeLeaf?.view as unknown as { file?: TFile })?.file?.path,
           leaves,
         },
@@ -2249,7 +2266,7 @@ export class WindowLayoutManager {
       if (layout.workspace) {
         const normalizedRoot = this.normalizeWindowLayout(layout.workspace.layout);
         if (normalizedRoot && normalizedRoot !== layout.workspace.layout) {
-          layout.workspace.layout = normalizedRoot as Record<string, unknown>;
+          layout.workspace.layout = normalizedRoot;
         }
       }
 
@@ -2987,7 +3004,7 @@ export class WindowLayoutManager {
         const ws = this.app.workspace as unknown as ExtendedWorkspace;
         if (root !== ws.rootSplit && root !== ws.leftSplit && root !== ws.rightSplit) {
           const rootLayout = root.getLayout();
-          if (rootLayout) return rootLayout as unknown as LayoutNode;
+          if (rootLayout) return rootLayout;
         }
       }
     }

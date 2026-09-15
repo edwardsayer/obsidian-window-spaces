@@ -55,6 +55,10 @@ interface ActivityLayoutNode {
   children?: ActivityLayoutNode[];
 }
 
+interface DetachableLeafPrototype {
+  detach?: (this: WorkspaceLeaf, ...args: unknown[]) => unknown;
+}
+
 /**
  * Popout Activity Bar 控制器。
  *
@@ -1550,9 +1554,9 @@ export class PopoutActivityBarManager {
       });
     }
 
-    const proto =
-      (WorkspaceLeaf as unknown as { prototype?: { detach?: (...args: unknown[]) => unknown } })?.prototype ??
-      (leaf ? Object.getPrototypeOf(leaf) : null);
+    const proto: DetachableLeafPrototype | null =
+      (WorkspaceLeaf as unknown as { prototype?: DetachableLeafPrototype })?.prototype ??
+      (leaf ? (Object.getPrototypeOf(leaf) as DetachableLeafPrototype) : null);
 
     if (!proto || typeof proto.detach !== "function") return;
 

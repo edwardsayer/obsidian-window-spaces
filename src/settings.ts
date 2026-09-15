@@ -283,7 +283,7 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
     s.addButton((button) => {
       button
         .setButtonText(t("settings.resetButton"))
-        .setWarning()
+        .setDestructive()
         .onClick(async () => {
           const confirmed = await this.showConfirmDialog(
             t("settings.resetConfirmMessage"),
@@ -304,7 +304,7 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
             this.plugin.settings.workspaceInterceptorEnabled !== false;
           this.plugin.manager?.refreshLayoutLabels();
           this.plugin.activityBars?.refreshAll();
-          this.display();
+          this.update();
           new Notice(t("settings.resetSuccess"));
         });
     });
@@ -342,264 +342,10 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
     return setting;
   }
 
+  /** Declarative setting definitions are the only supported renderer (minAppVersion 1.13+). */
   display(): void {
-    const { containerEl } = this;
-    containerEl.empty();
-
-    // ===== Window Spaces 一般設定（單一 panel） =====
-    new Setting(containerEl).setName(t("settings.generalSection")).setHeading();
-    const generalGroup = this.createGroup(containerEl) ?? containerEl;
-
-    this.createSettingIn(generalGroup, (s) => {
-      s.setName(t("settings.showNotifications")).setDesc(t("settings.showNotificationsDesc"));
-      s.addToggle((toggle) => {
-        toggle.setValue(this.plugin.settings.showNotifications !== false);
-        toggle.onChange(async (value) => {
-          this.plugin.settings.showNotifications = value;
-          await this.plugin.saveSettings();
-        });
-      });
-    });
-
-    this.createSettingIn(generalGroup, (s) => {
-      // 主視窗 ribbon 圖示（一般設定，非 per-space）
-      s.setName(t("settings.showWindowLayoutsRibbonIcon")).setDesc(t("settings.showWindowLayoutsRibbonIconDesc"));
-      s.addToggle((toggle) => {
-        toggle.setValue(this.plugin.settings.showWindowLayoutsRibbonIcon !== false);
-        toggle.onChange(async (value) => {
-          this.plugin.settings.showWindowLayoutsRibbonIcon = value;
-          await this.plugin.saveSettings();
-          this.plugin.refreshRibbonIcons();
-        });
-      });
-    });
-
-    this.createSettingIn(generalGroup, (s) => {
-      // Popout 底部 space status bar（一般設定，無 per-space override）
-      s.setName(t("settings.showLayoutStatusBar")).setDesc(t("settings.showLayoutStatusBarDesc"));
-      s.addToggle((toggle) => {
-        toggle.setValue(this.plugin.settings.showLayoutStatusBar === true);
-        toggle.onChange(async (value) => {
-          this.plugin.settings.showLayoutStatusBar = value;
-          await this.plugin.saveSettings();
-          this.plugin.manager.refreshLayoutLabels();
-        });
-      });
-    });
-
-    // Space 主題視覺裝飾增強（一般設定，無 per-space override）
-    this.createSettingIn(generalGroup, (s) => {
-      s.setName(t("settings.popoutAccentsEnable")).setDesc(t("settings.popoutAccentsEnableDesc"));
-      s.addToggle((toggle) => {
-        toggle.setValue(this.plugin.settings.popoutAccents?.enabled !== false);
-        toggle.onChange(async (value) => {
-          if (!this.plugin.settings.popoutAccents) {
-            this.plugin.settings.popoutAccents = { enabled: value, splitter: true, activityBar: true };
-          } else {
-            this.plugin.settings.popoutAccents.enabled = value;
-          }
-          await this.plugin.saveSettings();
-          this.plugin.activityBars.refreshAll();
-          this.display();
-        });
-      });
-    });
-
-    if (this.plugin.settings.popoutAccents?.enabled !== false) {
-      this.createSettingIn(generalGroup, (s) => {
-        s.setName(t("settings.popoutAccentsSplitter")).setDesc(t("settings.popoutAccentsSplitterDesc"));
-        s.addToggle((toggle) => {
-          toggle.setValue(this.plugin.settings.popoutAccents?.splitter !== false);
-          toggle.onChange(async (value) => {
-            if (!this.plugin.settings.popoutAccents) {
-              this.plugin.settings.popoutAccents = { enabled: true, splitter: value, activityBar: true };
-            } else {
-              this.plugin.settings.popoutAccents.splitter = value;
-            }
-            await this.plugin.saveSettings();
-            this.plugin.activityBars.refreshAll();
-          });
-        });
-      });
-
-      this.createSettingIn(generalGroup, (s) => {
-        s.setName(t("settings.popoutAccentsActivityBar")).setDesc(t("settings.popoutAccentsActivityBarDesc"));
-        s.addToggle((toggle) => {
-          toggle.setValue(this.plugin.settings.popoutAccents?.activityBar !== false);
-          toggle.onChange(async (value) => {
-            if (!this.plugin.settings.popoutAccents) {
-              this.plugin.settings.popoutAccents = { enabled: true, splitter: true, activityBar: value };
-            } else {
-              this.plugin.settings.popoutAccents.activityBar = value;
-            }
-            await this.plugin.saveSettings();
-            this.plugin.activityBars.refreshAll();
-          });
-        });
-      });
-    }
-
-    this.createSettingIn(generalGroup, (s) => {
-      // Workspace API 攔截器（一般設定，非 per-space）
-      s.setName(t("settings.enableInterceptor")).setDesc(t("settings.enableInterceptorDesc"));
-      s.addToggle((toggle) => {
-        toggle.setValue(this.plugin.settings.workspaceInterceptorEnabled !== false);
-        toggle.onChange(async (value) => {
-          this.plugin.settings.workspaceInterceptorEnabled = value;
-          this.plugin.workspaceInterceptor.enabled = value;
-          await this.plugin.saveSettings();
-        });
-      });
-    });
-
-    // ===== 新 Popout 預設設定（per space 可 override） =====
-    new Setting(containerEl).setName(t("settings.popoutDefaultsSection")).setHeading();
-    const defaultsGroup = this.createGroup(containerEl) ?? containerEl;
-
-    this.createSettingIn(defaultsGroup, (s) => {
-      // 全局自動儲存預設（per space 可用 auto-save toggle override）
-      s.setName(t("settings.autoSaveEnabled")).setDesc(t("settings.autoSaveDescription"));
-      s.addToggle((toggle) => {
-        toggle.setValue(this.plugin.settings.autoSave === true);
-        toggle.onChange(async (value) => {
-          this.plugin.settings.autoSave = value;
-          await this.plugin.saveSettings();
-
-          if (value) {
-            this.setupAutoSave();
-          } else {
-            this.removeAutoSave();
-          }
-        });
-      });
-    });
-
-    this.createSettingIn(defaultsGroup, (s) => {
-      s.setName(t("settings.defaultIcon")).setDesc(t("settings.defaultIconDesc"));
-      s.controlEl.addClass("window-space-icon-setting-control");
-
-      let currentIcon = this.plugin.settings.defaultIcon || DEFAULT_SPACE_ICON;
-      let iconInputEl!: HTMLInputElement;
-
-      s.addText((text) => {
-        iconInputEl = text.inputEl;
-        text.setPlaceholder(t("saveModal.iconPlaceholder"));
-        text.setValue(currentIcon);
-        text.onChange(async (val) => {
-          currentIcon = val.trim() || DEFAULT_SPACE_ICON;
-          this.plugin.settings.defaultIcon = currentIcon;
-          await this.plugin.saveSettings();
-          updatePreview();
-          this.plugin.activityBars.refreshAll();
-        });
-      });
-
-      const pickIconBtn = s.controlEl.createEl("button", {
-        cls: "clickable-icon",
-        attr: { type: "button", title: t("settings.pickIcon") },
-      });
-      setIcon(pickIconBtn, "image");
-      pickIconBtn.onclick = () => {
-        new IconPickerModal(this.app, (selected) => {
-          currentIcon = selected;
-          iconInputEl.value = selected;
-          this.plugin.settings.defaultIcon = selected;
-          void this.plugin.saveSettings().then(() => {
-            updatePreview();
-            this.plugin.activityBars.refreshAll();
-          });
-        }).open();
-      };
-
-      const previewEl = s.controlEl.createDiv({ cls: "window-space-icon-preview" });
-      const updatePreview = () => {
-        previewEl.empty();
-        const val = currentIcon || DEFAULT_SPACE_ICON;
-        const isEmoji = isSpaceEmoji(val);
-        if (isEmoji) {
-          previewEl.createSpan({ text: val });
-        } else {
-          const iconDiv = previewEl.createDiv();
-          if (!setIconWithCheck(iconDiv, val)) {
-            setIcon(iconDiv, "layout");
-          }
-        }
-      };
-      updatePreview();
-    });
-
-    this.createSettingIn(defaultsGroup, (s) => {
-      s.setName(t("settings.defaultBorderInset")).setDesc(t("settings.defaultBorderInsetDesc"));
-      s.addSlider((slider) => {
-        slider
-          .setLimits(0, 5, 1)
-          .setValue(this.getDefaultBorderInset())
-          .onChange(async (value) => {
-            this.plugin.settings.defaultBorderInset = value;
-            await this.plugin.saveSettings();
-            this.plugin.activityBars.refreshAll();
-          });
-      });
-    });
-
-    this.createSettingIn(defaultsGroup, (s) => {
-      s.setName(t("settings.defaultFoldedCorner")).setDesc(t("settings.defaultFoldedCornerDesc"));
-      s.addToggle((toggle) => {
-        toggle.setValue(this.plugin.settings.defaultShowFoldedCorner !== false);
-        toggle.onChange(async (value) => {
-          this.plugin.settings.defaultShowFoldedCorner = value;
-          await this.plugin.saveSettings();
-          this.plugin.activityBars.refreshAll();
-        });
-      });
-    });
-
-    this.renderActivityBarSide(containerEl, "left", t("settings.leftBar"));
-    this.renderActivityBarSide(containerEl, "right", t("settings.rightBar"));
-
-    // ===== 危險操作（單一 panel） =====
-    new Setting(containerEl).setName(t("settings.resetSettings")).setHeading();
-    const dangerGroup = this.createGroup(containerEl) ?? containerEl;
-
-    this.createSettingIn(dangerGroup, (s) => {
-      s.setName(t("settings.resetSettings")).setDesc(t("settings.resetSettingsDescription"));
-      s.addButton((button) => {
-        button
-          .setButtonText(t("settings.resetButton"))
-          .setWarning()
-          .onClick(async () => {
-            const confirmed = await this.showConfirmDialog(
-              t("settings.resetConfirmMessage"),
-              t("settings.resetConfirmTitle")
-            );
-            if (confirmed) {
-              try {
-                await this.plugin.resetSettingsPreservingSpaces();
-              } catch (error: unknown) {
-                const message = error instanceof Error ? error.message : String(error);
-                console.warn("Failed to reset Window Spaces settings:", error);
-                new Notice(`${t("errors.failedToSave")}: ${message}`);
-                return;
-              }
-
-              // Resetting auto-save to its factory default must also cancel a
-              // pending debounce owned by this settings tab.
-              this.removeAutoSave();
-              this.plugin.refreshRibbonIcons();
-              if (this.plugin.workspaceInterceptor) {
-                this.plugin.workspaceInterceptor.enabled =
-                  this.plugin.settings.workspaceInterceptorEnabled !== false;
-              }
-              this.plugin.manager?.refreshLayoutLabels();
-              this.plugin.activityBars?.refreshAll();
-              this.display(); // 重新顯示設定頁面
-              new Notice(t("settings.resetSuccess"));
-            }
-          });
-      });
-    });
+    this.update();
   }
-
   private getDefaultBorderInset(): number {
     const value = this.plugin.settings.defaultBorderInset;
     return typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.min(5, value)) : 1;
@@ -625,7 +371,7 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
       s.addButton((button) => {
         iconBtn = button;
         // 動態套用 icon（見 saveModal）：避免同步 fallback("layout") 蓋過社群 view 的真實 icon。
-        applyItemIcon(button.buttonEl as HTMLElement, this.app, item);
+        applyItemIcon(button.buttonEl, this.app, item);
         button.setTooltip(t("settings.pickIcon"));
         button.onClick(() => {
           const modal = new IconPickerModal(this.app, (iconName) => {
@@ -655,7 +401,7 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
       });
 
       s.addButton((button) => {
-        button.setButtonText(t("settings.removeView")).setWarning().onClick(() => {
+         button.setButtonText(t("settings.removeView")).setDestructive().onClick(() => {
           const current = this.plugin.settings.activityBars?.[side] ?? [];
           if (!canRemoveActivityBarItem(current, enumerateAvailableViews(this.app)[side])) {
             new Notice(t("settings.keepOneActivityBarView"));

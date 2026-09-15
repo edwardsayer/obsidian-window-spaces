@@ -69,7 +69,8 @@ export class SaveLayoutModal extends Modal {
         result = setting;
         configure(setting);
       });
-      return result as Setting;
+      if (result === null) throw new Error("SettingGroup.addSetting did not create a Setting");
+      return result;
     }
     const setting = new Setting(container as HTMLElement);
     configure(setting);
@@ -83,9 +84,11 @@ export class SaveLayoutModal extends Modal {
    */
   private getGroupElement(group: SettingContainer, fallback: HTMLElement): HTMLElement {
     const candidate = (group as SettingGroupLike).settingEl;
-    if (candidate && typeof candidate.querySelectorAll === "function") return candidate;
+    if (candidate) return candidate;
 
-    const groups = fallback.querySelectorAll<HTMLElement>(".setting-group");
+    const groups = typeof fallback.findAll === "function"
+      ? fallback.findAll(".setting-group")
+      : Array.from(fallback.querySelectorAll<HTMLElement>(".setting-group"));
     return groups[groups.length - 1] ?? fallback;
   }
 
@@ -396,11 +399,11 @@ export class SaveLayoutModal extends Modal {
       const match = existingLayouts.find((l) => l.name === currentName);
       if (match) {
         noticeContainer.setText(`ℹ️ ${t("saveModal.overwriteNotice")}「${currentName}」`);
-        if (autoSaveToggleComponent && match.autoSave !== undefined) {
+        if (autoSaveToggleComponent !== null && match.autoSave !== undefined) {
           autoSave = !!match.autoSave;
           autoSaveToggleComponent.setValue(autoSave);
         }
-        if (geometryToggleComponent && match.includeGeometry !== undefined) {
+        if (geometryToggleComponent !== null && match.includeGeometry !== undefined) {
           includeGeometry = !!match.includeGeometry;
           geometryToggleComponent.setValue(includeGeometry);
         }
@@ -685,7 +688,7 @@ export class SaveLayoutModal extends Modal {
           // 動態套用 icon：item.icon 未定時走動態發現（detect 完成自動更新按鈕），
           // 避免同步 resolveViewIcon fallback("layout") 蓋過社群 view（如
           // notebook-navigator）的真實 icon。
-          applyItemIcon(button.buttonEl as HTMLElement, this.app, item);
+          applyItemIcon(button.buttonEl, this.app, item);
           button.setTooltip(t("settings.pickIcon"));
           button.onClick(() => {
             new IconPickerModal(this.app, (icon) => {
@@ -706,7 +709,7 @@ export class SaveLayoutModal extends Modal {
           });
         });
         row.addButton((button) => {
-          button.setButtonText(t("settings.removeView")).setWarning().onClick(() => {
+          button.setButtonText(t("settings.removeView")).setDestructive().onClick(() => {
             const items = draft.items ?? [];
             if (!canRemoveActivityBarItem(items, enumerateAvailableViews(this.app)[side])) {
               new Notice(t("settings.keepOneActivityBarView"));
