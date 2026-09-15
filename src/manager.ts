@@ -1,4 +1,4 @@
-import { App, WorkspaceLeaf, Notice, Menu, TFile, setIcon, WorkspaceWindowInitData } from "obsidian";
+import { App, OpenViewState, WorkspaceLeaf, Notice, Menu, TFile, setIcon, WorkspaceWindowInitData } from "obsidian";
 import {
   WindowLayout,
   WindowState,
@@ -29,6 +29,40 @@ interface PreservedWindowLayout {
 }
 
 const WINDOW_GEOMETRY_TOLERANCE = 5;
+
+interface LayoutNodeState {
+  id?: string;
+  type?: string;
+  state?: Record<string, unknown>;
+  pinned?: boolean;
+}
+
+interface LayoutNode extends Record<string, unknown> {
+  type?: string;
+  id?: string;
+  direction?: string;
+  currentTab?: number;
+  dimension?: number;
+  state?: LayoutNodeState;
+  children?: LayoutNode[];
+  floating?: LayoutNode | LayoutNode[];
+  win?: Window;
+  doc?: Document;
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  zoom?: number;
+  isMaximized?: boolean;
+  isFullScreen?: boolean;
+  pinned?: boolean;
+}
+
+interface LayoutWorkspaceItem extends WorkspaceItem {
+  parent?: LayoutWorkspaceItem;
+  getLayout?: () => LayoutNode;
+  setDimension?: (value: number) => void;
+}
 
 export class WindowLayoutManager {
   private plugin: WindowSpacesPlugin;
@@ -300,14 +334,14 @@ export class WindowLayoutManager {
    * changeLayout；revealLeaf/setActiveLeaf 會讓 Obsidian 更新對應 tabs
    * group 的 active leaf，而不會重建其他 WorkspaceWindow。
    */
-  private async restoreSavedTabSelections(targetWin: Window, rootNode: any): Promise<void> {
+  private async restoreSavedTabSelections(targetWin: Window, rootNode: LayoutNode): Promise<void> {
     if (!rootNode) return;
 
     const liveLeaves = this.getLeavesForWindow(targetWin);
     let leafIndex = 0;
     const activeLeaves: WorkspaceLeaf[] = [];
 
-    const collectLeaves = (node: any): WorkspaceLeaf[] => {
+    const collectLeaves = (node: LayoutNode): WorkspaceLeaf[] => {
       if (!node || typeof node !== "object") return [];
       if (node.type === "leaf") {
         const leaf = liveLeaves[leafIndex++];
@@ -315,7 +349,7 @@ export class WindowLayoutManager {
       }
 
       if (!Array.isArray(node.children)) return [];
-      const children = node.children.flatMap((child: any) => collectLeaves(child));
+      const children = node.children.flatMap((child) => collectLeaves(child));
       if (node.type === "tabs" && children.length > 0) {
         const currentTab = typeof node.currentTab === "number" ? node.currentTab : 0;
         const activeLeaf = children[Math.max(0, Math.min(currentTab, children.length - 1))];
@@ -348,7 +382,7 @@ export class WindowLayoutManager {
       const savedRoot = layout.workspace?.layout;
       if (!savedRoot) return false;
 
-      const floatingWindows = this.getFloatingWindows(
+        const floatingWindows = this.getFloatingWindows(
         (this.app.workspace as unknown as ExtendedWorkspace).getLayout()
       );
       const targetIndex = this.findFloatingWindowIndexForWindow(targetWin, floatingWindows);
@@ -361,7 +395,7 @@ export class WindowLayoutManager {
     }
   }
 
-  private normalizeStartupLayoutNode(node: any): unknown {
+  private normalizeStartupLayoutNode(node: LayoutNode): unknown {
     if (!node || typeof node !== "object") return null;
 
     const normalized: Record<string, unknown> = {
@@ -376,7 +410,7 @@ export class WindowLayoutManager {
 
     if (typeof node.direction === "string") normalized.direction = node.direction;
     if (Array.isArray(node.children)) {
-      normalized.children = node.children.map((child: any) => this.normalizeStartupLayoutNode(child));
+      normalized.children = node.children.map((child) => this.normalizeStartupLayoutNode(child));
     }
     return normalized;
   }
@@ -1218,10 +1252,10 @@ export class WindowLayoutManager {
   }
 
   /** 讀取目標 popout 目前的 live layout 樹（含目前開啟的 view state）。 */
-  private getLiveWindowLayoutTree(win: Window): any {
+  private getLiveWindowLayoutTree(win: Window): LayoutNode | null {
     try {
       const globalLayout = (this.app.workspace as unknown as {
-        getLayout?: () => any;
+        getLayout?: () => unknown;
       }).getLayout?.();
       if (!globalLayout) return null;
       const floatingWindows = this.getFloatingWindows(globalLayout);
@@ -1239,17 +1273,17 @@ export class WindowLayoutManager {
    * 若 rootNode 本身即 split，則直接在該 split 的 children 插入 sidebar。
    */
   private buildLayoutTreeWithSidebars(
-    rootNode: any,
+    rootNode: LayoutNode,
     leftView?: string,
     rightView?: string
-  ): any {
+  ): LayoutNode | null {
     if (!rootNode) return null;
     const clone = JSON.parse(JSON.stringify(rootNode));
-    let container: any = clone;
+    let container: LayoutNode = clone;
     if (clone?.type === "floating") {
       container =
-        (clone.children || []).find((c: any) => c && c.type === "window") ||
-        (clone.children || []).find((c: any) => c && c.type === "split") ||
+        (clone.children || []).find((c) => c.type === "window") ||
+        (clone.children || []).find((c) => c.type === "split") ||
         null;
     }
     if (
@@ -1273,7 +1307,7 @@ export class WindowLayoutManager {
     // 這修復第三方 view（explorer/grid/notebook…）在側欄被水平均分成窄欄、
     // 導致 client area 寬度異常（判窗框太窄）的問題。
     const prior = Array.isArray(container.children)
-      ? container.children.map((c: any) => this.normalizeColumnNode(c))
+      ? container.children.map((c) => this.normalizeColumnNode(c))
       : [];
     container.children = [
       ...(leftView ? [mkTabs(leftView)] : []),
@@ -1294,28 +1328,28 @@ export class WindowLayoutManager {
    * 遞迴 normalizeColumnNode：收斂水平 multi-column 欄位，回傳收斂後的新樹；
    * 若無需收斂則回傳原 rootNode（不建立克隆）。
    */
-  private normalizeWindowLayout(rootNode: any): any {
+  private normalizeWindowLayout(rootNode: LayoutNode): LayoutNode {
     if (!rootNode) return rootNode;
     const isContainer = rootNode?.type === "window" || rootNode?.type === "floating";
     const containerSource = isContainer
-      ? (rootNode.children || []).find((c: any) => c && c.type === "split")
+      ? (rootNode.children || []).find((c) => c.type === "split")
       : rootNode;
     if (!containerSource || containerSource.type !== "split") return rootNode;
-    const normalized = (containerSource.children || []).map((c: any) =>
+    const normalized = (containerSource.children || []).map((c) =>
       this.normalizeColumnNode(c)
     );
-    if (normalized.every((c: any, i: number) => c === (containerSource.children || [])[i])) {
+    if (normalized.every((c, i) => c === (containerSource.children || [])[i])) {
       return rootNode;
     }
     const clone = JSON.parse(JSON.stringify(rootNode));
     const container = isContainer
-      ? (clone.children || []).find((c: any) => c && c.type === "split")
+      ? (clone.children || []).find((c) => c.type === "split")
       : clone;
     if (container) container.children = normalized;
     return clone;
   }
 
-  private normalizeColumnNode(col: any): any {
+  private normalizeColumnNode(col: LayoutNode): LayoutNode {
     if (!col) return col;
     if (col.type === "split") {
       if (col.direction === "vertical") {
@@ -1329,7 +1363,7 @@ export class WindowLayoutManager {
         return col;
       }
       const children = (Array.isArray(col.children) ? col.children : []).map(
-        (c: any) => this.normalizeColumnNode(c)
+        (c) => this.normalizeColumnNode(c)
       );
       return { ...col, children };
     }
@@ -1341,9 +1375,9 @@ export class WindowLayoutManager {
    * Empty/editor leaf 代表 content area 的合法 split，不能因方向相同
    * 就折疊；這是 2x2 等巢狀 content layout 的重要區分。
    */
-  private isSidebarOnlySplit(col: any): boolean {
+  private isSidebarOnlySplit(col: LayoutNode): boolean {
     const leafTypes: string[] = [];
-    const walk = (node: any): void => {
+    const walk = (node: LayoutNode): void => {
       if (!node) return;
       if (node.type === "leaf") {
         const type = node.state?.type;
@@ -1376,10 +1410,10 @@ export class WindowLayoutManager {
    * 垂直方向的 split（direction: horizontal / flex-direction: column，即
    * Obsidian 側欄允許的多 row）與一般 tabs 欄位保持不動。
    */
-  private collapseSplitColumnIntoColumnTabs(col: any): any {
+  private collapseSplitColumnIntoColumnTabs(col: LayoutNode): LayoutNode {
     if (!col || col.type !== "split" || col.direction !== "vertical") return col;
-    const leaves: any[] = [];
-    const walk = (n: any): void => {
+    const leaves: LayoutNode[] = [];
+    const walk = (n: LayoutNode): void => {
       if (!n) return;
       if (n.type === "leaf") {
         leaves.push(n);
@@ -1399,7 +1433,7 @@ export class WindowLayoutManager {
 
   private async rebuildTargetWindowStructure(
     targetWin: Window,
-    rootNode: any
+    rootNode: LayoutNode
   ): Promise<WorkspaceLeaf[] | null> {
     if (!targetWin || !rootNode) return null;
 
@@ -1422,7 +1456,7 @@ export class WindowLayoutManager {
    */
   private async buildWindowStructureWithDeserializer(
     targetWin: Window,
-    rootNode: any
+    rootNode: LayoutNode
   ): Promise<WorkspaceLeaf[] | null> {
     const workspace = this.app.workspace as unknown as ExtendedWorkspace & {
       deserializeLayout?: (node: Record<string, unknown>, parentType?: string | null) => Promise<WorkspaceItem | null>;
@@ -2852,8 +2886,9 @@ export class WindowLayoutManager {
     }
 
     // 2. 檢查 activeLeaf containerEl 所在 document
-    if (activeLeaf && (activeLeaf as any).containerEl) {
-      const doc = (activeLeaf as any).containerEl.ownerDocument;
+    const activeExtLeaf = activeLeaf as unknown as ExtendedWorkspaceLeaf | null;
+    if (activeExtLeaf?.containerEl) {
+      const doc = activeExtLeaf.containerEl.ownerDocument;
       if (doc && doc.defaultView && doc.defaultView !== window) {
         return true;
       }
@@ -2873,7 +2908,7 @@ export class WindowLayoutManager {
   /**
    * 檢查 floating 視窗佈局中是否包含開啟指定的檔案
    */
-  private floatingLayoutContainsFile(layout: any, filePath: string): boolean {
+  private floatingLayoutContainsFile(layout: LayoutNode, filePath: string): boolean {
     if (!layout) return false;
 
     if (layout.type === "leaf") {
@@ -2892,7 +2927,7 @@ export class WindowLayoutManager {
   /**
    * 只提取當前活動視窗的浮動佈局資訊 (完美支援新開 Popout 視窗)
    */
-  private extractCurrentFloatingLayout(fullLayout: any, activeLeaf: WorkspaceLeaf | null): any {
+  private extractCurrentFloatingLayout(fullLayout: LayoutNode, activeLeaf: WorkspaceLeaf | null): LayoutNode | null {
     const isPopout = this.isCurrentlyInPopoutWindow(activeLeaf);
 
     // 策略 A: 優先使用完整 workspace layout 中的 floating tree。
@@ -2901,7 +2936,7 @@ export class WindowLayoutManager {
     const floatingWindows = this.getFloatingWindows(fullLayout);
     if (floatingWindows.length > 0) {
       // 1. 透過 activeLeafId 比對
-      const activeLeafId = (activeLeaf as any)?.id || null;
+      const activeLeafId = (activeLeaf as unknown as ExtendedWorkspaceLeaf | null)?.id || null;
       if (activeLeafId) {
         for (let floatingItem of floatingWindows) {
           if (this.floatingWindowContainsLeaf(floatingItem, activeLeafId)) {
@@ -2911,7 +2946,7 @@ export class WindowLayoutManager {
       }
 
       // 2. 透過檔案路徑比對
-      const activeFilePath = (activeLeaf?.view as any)?.file?.path;
+      const activeFilePath = (activeLeaf?.view as { file?: TFile } | null)?.file?.path;
       if (activeFilePath) {
         for (let floatingItem of floatingWindows) {
           if (this.floatingLayoutContainsFile(floatingItem, activeFilePath)) {
@@ -2928,25 +2963,28 @@ export class WindowLayoutManager {
 
     // 策略 B: 只有在完整 layout 無法辨識時，才向 activeLeaf 的獨立
     // root 取得 layout。
-    if (activeLeaf && typeof (activeLeaf as any).getRoot === "function") {
-      const root = (activeLeaf as any).getRoot();
+    const activeLeafWithRoot = activeLeaf as unknown as {
+      getRoot?: () => LayoutWorkspaceItem | null;
+    };
+    if (activeLeaf && typeof activeLeafWithRoot.getRoot === "function") {
+      const root = activeLeafWithRoot.getRoot();
       if (root && typeof root.getLayout === "function") {
-        const ws = this.app.workspace as any;
+        const ws = this.app.workspace as unknown as ExtendedWorkspace;
         if (root !== ws.rootSplit && root !== ws.leftSplit && root !== ws.rightSplit) {
           const rootLayout = root.getLayout();
-          if (rootLayout) return rootLayout;
+          if (rootLayout) return rootLayout as unknown as LayoutNode;
         }
       }
     }
 
     // 策略 C: 只要確認當前確實在 Popout 視窗內 (isPopout = true)
     if (isPopout && activeLeaf) {
-      const viewState = typeof (activeLeaf as any).getViewState === "function" 
-        ? (activeLeaf as any).getViewState() 
+      const viewState = typeof activeLeaf?.getViewState === "function"
+        ? activeLeaf.getViewState()
         : { type: activeLeaf.view?.getViewType() || "empty", state: {} };
 
       return {
-        id: (activeLeaf as any).id || this.generateId(),
+        id: (activeLeaf as unknown as ExtendedWorkspaceLeaf).id || this.generateId(),
         type: "leaf",
         state: viewState,
       };
@@ -2956,11 +2994,16 @@ export class WindowLayoutManager {
   }
 
   /** 取得 Obsidian floating container 內的實際 WorkspaceWindow 陣列。 */
-  private getFloatingWindows(layout: any): any[] {
-    const floating = layout?.floating;
-    if (Array.isArray(floating)) return floating;
-    if (floating?.type === "floating" && Array.isArray(floating.children)) {
-      return floating.children;
+  private getFloatingWindows(layout: unknown): LayoutNode[] {
+    if (!layout || typeof layout !== "object") return [];
+    const root = layout as { floating?: unknown };
+    const floating = root.floating;
+    if (Array.isArray(floating)) return floating as LayoutNode[];
+    if (floating && typeof floating === "object") {
+      const floatingNode = floating as LayoutNode;
+      if (floatingNode.type === "floating" && Array.isArray(floatingNode.children)) {
+        return floatingNode.children;
+      }
     }
     return [];
   }
@@ -2971,7 +3014,7 @@ export class WindowLayoutManager {
    */
   private findFloatingWindowIndexForWindow(
     targetWin: Window,
-    floatingWindows: any[]
+    floatingWindows: LayoutNode[]
   ): number {
     const windowLeaves = this.getLeavesForWindow(targetWin);
 
@@ -2996,7 +3039,7 @@ export class WindowLayoutManager {
 
     const matchingIndices = new Set<number>();
     windowLeaves.forEach((leaf) => {
-      const leafId = (leaf as any).id;
+      const leafId = (leaf as unknown as ExtendedWorkspaceLeaf).id;
       if (!leafId) return;
       floatingWindows.forEach((floatingWindow, index) => {
         if (this.floatingWindowContainsLeaf(floatingWindow, leafId)) {
@@ -3015,7 +3058,10 @@ export class WindowLayoutManager {
    * Obsidian 公開 API 不保證 WorkspaceWindow 帶有 serialized window ID。
    */
   private findPopoutOrdinal(targetWin: Window, floatingCount: number): number {
-    const workspace = this.app.workspace as any;
+    const workspace = this.app.workspace as unknown as ExtendedWorkspace & {
+      floating?: LayoutNode;
+      floatingSplit?: { children?: WorkspaceItem[] };
+    };
     // INTERNAL API: Workspace.floatingSplit / floating（d.ts 未宣告）；
     // 雙 fallback：floatingSplit.children 不存在時退 floating.children，再退空陣列。
     const floatingChildren =
@@ -3024,7 +3070,7 @@ export class WindowLayoutManager {
       [];
 
     if (Array.isArray(floatingChildren)) {
-      const directIndex = floatingChildren.findIndex((container: any) =>
+      const directIndex = floatingChildren.findIndex((container) =>
         container?.win === targetWin || container?.doc?.defaultView === targetWin
       );
       if (directIndex >= 0 && directIndex < floatingCount) {
@@ -3033,9 +3079,12 @@ export class WindowLayoutManager {
     }
 
     const livePopoutWindows: Window[] = [];
-    (this.app.workspace as any).iterateAllLeaves((leaf: WorkspaceLeaf) => {
-      const container = typeof (leaf as any).getContainer === "function"
-        ? (leaf as any).getContainer()
+    (this.app.workspace as unknown as ExtendedWorkspace).iterateAllLeaves((leaf: WorkspaceLeaf) => {
+      const leafWithContainer = leaf as unknown as ExtendedWorkspaceLeaf & {
+        getContainer?: () => { win?: Window; doc?: Document } | null;
+      };
+      const container = typeof leafWithContainer.getContainer === "function"
+        ? leafWithContainer.getContainer()
         : null;
       const leafWindow = container?.win || this.getWindowForLeaf(leaf);
       if (
@@ -3081,8 +3130,8 @@ export class WindowLayoutManager {
    * （如 Professional：tabs + tabs + split）也可由 leaf 層級重建，是否可行
    * 交由 isSimpleLayoutStructure 遞迴判定。
    */
-  private extractLayoutRootNode(layout: any): any {
-    return layout ?? null;
+  private extractLayoutRootNode(layout: unknown): LayoutNode | null {
+    return (layout as LayoutNode | null) ?? null;
   }
 
   /**
@@ -3093,7 +3142,7 @@ export class WindowLayoutManager {
    *   本身無巢狀。
    * 其餘（巢狀 split、未知節點）一律回傳 false，交由全域 changeLayout fallback。
    */
-  private isSimpleLayoutStructure(node: any, parentDirection?: string): boolean {
+  private isSimpleLayoutStructure(node: LayoutNode, parentDirection?: string): boolean {
     if (!node) return false;
     if (node.type === "leaf" || node.type === "tabs") return true;
     if (node.type === "split") {
@@ -3139,19 +3188,19 @@ export class WindowLayoutManager {
    */
   private async buildSimpleWindowStructure(
     targetWin: Window,
-    rootNode: any
+    rootNode: LayoutNode
   ): Promise<WorkspaceLeaf[]> {
     const workspace = this.app.workspace as unknown as ExtendedWorkspace;
     const initialLeaves = this.getLeavesForWindow(targetWin);
     const built: WorkspaceLeaf[] = [];
 
-    const fillTabs = async (leaf: WorkspaceLeaf, node: any): Promise<WorkspaceLeaf> => {
+    const fillTabs = async (leaf: WorkspaceLeaf, node: LayoutNode): Promise<WorkspaceLeaf> => {
       // 把 tabs/leaf 節點的 leaf 依序填入 leaf 所在的 tabs 群組，回傳最後 leaf
       const leafNodes =
         node.type === "leaf"
           ? [node]
           : Array.isArray(node.children)
-            ? node.children.filter((c: any) => c?.type === "leaf")
+            ? node.children.filter((c) => c.type === "leaf")
             : [];
       const groupLeaves: WorkspaceLeaf[] = [];
       let last: WorkspaceLeaf = leaf;
@@ -3195,7 +3244,7 @@ export class WindowLayoutManager {
     };
 
     const expandSplit = async (
-      node: any,
+      node: LayoutNode,
       direction: string,
       placeholderLeaf: WorkspaceLeaf
     ): Promise<WorkspaceLeaf> => {
@@ -3217,8 +3266,9 @@ export class WindowLayoutManager {
     };
 
     const isContainer = rootNode?.type === "window" || rootNode?.type === "floating";
-    const topDirection = isContainer ? rootNode.direction || "vertical" : "vertical";
-    const topUnits: any[] = isContainer ? rootNode.children || [] : [rootNode];
+    const topDirection: "horizontal" | "vertical" =
+      rootNode.direction === "horizontal" ? "horizontal" : "vertical";
+    const topUnits: LayoutNode[] = isContainer ? rootNode.children || [] : [rootNode];
 
     // INTERNAL API: Workspace.createLeafBySplit（d.ts @public 但官方文件未記載；
     // 依 asar-findings #2 依方向扁平插入或建新 split）。以 leaf 層級重建換取
@@ -3268,7 +3318,7 @@ export class WindowLayoutManager {
    * - flex-grow 權重在容器縮放時自動重新分配；
    * - display:none 隱藏側欄時，剩餘欄位自動填滿（不需 rebalance）。
    */
-  private applySavedSplitDimensions(win: Window, rootNode: any): void {
+  private applySavedSplitDimensions(win: Window, rootNode: LayoutNode): void {
     if (!win || win.closed || !rootNode) return;
     const rootEl = win.document?.querySelector<HTMLElement>(".workspace-split.mod-root");
     if (!rootEl) return;
@@ -3279,16 +3329,17 @@ export class WindowLayoutManager {
     // dimension 丟失（Obsidian serialize 讀的是物件的 dimension 屬性）。
     // INTERNAL API: WorkspaceItem.setDimension（d.ts 未宣告）；已偵測
     // typeof === "function"，失敗 fallback 至純 CSS flex-grow。
-    const elToItem = new Map<HTMLElement, { setDimension?: (v: number) => void }>();
+    const elToItem = new Map<HTMLElement, LayoutWorkspaceItem>();
     try {
       (this.app.workspace as unknown as {
-        iterateAllLeaves: (cb: (leaf: any) => void) => void;
-      }).iterateAllLeaves((leaf: any) => {
+        iterateAllLeaves: (cb: (leaf: WorkspaceLeaf) => void) => void;
+      }).iterateAllLeaves((leaf: WorkspaceLeaf) => {
         if (!leaf || this.getWindowForLeaf(leaf) !== win) return;
-        let item: any = leaf.parent;
+        let item: LayoutWorkspaceItem | undefined =
+          (leaf as unknown as ExtendedWorkspaceLeaf).parent as LayoutWorkspaceItem | undefined;
         let guard = 0;
         while (item && guard++ < 20) {
-          const itemEl = (item as { containerEl?: HTMLElement }).containerEl;
+          const itemEl = item.containerEl;
           if (itemEl.instanceOf(HTMLElement) && !elToItem.has(itemEl)) {
             elToItem.set(itemEl, item);
           }
@@ -3333,7 +3384,7 @@ export class WindowLayoutManager {
       }
     };
 
-    const applyNode = (node: any, domEl: HTMLElement | null | undefined): void => {
+    const applyNode = (node: LayoutNode, domEl: HTMLElement | null | undefined): void => {
       if (!node || !domEl) return;
       const dimension = Number(node.dimension);
       if (Number.isFinite(dimension) && dimension > 0 && dimension <= 100) {
@@ -3341,7 +3392,7 @@ export class WindowLayoutManager {
       }
       if (node.type === "split" && Array.isArray(node.children)) {
         const domChildren = getSplitChildren(domEl);
-        node.children.forEach((child: any, index: number) => {
+        node.children.forEach((child, index) => {
           applyNode(child, domChildren[index]);
         });
       }
@@ -3351,7 +3402,7 @@ export class WindowLayoutManager {
     if (rootNode.type === "window" || rootNode.type === "floating") {
       const domChildren = getSplitChildren(rootEl);
       (Array.isArray(rootNode.children) ? rootNode.children : []).forEach(
-        (child: any, index: number) => {
+        (child, index) => {
           applyNode(child, domChildren[index]);
         }
       );
@@ -3365,7 +3416,7 @@ export class WindowLayoutManager {
    * 檔案 leaf 交由 restoreFileStatesForWindow 的 openFile 處理（此處跳過）；
    * 非檔案 leaf 在此先建立 view，讓後續的 ensureViewRenderedWithRetries 能渲染。
    */
-  private async applyBuiltLeafState(leaf: WorkspaceLeaf, node: any): Promise<void> {
+  private async applyBuiltLeafState(leaf: WorkspaceLeaf, node: LayoutNode): Promise<void> {
     if (!leaf || !node) return;
     const nodeState = (node.state as { type?: string; state?: Record<string, unknown> } | undefined) || {};
     const viewType = nodeState.type || node.type;
@@ -3419,12 +3470,12 @@ export class WindowLayoutManager {
   }
 
   private prepareFloatingWindowForRestore(
-    savedLayout: any,
-    currentWindow: any,
+    savedLayout: LayoutNode,
+    currentWindow: LayoutNode,
     includeGeometry = true,
     windowState?: WindowState | null
-  ): any {
-    const saved = JSON.parse(JSON.stringify(savedLayout));
+  ): LayoutNode {
+    const saved = JSON.parse(JSON.stringify(savedLayout)) as LayoutNode;
 
     if (currentWindow?.type === "window") {
       if (saved.type === "window") {
@@ -3433,7 +3484,7 @@ export class WindowLayoutManager {
           ...saved,
           id: currentWindow.id,
           children: Array.isArray(saved.children)
-            ? saved.children.map((child: any) => this.normalizeFloatingLayout(child))
+            ? saved.children.map((child) => this.normalizeFloatingLayout(child))
             : [],
         };
 
@@ -3490,7 +3541,7 @@ export class WindowLayoutManager {
     return saved.type === "window" ? saved : this.normalizeFloatingLayout(saved);
   }
 
-  private normalizeFloatingLayout(layout: any): any {
+  private normalizeFloatingLayout(layout: LayoutNode): LayoutNode {
     if (!layout) return layout;
 
     if (layout.type === "leaf") {
@@ -3510,7 +3561,7 @@ export class WindowLayoutManager {
       return {
         ...layout,
         children: Array.isArray(layout.children)
-          ? layout.children.map((child: any) => JSON.parse(JSON.stringify(child)))
+          ? layout.children.map((child) => JSON.parse(JSON.stringify(child)) as LayoutNode)
           : [],
       };
     }
@@ -3519,7 +3570,7 @@ export class WindowLayoutManager {
       return {
         ...layout,
         children: Array.isArray(layout.children)
-          ? layout.children.map((child: any) => this.normalizeFloatingLayout(child))
+          ? layout.children.map((child) => this.normalizeFloatingLayout(child))
           : [],
       };
     }
@@ -3528,7 +3579,7 @@ export class WindowLayoutManager {
       return {
         ...layout,
         children: Array.isArray(layout.children)
-          ? layout.children.map((child: any) => {
+          ? layout.children.map((child) => {
               if (child?.type === "leaf") {
                 return {
                   type: "tabs",
@@ -3548,7 +3599,7 @@ export class WindowLayoutManager {
   /**
    * 檢查 floating 視窗是否包含指定的 leaf
    */
-  private floatingWindowContainsLeaf(layout: any, leafId: string): boolean {
+  private floatingWindowContainsLeaf(layout: LayoutNode, leafId: string): boolean {
     if (!layout) return false;
 
     if (layout.type === "leaf") {
@@ -3568,7 +3619,7 @@ export class WindowLayoutManager {
    * 從佈局數據中提取 leaf 信息
    */
   private extractLeavesFromLayout(
-    layout: any,
+    layout: LayoutNode,
     leaves: ViewState[] = []
   ): ViewState[] {
     if (!layout) return leaves;
@@ -3581,7 +3632,7 @@ export class WindowLayoutManager {
         pinned: layout.pinned === true || layout.state?.pinned === true,
       });
     } else if (Array.isArray(layout.children)) {
-      layout.children.forEach((child: any) => {
+      layout.children.forEach((child) => {
         this.extractLeavesFromLayout(child, leaves);
       });
     }
@@ -3805,7 +3856,7 @@ export class WindowLayoutManager {
     const windowLeaves = await this.waitForWindowLeaves(currentWin, leaves.length);
     const leavesById = new Map<string, WorkspaceLeaf>();
     windowLeaves.forEach((leaf) => {
-      const id = (leaf as any).id;
+      const id = (leaf as unknown as ExtendedWorkspaceLeaf).id;
       if (id) leavesById.set(id, leaf);
     });
 
@@ -3875,7 +3926,7 @@ export class WindowLayoutManager {
           // INTERNAL API: Workspace.createLeafBySplit（d.ts @public 但官方文件
           // 未記載；依 asar-findings #2 方向扁平化行為）。已 try-catch 包覆，
           // 失敗時 warn 且不中斷後續檔案開啟。
-          targetLeaf = (this.app.workspace as any).createLeafBySplit(baseLeaf, "vertical");
+          targetLeaf = (this.app.workspace as unknown as ExtendedWorkspace).createLeafBySplit(baseLeaf, "vertical");
           if (targetLeaf) windowLeaves.push(targetLeaf);
         } catch (e) {
           console.warn("Failed to create leaf by split for target window:", e);
@@ -3905,7 +3956,7 @@ export class WindowLayoutManager {
             continue;
           }
 
-          const openOptions: any = { active: false };
+          const openOptions: OpenViewState = { active: false };
           if (viewMode) {
             openOptions.state = { mode: viewMode };
           }
@@ -3919,9 +3970,10 @@ export class WindowLayoutManager {
         const fileName = filePath.split("/").pop() || filePath;
         missingFiles.push(fileName);
 
-        if (targetLeaf && typeof (targetLeaf as any).setViewState === "function") {
+        const targetExtLeaf = targetLeaf as unknown as ExtendedWorkspaceLeaf | null;
+        if (targetExtLeaf && typeof targetExtLeaf.setViewState === "function") {
           try {
-            await (targetLeaf as any).setViewState({ type: "empty" });
+            await targetExtLeaf.setViewState({ type: "empty" });
           } catch (e) {
             console.warn("Failed to set empty view state:", e);
           }
@@ -3938,8 +3990,9 @@ export class WindowLayoutManager {
       try {
         await this.app.workspace.revealLeaf(leafToFocus);
         this.app.workspace.setActiveLeaf(leafToFocus, { focus: true });
-        if ((leafToFocus as any)?.containerEl && typeof (leafToFocus as any).containerEl.focus === "function") {
-          (leafToFocus as any).containerEl.focus();
+        const focusContainer = (leafToFocus as unknown as ExtendedWorkspaceLeaf).containerEl;
+        if (focusContainer && typeof focusContainer.focus === "function") {
+          focusContainer.focus();
         }
       } catch (e) {
         console.warn("Failed to set active leaf:", e);
@@ -3980,7 +4033,7 @@ export class WindowLayoutManager {
 
   /** 取得 leaf 所屬的 DOM Window。 */
   private getWindowForLeaf(leaf: WorkspaceLeaf | null): Window | null {
-    return (leaf as any)?.containerEl?.ownerDocument?.defaultView || null;
+    return (leaf as unknown as ExtendedWorkspaceLeaf)?.containerEl?.ownerDocument?.defaultView || null;
   }
 
   /** 根據保存的 leaf 集合辨識還原後的目標視窗。 */
@@ -4014,7 +4067,7 @@ export class WindowLayoutManager {
     let bestWindow: Window | null = null;
     let bestScore = 0;
 
-    (this.app.workspace as any).iterateAllLeaves((leaf: WorkspaceLeaf) => {
+    (this.app.workspace as unknown as ExtendedWorkspace).iterateAllLeaves((leaf: WorkspaceLeaf) => {
       const targetWindow = this.getWindowForLeaf(leaf);
       if (
         !targetWindow ||
@@ -4023,8 +4076,9 @@ export class WindowLayoutManager {
         !this.isPopoutDocument(targetWindow.document)
       ) return;
 
-      const viewState = typeof (leaf as any).getViewState === "function"
-        ? (leaf as any).getViewState()
+      const extLeaf = leaf as unknown as ExtendedWorkspaceLeaf;
+      const viewState = typeof extLeaf.getViewState === "function"
+        ? extLeaf.getViewState()
         : null;
       const filePath = this.getFilePathFromLeafState({
         state: viewState?.state || {},
@@ -4038,7 +4092,7 @@ export class WindowLayoutManager {
           matchedPanelIds.set(targetWindow, (matchedPanelIds.get(targetWindow) || 0) + 1);
         }
       }
-      const idHit = savedIds.has((leaf as any).id) ? 1 : 0;
+      const idHit = savedIds.has(extLeaf.id) ? 1 : 0;
       const fileHit = filePath && savedFiles.has(filePath) ? 1 : 0;
       const score = (windows.get(targetWindow) || 0) +
         (idHit ? 100 : 0) +
@@ -4388,8 +4442,8 @@ export class WindowLayoutManager {
   private findLeafById(id: string): WorkspaceLeaf | null {
     if (!id) return null;
     let targetLeaf: WorkspaceLeaf | null = null;
-    (this.app.workspace as any).iterateAllLeaves((leaf: WorkspaceLeaf) => {
-      if (!targetLeaf && (leaf as any).id === id) {
+    (this.app.workspace as unknown as ExtendedWorkspace).iterateAllLeaves((leaf: WorkspaceLeaf) => {
+      if (!targetLeaf && (leaf as unknown as ExtendedWorkspaceLeaf).id === id) {
         targetLeaf = leaf;
       }
     });

@@ -49,6 +49,12 @@ interface SidebarFlexSnapshot {
   right: ColumnFlexEntry | null;
 }
 
+interface ActivityLayoutNode {
+  type?: string;
+  dimension?: number;
+  children?: ActivityLayoutNode[];
+}
+
 /**
  * Popout Activity Bar 控制器。
  *
@@ -767,9 +773,9 @@ export class PopoutActivityBarManager {
     );
   }
 
-  private hasSavedLayoutDimensions(node: any): boolean {
+  private hasSavedLayoutDimensions(node: ActivityLayoutNode): boolean {
     if (!node || !Array.isArray(node.children)) return false;
-    return node.children.some((child: any) =>
+    return node.children.some((child) =>
       (typeof child?.dimension === "number" && Number.isFinite(child.dimension)) ||
       this.hasSavedLayoutDimensions(child)
     );
@@ -786,7 +792,7 @@ export class PopoutActivityBarManager {
    */
   private applySavedLayoutDimensions(win: Window): void {
     const layout = this.getLayoutForWindow(win);
-    let rootNode = layout?.workspace?.layout as any;
+    let rootNode = layout?.workspace?.layout as ActivityLayoutNode | undefined;
     if (!rootNode) return;
 
     // Some workspace snapshots wrap the actual window tree in a `floating`
@@ -822,14 +828,14 @@ export class PopoutActivityBarManager {
       }
     };
 
-    const applyNode = (node: any, splitEl: HTMLElement): void => {
+    const applyNode = (node: ActivityLayoutNode, splitEl: HTMLElement): void => {
       if (!node || !Array.isArray(node.children)) return;
       const domChildren = getSplitChildren(splitEl);
       // 欄位數不匹配（例如開檔建了新的中央編輯區後，欄位數 > 存檔樹）：
       // 跳過 dimension 套用，避免把存檔權重錯位覆蓋到新欄位（保持現狀）。
       // restore 後欄位數匹配時才正常套用。
       if (domChildren.length !== node.children.length) return;
-      node.children.forEach((child: any, index: number) => {
+      node.children.forEach((child, index) => {
         const domChild = domChildren[index];
         if (!domChild) return;
 

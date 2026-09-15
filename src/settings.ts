@@ -304,7 +304,7 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
             this.plugin.settings.workspaceInterceptorEnabled !== false;
           this.plugin.manager?.refreshLayoutLabels();
           this.plugin.activityBars?.refreshAll();
-          this.update();
+          this.display();
           new Notice(t("settings.resetSuccess"));
         });
     });
@@ -774,7 +774,9 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
     const items = this.plugin.settings.activityBars?.[side] ?? [];
 
     if (items.length === 0) {
-      this.createSettingIn(group, (s) => s.setDesc(t("settings.addView")));
+      this.createSettingIn(group, (s) => {
+        s.setDesc(t("settings.addView"));
+      });
     }
 
     // 先建立 add-row（capture selectEl 供 callback 使用），最後再移到底部

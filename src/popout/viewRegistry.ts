@@ -328,9 +328,7 @@ async function getIconFromEphemeralView(app: App, viewType: string): Promise<str
   const creator = getViewCreatorForType(app, viewType);
   if (!creator) return null;
 
-  const host = typeof document.body?.createDiv === "function"
-    ? document.body.createDiv()
-    : document.body.appendChild(document.createElement("div"));
+  const host = document.createDiv();
   hideElement(host);
   try {
 
@@ -374,7 +372,7 @@ async function getIconFromRealLeaf(app: App, viewType: string): Promise<string |
     leaf = workspace.getLeaf("tab");
     // 先隱藏 leaf 容器再開 view，避免 tab 開啟觸發版面計算（forced reflow）
     const container = (leaf as unknown as { containerEl?: HTMLElement }).containerEl;
-    if (container && (container instanceof HTMLElement || typeof (container as { instanceOf?: (cls: unknown) => boolean }).instanceOf === "function")) {
+    if (container && container.instanceOf(HTMLElement)) {
       hideElement(container);
     }
     await leaf.setViewState({ type: viewType, active: false, state: {} });
