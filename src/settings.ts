@@ -29,6 +29,30 @@ function isActivityBarItem(value: ActivityBarItem | null | undefined): value is 
   return !!value && typeof value.viewType === "string" && value.viewType.trim().length > 0;
 }
 
+function getSettingPath(source: Record<string, unknown>, path: string): unknown {
+  let value: unknown = source;
+  for (const part of path.split(".")) {
+    if (value === null || typeof value !== "object") return undefined;
+    value = (value as Record<string, unknown>)[part];
+  }
+  return value;
+}
+
+function setSettingPath(source: Record<string, unknown>, path: string, value: unknown): void {
+  const parts = path.split(".");
+  const last = parts.pop();
+  if (!last) return;
+  let cursor = source;
+  for (const part of parts) {
+    const next = cursor[part];
+    if (next === null || typeof next !== "object") {
+      cursor[part] = {};
+    }
+    cursor = cursor[part] as Record<string, unknown>;
+  }
+  cursor[last] = value;
+}
+
 /** Obsidian `SettingGroup` 建構式（1.12.7+；舊版為 undefined）。 */
 const SettingGroupCtor = (obsidian as unknown as {
   SettingGroup?: new (containerEl: HTMLElement) => SettingGroupLike;
@@ -75,10 +99,215 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
     this.plugin = plugin;
   }
 
-  // Obsidian 1.13.0+ 宣告式設定搜尋介面；minAppVersion 1.12.7 仍以 display()
-  // 為主要渲染路徑，故此處回空陣列以滿足 declarative settings 契約。
   getSettingDefinitions(): SettingDefinitionItem[] {
-    return [];
+    return [
+      {
+        type: "group",
+        heading: t("settings.generalSection"),
+        items: [
+          {
+            name: t("settings.showNotifications"),
+            desc: t("settings.showNotificationsDesc"),
+            control: { type: "toggle", key: "showNotifications" }
+          },
+          {
+            name: t("settings.showWindowLayoutsRibbonIcon"),
+            desc: t("settings.showWindowLayoutsRibbonIconDesc"),
+            control: { type: "toggle", key: "showWindowLayoutsRibbonIcon" }
+          },
+          {
+            name: t("settings.showLayoutStatusBar"),
+            desc: t("settings.showLayoutStatusBarDesc"),
+            control: { type: "toggle", key: "showLayoutStatusBar" }
+          },
+          {
+            name: t("settings.popoutAccentsEnable"),
+            desc: t("settings.popoutAccentsEnableDesc"),
+            control: { type: "toggle", key: "popoutAccents.enabled" }
+          },
+          {
+            name: t("settings.popoutAccentsSplitter"),
+            desc: t("settings.popoutAccentsSplitterDesc"),
+            visible: () => this.plugin.settings.popoutAccents?.enabled !== false,
+            control: { type: "toggle", key: "popoutAccents.splitter" }
+          },
+          {
+            name: t("settings.popoutAccentsActivityBar"),
+            desc: t("settings.popoutAccentsActivityBarDesc"),
+            visible: () => this.plugin.settings.popoutAccents?.enabled !== false,
+            control: { type: "toggle", key: "popoutAccents.activityBar" }
+          },
+          {
+            name: t("settings.enableInterceptor"),
+            desc: t("settings.enableInterceptorDesc"),
+            control: { type: "toggle", key: "workspaceInterceptorEnabled" }
+          }
+        ]
+      },
+      {
+        type: "group",
+        heading: t("settings.popoutDefaultsSection"),
+        items: [
+          {
+            name: t("settings.autoSaveEnabled"),
+            desc: t("settings.autoSaveDescription"),
+            control: { type: "toggle", key: "autoSave" }
+          },
+          {
+            name: t("settings.defaultIcon"),
+            desc: t("settings.defaultIconDesc"),
+            render: (setting) => this.renderDefaultIconSetting(setting)
+          },
+          {
+            name: t("settings.defaultBorderInset"),
+            desc: t("settings.defaultBorderInsetDesc"),
+            control: {
+              type: "slider",
+              key: "defaultBorderInset",
+              min: 0,
+              max: 5,
+              step: 1,
+              defaultValue: 1
+            }
+          },
+          {
+            name: t("settings.defaultFoldedCorner"),
+            desc: t("settings.defaultFoldedCornerDesc"),
+            control: { type: "toggle", key: "defaultShowFoldedCorner" }
+          }
+        ]
+      },
+      {
+        name: t("settings.leftBar"),
+        desc: t("settings.defaultActivityBarVisibilityDesc"),
+        render: (setting) => this.renderActivityBarDefinition(setting, "left")
+      },
+      {
+        name: t("settings.rightBar"),
+        desc: t("settings.defaultActivityBarVisibilityDesc"),
+        render: (setting) => this.renderActivityBarDefinition(setting, "right")
+      },
+      {
+        name: t("settings.resetSettings"),
+        desc: t("settings.resetSettingsDescription"),
+        render: (setting) => this.renderResetSetting(setting)
+      }
+    ];
+  }
+
+  getControlValue(key: string): unknown {
+    return getSettingPath(this.plugin.settings as unknown as Record<string, unknown>, key);
+  }
+
+  async setControlValue(key: string, value: unknown): Promise<void> {
+    setSettingPath(this.plugin.settings as unknown as Record<string, unknown>, key, value);
+    await this.plugin.saveSettings();
+
+    if (key === "autoSave") {
+      if (value === true) this.setupAutoSave();
+      else this.removeAutoSave();
+    } else if (key === "workspaceInterceptorEnabled") {
+      this.plugin.workspaceInterceptor.enabled = value !== false;
+    } else if (key === "showWindowLayoutsRibbonIcon") {
+      this.plugin.refreshRibbonIcons();
+    } else if (
+      key === "showLayoutStatusBar" ||
+      key === "popoutAccents.enabled" ||
+      key === "popoutAccents.splitter" ||
+      key === "popoutAccents.activityBar" ||
+      key === "defaultBorderInset" ||
+      key === "defaultShowFoldedCorner"
+    ) {
+      this.plugin.activityBars.refreshAll();
+      if (key === "showLayoutStatusBar" || key.startsWith("popoutAccents.")) {
+        this.plugin.manager.refreshLayoutLabels();
+      }
+    }
+  }
+
+  private renderDefaultIconSetting(s: Setting): void {
+    s.controlEl.addClass("window-space-icon-setting-control");
+
+    let currentIcon = this.plugin.settings.defaultIcon || DEFAULT_SPACE_ICON;
+    let iconInputEl!: HTMLInputElement;
+    s.addText((text) => {
+      iconInputEl = text.inputEl;
+      text.setPlaceholder(t("saveModal.iconPlaceholder"));
+      text.setValue(currentIcon);
+      text.onChange(async (val) => {
+        currentIcon = val.trim() || DEFAULT_SPACE_ICON;
+        this.plugin.settings.defaultIcon = currentIcon;
+        await this.plugin.saveSettings();
+        updatePreview();
+        this.plugin.activityBars.refreshAll();
+      });
+    });
+
+    const pickIconBtn = s.controlEl.createEl("button", {
+      cls: "clickable-icon",
+      attr: { type: "button", title: t("settings.pickIcon") }
+    });
+    setIcon(pickIconBtn, "image");
+    pickIconBtn.onclick = () => {
+      new IconPickerModal(this.app, (selected) => {
+        currentIcon = selected;
+        iconInputEl.value = selected;
+        this.plugin.settings.defaultIcon = selected;
+        void this.plugin.saveSettings().then(() => {
+          updatePreview();
+          this.plugin.activityBars.refreshAll();
+        });
+      }).open();
+    };
+
+    const previewEl = s.controlEl.createDiv({ cls: "window-space-icon-preview" });
+    const updatePreview = () => {
+      previewEl.empty();
+      const val = currentIcon || DEFAULT_SPACE_ICON;
+      if (isSpaceEmoji(val)) {
+        previewEl.createSpan({ text: val });
+      } else {
+        const iconDiv = previewEl.createDiv();
+        if (!setIconWithCheck(iconDiv, val)) setIcon(iconDiv, "layout");
+      }
+    };
+    updatePreview();
+  }
+
+  private renderActivityBarDefinition(s: Setting, side: "left" | "right"): void {
+    s.controlEl.empty();
+    this.renderActivityBarSide(s.controlEl, side, side === "left" ? t("settings.leftBar") : t("settings.rightBar"));
+  }
+
+  private renderResetSetting(s: Setting): void {
+    s.addButton((button) => {
+      button
+        .setButtonText(t("settings.resetButton"))
+        .setWarning()
+        .onClick(async () => {
+          const confirmed = await this.showConfirmDialog(
+            t("settings.resetConfirmMessage"),
+            t("settings.resetConfirmTitle")
+          );
+          if (!confirmed) return;
+          try {
+            await this.plugin.resetSettingsPreservingSpaces();
+          } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : String(error);
+            console.warn("Failed to reset Window Spaces settings:", error);
+            new Notice(`${t("errors.failedToSave")}: ${message}`);
+            return;
+          }
+          this.removeAutoSave();
+          this.plugin.refreshRibbonIcons();
+          this.plugin.workspaceInterceptor.enabled =
+            this.plugin.settings.workspaceInterceptorEnabled !== false;
+          this.plugin.manager?.refreshLayoutLabels();
+          this.plugin.activityBars?.refreshAll();
+          this.update();
+          new Notice(t("settings.resetSuccess"));
+        });
+    });
   }
 
   /** 建立 SettingGroup（若當前 Obsidian 版本支援）；不支援則回傳 null。 */
