@@ -1,4 +1,4 @@
-import { TFile, type App, type WorkspaceLeaf } from "obsidian";
+import type { App, WorkspaceLeaf, TFile } from "obsidian";
 import { getWindowOfLeaf } from "./popoutLayout.js";
 
 export interface PatchableViewOnFileOpen {
@@ -23,10 +23,16 @@ type GlobalNamespace = typeof window & {
 };
 
 function isTFile(value: unknown): value is TFile {
-  if (value instanceof TFile) return true;
   if (!value || typeof value !== "object") return false;
-  if (!("path" in value) || !("name" in value)) return false;
-  return typeof value.path === "string" && typeof value.name === "string";
+  const currentWindow = typeof window !== "undefined"
+    ? (window as unknown as { TFile?: { new (...args: never[]): TFile } })
+    : null;
+  const fileConstructor = currentWindow?.TFile;
+  if (typeof fileConstructor === "function") {
+    return value instanceof fileConstructor;
+  }
+  return "path" in value && "name" in value &&
+    typeof value.path === "string" && typeof value.name === "string";
 }
 
 export function getSharedActiveFileState(): WindowActiveFileTrackerState {
