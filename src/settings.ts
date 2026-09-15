@@ -328,13 +328,14 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
     configure: (setting: Setting) => void
   ): Setting {
     const group = container as SettingGroupLike;
-    if (group && typeof group.addSetting === "function") {
+    if ("addSetting" in group && typeof group.addSetting === "function") {
       let result: Setting | null = null;
       group.addSetting((setting) => {
         result = setting;
         configure(setting);
       });
-      return result as Setting;
+      if (result === null) throw new Error("SettingGroup.addSetting did not create a Setting");
+      return result;
     }
     const setting = new Setting(container as HTMLElement);
     configure(setting);
@@ -940,15 +941,17 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
           if (this.autoSaveTimeout !== null) {
             window.clearTimeout(this.autoSaveTimeout);
           }
-          this.autoSaveTimeout = window.setTimeout(async () => {
-            try {
-              const layout = await this.plugin.manager.captureCurrentLayout({
-                name: t("settings.autoSaveEnabled"),
-              });
-              await this.plugin.manager.saveLayout(layout);
-            } catch (error: unknown) {
-              console.warn("Auto save failed:", error);
-            }
+          this.autoSaveTimeout = window.setTimeout(() => {
+            void (async () => {
+              try {
+                const layout = await this.plugin.manager.captureCurrentLayout({
+                  name: t("settings.autoSaveEnabled"),
+                });
+                await this.plugin.manager.saveLayout(layout);
+              } catch (error: unknown) {
+                console.warn("Auto save failed:", error);
+              }
+            })();
           }, 2000);
         }
       })

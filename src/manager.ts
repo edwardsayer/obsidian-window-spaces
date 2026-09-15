@@ -64,6 +64,15 @@ interface LayoutWorkspaceItem extends WorkspaceItem {
   setDimension?: (value: number) => void;
 }
 
+function cloneJsonValue<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as unknown as T;
+}
+
+function invokeManagerMethod<TResult>(method: unknown, receiver: unknown, args: unknown[]): TResult | undefined {
+  if (typeof method !== "function") return undefined;
+  return Reflect.apply(method as (...args: unknown[]) => unknown, receiver, args) as TResult;
+}
+
 export class WindowLayoutManager {
   private plugin: WindowSpacesPlugin;
   private app: App;
@@ -455,23 +464,21 @@ export class WindowLayoutManager {
       if (originalDescriptor && originalDescriptor.set) {
         const originalSet = originalDescriptor.set;
         const originalGet = originalDescriptor.get;
-        const self = this;
-
         docRecord._hasWindowSpacesTitlePatch = true;
         docRecord._originalTitleSet = originalSet;
 
         Object.defineProperty(targetDoc, "title", {
           configurable: true,
           enumerable: true,
-          get() {
+          get: () => {
             try {
-              return originalGet ? originalGet.call(targetDoc) : "";
+              return invokeManagerMethod<string>(originalGet, targetDoc, []) ?? "";
             } catch {
               return "";
             }
           },
-          set(newTitle: string) {
-            const spaceName = self.getLayoutNameForWindow(targetWin);
+          set: (newTitle: string) => {
+            const spaceName = this.getLayoutNameForWindow(targetWin);
             if (spaceName) {
               let formattedTitle = newTitle;
               if (newTitle && !newTitle.startsWith(spaceName)) {
@@ -479,9 +486,9 @@ export class WindowLayoutManager {
               } else if (!newTitle) {
                 formattedTitle = spaceName;
               }
-              originalSet.call(targetDoc, formattedTitle);
+              invokeManagerMethod<void>(originalSet, targetDoc, [formattedTitle]);
             } else {
-              originalSet.call(targetDoc, newTitle);
+              invokeManagerMethod<void>(originalSet, targetDoc, [newTitle]);
             }
           },
         });
@@ -499,25 +506,25 @@ export class WindowLayoutManager {
 
     if (workspaceWindow && typeof workspaceWindow.setTitle === "function") {
       if (!workspaceWindow._originalSetTitle) {
-        workspaceWindow._originalSetTitle = workspaceWindow.setTitle;
-        const self = this;
+        const originalSetTitle = workspaceWindow.setTitle;
+        workspaceWindow._originalSetTitle = originalSetTitle;
 
-        workspaceWindow.setTitle = function (originalTitle: string) {
-          const spaceName = self.getLayoutNameForWindow(targetWin);
-          const origFn = this._originalSetTitle;
+        workspaceWindow.setTitle = (originalTitle: string) => {
+          const spaceName = this.getLayoutNameForWindow(targetWin);
 
-          if (spaceName && typeof origFn === "function") {
+          if (spaceName && originalSetTitle) {
             let formattedTitle = originalTitle;
             if (originalTitle && !originalTitle.startsWith(spaceName)) {
               formattedTitle = `${spaceName} - ${originalTitle}`;
             } else if (!originalTitle) {
               formattedTitle = spaceName;
             }
-            return origFn.call(this, formattedTitle);
+            invokeManagerMethod<void>(originalSetTitle, workspaceWindow, [formattedTitle]);
+            return;
           }
 
-          if (typeof origFn === "function") {
-            return origFn.call(this, originalTitle);
+          if (originalSetTitle) {
+            invokeManagerMethod<void>(originalSetTitle, workspaceWindow, [originalTitle]);
           }
         };
       }
@@ -551,10 +558,14 @@ export class WindowLayoutManager {
         configurable: true,
         enumerable: true,
         get() {
-          return Object.getOwnPropertyDescriptor(Document.prototype, "title")?.get?.call(targetDoc) ?? "";
+          return invokeManagerMethod<string>(
+            Object.getOwnPropertyDescriptor(Document.prototype, "title")?.get,
+            targetDoc,
+            []
+          ) ?? "";
         },
         set(newTitle: string) {
-          originalSet.call(targetDoc, newTitle);
+          invokeManagerMethod<void>(originalSet, targetDoc, [newTitle]);
         },
       });
     }
@@ -1278,7 +1289,7 @@ export class WindowLayoutManager {
     rightView?: string
   ): LayoutNode | null {
     if (!rootNode) return null;
-    const clone = JSON.parse(JSON.stringify(rootNode));
+    const clone = cloneJsonValue(rootNode);
     let container: LayoutNode = clone;
     if (clone?.type === "floating") {
       container =
@@ -1341,7 +1352,7 @@ export class WindowLayoutManager {
     if (normalized.every((c, i) => c === (containerSource.children || [])[i])) {
       return rootNode;
     }
-    const clone = JSON.parse(JSON.stringify(rootNode));
+    const clone = cloneJsonValue(rootNode);
     const container = isContainer
       ? (clone.children || []).find((c) => c.type === "split")
       : clone;
@@ -1482,7 +1493,7 @@ export class WindowLayoutManager {
 
     for (const node of topNodes) {
       const item = await workspace.deserializeLayout(
-        JSON.parse(JSON.stringify(node)) as Record<string, unknown>,
+         cloneJsonValue<Record<string, unknown>>(node),
         null
       );
       if (!item) return null;
@@ -1832,7 +1843,9 @@ export class WindowLayoutManager {
   private isWindowFocused(targetWin: Window): boolean {
     try {
       const hasFocus = targetWin.document?.hasFocus;
-      return typeof hasFocus === "function" ? hasFocus.call(targetWin.document) : true;
+      return typeof hasFocus === "function"
+        ? invokeManagerMethod<boolean>(hasFocus, targetWin.document, []) ?? true
+        : true;
     } catch {
       return true;
     }
@@ -1842,7 +1855,9 @@ export class WindowLayoutManager {
   private isMainWindowFocused(): boolean {
     try {
       const hasFocus = window.document?.hasFocus;
-      return typeof hasFocus === "function" ? hasFocus.call(window.document) : true;
+      return typeof hasFocus === "function"
+        ? invokeManagerMethod<boolean>(hasFocus, window.document, []) ?? true
+        : true;
     } catch {
       return true;
     }
@@ -3071,7 +3086,8 @@ export class WindowLayoutManager {
 
     if (Array.isArray(floatingChildren)) {
       const directIndex = floatingChildren.findIndex((container) =>
-        container?.win === targetWin || container?.doc?.defaultView === targetWin
+        (container as LayoutWorkspaceItem).win === targetWin ||
+        (container as LayoutWorkspaceItem).doc?.defaultView === targetWin
       );
       if (directIndex >= 0 && directIndex < floatingCount) {
         return directIndex;
@@ -3211,7 +3227,7 @@ export class WindowLayoutManager {
           // INTERNAL API: Workspace.createLeafInParent（d.ts @public 但官方文件
           // 未記載；依 asar-findings #2 方向扁平化行為）。已檢查 parent 存在。
           last = workspace.createLeafInParent(
-            parent as unknown as Parameters<typeof workspace.createLeafInParent>[0],
+            parent,
             -1
           );
         }
@@ -3475,7 +3491,7 @@ export class WindowLayoutManager {
     includeGeometry = true,
     windowState?: WindowState | null
   ): LayoutNode {
-    const saved = JSON.parse(JSON.stringify(savedLayout)) as LayoutNode;
+    const saved = cloneJsonValue(savedLayout);
 
     if (currentWindow?.type === "window") {
       if (saved.type === "window") {
@@ -3552,7 +3568,7 @@ export class WindowLayoutManager {
         children: [{
           type: "tabs",
           id: this.generateId(),
-          children: [JSON.parse(JSON.stringify(layout))],
+          children: [cloneJsonValue(layout)],
         }],
       };
     }
@@ -3561,7 +3577,7 @@ export class WindowLayoutManager {
       return {
         ...layout,
         children: Array.isArray(layout.children)
-          ? layout.children.map((child) => JSON.parse(JSON.stringify(child)) as LayoutNode)
+          ? layout.children.map((child) => cloneJsonValue(child))
           : [],
       };
     }
@@ -3584,7 +3600,7 @@ export class WindowLayoutManager {
                 return {
                   type: "tabs",
                   id: this.generateId(),
-                  children: [JSON.parse(JSON.stringify(child))],
+                  children: [cloneJsonValue(child)],
                 };
               }
               return this.normalizeFloatingLayout(child);
@@ -3593,7 +3609,7 @@ export class WindowLayoutManager {
       };
     }
 
-    return JSON.parse(JSON.stringify(layout));
+    return cloneJsonValue(layout);
   }
 
   /**
@@ -3652,7 +3668,7 @@ export class WindowLayoutManager {
       typeStr.includes("folder-space") ||
       typeStr.includes("folderspace");
 
-    const stateObj = leaf.state as Record<string, unknown> | undefined;
+    const stateObj = leaf.state;
     if (!stateObj && !isFolderSpaceView) return null;
 
     let rawFolderPath: string | null = null;

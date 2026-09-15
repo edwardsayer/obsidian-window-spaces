@@ -217,7 +217,7 @@ export class PopoutActivityBarManager {
    */
   private ensureLayoutColumns(win: Window): Promise<void> {
     const existing = this.columnEnsurePromises.get(win);
-    if (existing) return existing;
+    if (existing !== undefined) return existing;
 
     const promise = (async () => {
       // Sidebar rebuilds invoke restoreOpenSpaceInPlace(), which renders the
@@ -511,8 +511,11 @@ export class PopoutActivityBarManager {
   }
 
   private async waitForLayoutFrame(win: Window): Promise<void> {
-    const raf = win.requestAnimationFrame?.bind(win);
-    if (raf) {
+    const raf = (callback: FrameRequestCallback): number | undefined =>
+      typeof win.requestAnimationFrame === "function"
+        ? win.requestAnimationFrame(callback)
+        : undefined;
+    if (typeof raf === "function") {
       await new Promise<void>((resolve) => raf(() => resolve()));
       await new Promise<void>((resolve) => raf(() => resolve()));
       return;
@@ -1127,7 +1130,7 @@ export class PopoutActivityBarManager {
     const body = win.document?.body;
     if (body) {
       if (hasCustomColor) {
-        body.style.setProperty("--window-space-color", color as string);
+        body.style.setProperty("--window-space-color", color ?? "");
         body.classList.add("has-window-space-color");
       } else {
         body.style.removeProperty("--window-space-color");
@@ -1716,10 +1719,10 @@ export class PopoutActivityBarManager {
    * 避免 sidebar 視覺樣式在拖曳後失效。
    */
   private scheduleDeferredSync(win: Window): void {
-    const raf =
-      (win && typeof win.requestAnimationFrame === "function" ? win.requestAnimationFrame : window.requestAnimationFrame).bind(
-        win && typeof win.requestAnimationFrame === "function" ? win : window
-      );
+    const raf = (callback: FrameRequestCallback): number =>
+      win && typeof win.requestAnimationFrame === "function"
+        ? win.requestAnimationFrame(callback)
+        : window.requestAnimationFrame(callback);
     raf(() => {
       if (win.closed) return;
       raf(() => {
@@ -2236,10 +2239,10 @@ export class PopoutActivityBarManager {
           items: this.getItemsForSide(side).map((item) => ({ ...item })),
         };
       }
-      if (!layout.activityBars[side]!.items) {
-        layout.activityBars[side]!.items = this.getItemsForSide(side).map((item) => ({ ...item }));
+      if (!layout.activityBars[side].items) {
+        layout.activityBars[side].items = this.getItemsForSide(side).map((item) => ({ ...item }));
       }
-      items = layout.activityBars[side]!.items;
+      items = layout.activityBars[side].items;
     } else {
       this.settings.activityBars = this.settings.activityBars ?? { left: [], right: [] };
       if (!this.settings.activityBars[side]) {
@@ -2309,7 +2312,7 @@ export class PopoutActivityBarManager {
           items: this.getItemsForSide(side).map((item) => ({ ...item })),
         };
       } else {
-        layout.activityBars[side]!.show = nextVisible;
+        layout.activityBars[side].show = nextVisible;
       }
 
       // 當 Activity Bar 不顯示時，該側 sidebar 一律顯示（強制解除隱藏）

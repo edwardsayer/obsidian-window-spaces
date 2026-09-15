@@ -397,7 +397,7 @@ const inFlightDetections = new Map<string, Promise<string | null>>();
 /** 動態偵測 view icon：掃全部視窗 → registry entry → 不可見實體 → 真實 leaf 兜底。 */
 async function detectViewIcon(app: App, viewType: string): Promise<string | null> {
   const inFlight = inFlightDetections.get(viewType);
-  if (inFlight) return inFlight;
+  if (inFlight !== undefined) return inFlight;
 
   const promise = (async () => {
     const openIcon = findIconFromOpenLeaves(app, viewType);
