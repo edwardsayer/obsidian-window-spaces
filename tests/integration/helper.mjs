@@ -2,7 +2,9 @@
 // 零依賴（Node 20+ 全域 WebSocket）。用法見 README.md。
 import http from 'node:http';
 
-export const PORT = Number(process.env.WINDOW_SPACES_DEBUG_PORT || 9222);
+export const PORT = Number(
+  process.env.OBSIDIAN_DEBUG_PORT || process.env.WINDOW_SPACES_DEBUG_PORT || 9222
+);
 
 export function getJSON(path) {
   return new Promise((resolve, reject) => {

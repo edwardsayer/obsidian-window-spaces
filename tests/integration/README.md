@@ -8,7 +8,8 @@
    ```bash
    npm run obsidian:debug
    ```
-   （預設 port 9222；可用 `WINDOW_SPACES_DEBUG_PORT` 或 `npm run obsidian:debug -- <port>` 指定）
+   （預設 port 9222；可用 `OBSIDIAN_DEBUG_PORT`（legacy `WINDOW_SPACES_DEBUG_PORT` 仍相容）
+   或 `npm run obsidian:debug -- <port>` 指定）
 2. 確認 Obsidian 已載入 window-spaces plugin。
 
 ## 執行
