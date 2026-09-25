@@ -15,6 +15,7 @@
 		"test": "vitest run",
 		"test:watch": "vitest",
 		"test:build": "node scripts/test-build.mjs",
+		"test:integration": "node --test \"tests/integration/*.test.mjs\"",
 		"deploy": "node ../tools/deploy.mjs",
 		"obsidian:debug": "node ../tools/obsidian-debug.mjs",
 		"probe": "node ../tools/probe.mjs",
