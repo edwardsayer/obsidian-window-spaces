@@ -69,6 +69,9 @@ describe("Window Spaces settings reset", () => {
     expect(plugin.settings.activityBarDefaults).toEqual({ left: true, right: true });
     expect(plugin.settings.popoutAccents).toEqual({ enabled: true, splitter: true, activityBar: true });
     expect(plugin.settings.workspaceInterceptorEnabled).toBe(true);
+    expect(plugin.settings.disableOnUrlPopouts).toBe(true);
+    expect(plugin.settings.nativePopoutPolicy).toBe("status-bar-only");
+    expect(plugin.settings.urlPopoutPolicy).toBe("disabled");
     expect((plugin.settings as WindowSettings & { legacyOption?: unknown }).legacyOption).toBeUndefined();
     expect(saveSettings).toHaveBeenCalledTimes(1);
   });

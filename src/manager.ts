@@ -30,6 +30,29 @@ interface PreservedWindowLayout {
 
 const WINDOW_GEOMETRY_TOLERANCE = 5;
 
+/**
+ * `Workspace.openPopoutLeaf({ size })` 的尺寸語意補償（實機 CDP 量測結論）。
+ *
+ * 實測：傳入 size w/h 後，Electron 實際 bounds 會固定多出約 +4x+5px
+ * （req 700x620 → bounds 704x625；1038x809 → 1042x813；1200x900 → 1204x905）。
+ * 因 `WINDOW_GEOMETRY_TOLERANCE` 為 5，這個固定膨脹正好落在容差邊界，
+ * 造成部分 Space（誤差 6~7px）觸發一次收縮校正、部分（誤差 4~5px）不觸發，
+ * 呈現「某些 Space 還原時右邊框會往左縮一下」的不一致現象。
+ * 預先扣除補償量，使初始 bounds 直接落在目標容差内，完全不再觸發校正。
+ */
+const POPOUT_LEAF_SIZE_INFLATION = { width: 4, height: 5 };
+
+/** 對 `openPopoutLeaf` 的請求尺寸扣除已知膨脹量，使其落點即為目標 bounds。 */
+export function compensatePopoutLeafSize(
+  size: { width: number; height: number } | undefined
+): { width: number; height: number } | undefined {
+  if (!size || size.width <= 0 || size.height <= 0) return undefined;
+  return {
+    width: Math.max(1, size.width - POPOUT_LEAF_SIZE_INFLATION.width),
+    height: Math.max(1, size.height - POPOUT_LEAF_SIZE_INFLATION.height),
+  };
+}
+
 interface LayoutNodeState {
   id?: string;
   type?: string;
@@ -100,9 +123,21 @@ export class WindowLayoutManager {
     this.app = plugin.app;
   }
 
+  private isWindowDisabled(win: Window): boolean {
+    return (this.plugin as unknown as { isWindowDisabled?: (w: Window) => boolean })?.isWindowDisabled?.(win) ?? false;
+  }
+
+  private canInjectStatusBar(targetWin: Window): boolean {
+    const pluginWithCan = this.plugin as unknown as { canInjectStatusBar?: (w: Window) => boolean };
+    if (typeof pluginWithCan.canInjectStatusBar === "function") {
+      return pluginWithCan.canInjectStatusBar(targetWin);
+    }
+    return this.plugin.settings.showLayoutStatusBar === true && !this.isWindowDisabled(targetWin);
+  }
+
   /** 記錄 Obsidian 建立的 Popout，供 label 與 title 生命週期管理使用。 */
   registerPopoutWindow(targetWin: Window): void {
-    if (!targetWin) return;
+    if (!targetWin || this.isWindowDisabled(targetWin)) return;
 
     this.popoutWindows.add(targetWin);
     this.matchUnlabeledPopoutWindows();
@@ -112,21 +147,37 @@ export class WindowLayoutManager {
 
     // window-open 觸發時 Popout DOM 可能仍在建立中，再補多次確保狀態列與視窗標題 100% 正確反映。
     targetWin.setTimeout(() => {
+      if (this.isWindowDisabled(targetWin)) {
+        this.unregisterPopoutWindow(targetWin);
+        return;
+      }
       this.matchUnlabeledPopoutWindows();
       this.refreshLayoutStatusBar(targetWin);
       this.hookPopoutWindowTitle(targetWin);
     }, 0);
     targetWin.setTimeout(() => {
+      if (this.isWindowDisabled(targetWin)) {
+        this.unregisterPopoutWindow(targetWin);
+        return;
+      }
       this.matchUnlabeledPopoutWindows();
       this.refreshLayoutStatusBar(targetWin);
       this.hookPopoutWindowTitle(targetWin);
     }, 100);
     targetWin.setTimeout(() => {
+      if (this.isWindowDisabled(targetWin)) {
+        this.unregisterPopoutWindow(targetWin);
+        return;
+      }
       this.matchUnlabeledPopoutWindows();
       this.refreshLayoutStatusBar(targetWin);
       this.hookPopoutWindowTitle(targetWin);
     }, 300);
     targetWin.setTimeout(() => {
+      if (this.isWindowDisabled(targetWin)) {
+        this.unregisterPopoutWindow(targetWin);
+        return;
+      }
       this.matchUnlabeledPopoutWindows();
       this.refreshLayoutStatusBar(targetWin);
       this.hookPopoutWindowTitle(targetWin);
@@ -139,8 +190,9 @@ export class WindowLayoutManager {
    * view 會阻止 Chromium 產生 click，造成使用者必須點兩次。
    */
   private schedulePopoutViewRendering(targetWin: Window): void {
+    if (this.isWindowDisabled(targetWin)) return;
     const render = (): void => {
-      if (targetWin.closed) return;
+      if (targetWin.closed || this.isWindowDisabled(targetWin)) return;
       this.getLeavesForWindow(targetWin).forEach((leaf) => {
         // ensureViewRendered 會先檢查 .view-content 是否已有子元素，只有
         // 空的非檔案 view 才會進行 rebuild。
@@ -158,7 +210,7 @@ export class WindowLayoutManager {
     (this.app.workspace as unknown as ExtendedWorkspace).iterateAllLeaves((leaf: WorkspaceLeaf) => {
       const extLeaf = leaf as unknown as ExtendedWorkspaceLeaf;
       const targetWin = extLeaf.containerEl?.ownerDocument?.defaultView as Window | undefined;
-      if (targetWin && this.isPopoutDocument(targetWin.document)) {
+      if (targetWin && this.isPopoutDocument(targetWin.document) && !this.isWindowDisabled(targetWin)) {
         this.registerPopoutWindow(targetWin);
       }
     });
@@ -266,6 +318,7 @@ export class WindowLayoutManager {
 
     this.setLayoutLabelForWindow(targetWin, layout.name, false);
     this.syncWindowLeafMarker(targetWin, layout);
+    this.syncWindowIdToLayout(targetWin, layout.name);
     this.refreshLayoutLabels();
 
     this.plugin.activityBars?.prepareWindowForRestore(targetWin);
@@ -826,6 +879,9 @@ export class WindowLayoutManager {
       body.querySelectorAll(".window-spaces-layout-label").forEach((element) => element.remove());
     }
 
+    // 以穩定 window id 回寫 Space ↔ Window 對應（跨重啟保留），供純 ID 判定使用。
+    this.syncWindowIdToLayout(targetWin, layoutName);
+
     this.refreshLayoutStatusBar(targetWin);
     this.hookPopoutWindowTitle(targetWin);
     if (renderActivityBars) {
@@ -836,6 +892,29 @@ export class WindowLayoutManager {
     targetWin.setTimeout(() => this.hookPopoutWindowTitle(targetWin), 50);
     targetWin.setTimeout(() => this.hookPopoutWindowTitle(targetWin), 200);
     targetWin.setTimeout(() => this.hookPopoutWindowTitle(targetWin), 500);
+  }
+
+  /**
+   * 把視窗的穩定 window id 回寫到對應 Space 的 `windowInfo.windowId`。
+   * 這是 Space ↔ Window 一對一對應的權威鍵，供 `getOpenWindowForLayout`
+   * 與 startup 識別直接命中，完全不需組合 layout 內容推測。
+   */
+  syncWindowIdToLayout(targetWin: Window, layoutName?: string | null): void {
+    if (!targetWin || targetWin.closed) return;
+    const name = layoutName || this.getLayoutNameForWindow(targetWin);
+    if (!name) return;
+    const layout = (this.plugin.settings.spaces || []).find(
+      (space: WindowLayout) => space.name === name
+    );
+    if (!layout) return;
+    const windowId = this.getWindowId(targetWin);
+    if (!windowId) return;
+    const current = layout.windowInfo;
+    if (current?.windowId === windowId) return;
+    layout.windowInfo = { ...(current ?? {}), windowId };
+    void this.plugin.saveSettings().catch(() => {
+      // 靜默：對應同步失敗不影響主流程
+    });
   }
 
   getLayoutNameForWindow(targetWin: Window): string | null {
@@ -908,6 +987,7 @@ export class WindowLayoutManager {
       workspace.iterateAllLeaves((leaf: WorkspaceLeaf) => {
         const win = this.getWindowForLeaf(leaf);
         if (win && !win.closed && this.isPopoutDocument(win.document)) {
+          if (this.isWindowDisabled(win)) return;
           allPopouts.add(win);
           const name =
             this.layoutNames.get(win) ||
@@ -919,6 +999,49 @@ export class WindowLayoutManager {
           }
         }
       });
+
+      // 【第一階段】穩定 window id 直接對應：跨重啟保留，不依內容推測。
+      // 一個 Space 只認它自己記錄的 windowId，因此不可能出現多個 Space 同亮。
+      for (const win of Array.from(allPopouts)) {
+        const alreadyNamed =
+          this.layoutNames.get(win) ||
+          (typeof win.document?.body?.getAttribute === "function"
+            ? win.document.body.getAttribute("data-layout-name")
+            : null);
+        const winId = this.getWindowId(win);
+
+        if (alreadyNamed) {
+          // 已具名：DOM 標籤仍在（例如外掛 reload 而非程序重啟，DOM 不會重建）。
+          // 此時不可呼叫 setLayoutLabelForWindow（startup 不得觸碰 native layout），
+          // 但仍須確保對應 Space 的 windowId 已回寫，否則 data.json 會永遠缺
+          // windowId，退化成依賴內容比對。
+          const owner = (this.plugin.settings.spaces || []).find(
+            (space: WindowLayout) => space?.name === alreadyNamed
+          );
+          if (owner) {
+            claimedLayoutNames.add(owner.name);
+            this.layoutWindows.set(owner, win);
+            if (winId && owner.windowInfo?.windowId !== winId) {
+              this.syncWindowIdToLayout(win, owner.name);
+            }
+          }
+          continue;
+        }
+
+        if (!winId) continue;
+        const owner = (this.plugin.settings.spaces || []).find(
+          (space: WindowLayout) =>
+            space &&
+            space.name &&
+            !claimedLayoutNames.has(space.name) &&
+            space.windowInfo?.windowId === winId
+        );
+        if (!owner) continue;
+        claimedLayoutNames.add(owner.name);
+        this.setLayoutLabelForWindow(win, owner.name, renderActivityBars);
+        this.layoutWindows.set(owner, win);
+        this.syncWindowLeafMarker(win, owner);
+      }
 
       const unlabeledWindows = Array.from(allPopouts).filter((win) => {
         const name =
@@ -1066,11 +1189,13 @@ export class WindowLayoutManager {
             score += 50;
           }
 
-          // (d) 視窗幾何尺寸與位置相似度 (已有內容匹配時才作為加分項 +5)
+          // (d) 視窗幾何尺寸與位置相似度（已有內容匹配時才作為加分項 +5）
+          // 一律以 bounds 空間比對，與 windowState 儲存空間一致（outer 於過渡期不可靠）。
           const savedWindow = space.windowState;
-          if (score > 0 && savedWindow && savedWindow.size) {
-            const widthDiff = Math.abs(win.outerWidth - savedWindow.size.width);
-            const heightDiff = Math.abs(win.outerHeight - savedWindow.size.height);
+          const winBounds = this.getElectronBounds(win);
+          if (score > 0 && savedWindow && savedWindow.size && winBounds) {
+            const widthDiff = Math.abs(winBounds.width - savedWindow.size.width);
+            const heightDiff = Math.abs(winBounds.height - savedWindow.size.height);
             if (widthDiff < 50 && heightDiff < 50) {
               score += 5;
             }
@@ -1096,6 +1221,9 @@ export class WindowLayoutManager {
           this.layoutWindows.set(bestSpace, win);
           // 回寫識別記號：使下次重啟直接命中 leafIdMarker，不再依賴內容比對
           this.syncWindowLeafMarker(win, bestSpace);
+          // 同時回寫 windowId：這是最高優先且跨重啟保留的權威鍵，
+          // 缺它會使下次識別又退回內容比對。
+          this.syncWindowIdToLayout(win, bestSpace.name);
         }
       }
     } finally {
@@ -1109,17 +1237,17 @@ export class WindowLayoutManager {
     }
   }
 
-  private refreshLayoutStatusBar(targetWin: Window): void {
+  refreshLayoutStatusBar(targetWin: Window): void {
     const targetDocument = targetWin.document;
     const body = targetDocument?.body;
-    if (!body || !this.isPopoutDocument(targetDocument)) return;
+    if (!body || !this.isPopoutDocument(targetDocument) || this.isWindowDisabled(targetWin)) return;
 
     const labels = this.layoutLabels.get(targetWin) || { statusBar: null };
     this.layoutLabels.set(targetWin, labels);
 
     const layoutName = this.getLayoutNameForWindow(targetWin);
 
-    if (this.plugin.settings.showLayoutStatusBar === true) {
+    if (this.canInjectStatusBar(targetWin)) {
       labels.statusBar = this.ensureLayoutLabelElement(
         targetDocument,
         body,
@@ -1795,6 +1923,10 @@ export class WindowLayoutManager {
 
   /** 開啟全新的 Popout 視窗（等待 leaf 與 DOM 都完成掛載後再回傳視窗物件） */
   async openNewPopoutWindow(options: { initializeDefaults?: boolean } = {}): Promise<Window | null> {
+    const dedicated = options.initializeDefaults !== false;
+    // 這是「本外掛專屬啟動」：告知 main 的 initializeNewPopoutWindow policy
+    // 本次開窗應無視 nativePopoutPolicy，一律建立完整的 Space 結構。
+    if (dedicated) this.plugin.beginDedicatedSpacePopout();
     try {
       // shared 統一開窗：openPopoutLeaf + 初始 empty tab + 等待 window mount +
       // 依序呼叫所有已註冊 candidate 的 initializeNewPopoutWindow policy
@@ -1802,7 +1934,7 @@ export class WindowLayoutManager {
       const result = await this.plugin.popoutLayout.openNewPopoutWindow();
       if (!result) return null;
 
-      if (options.initializeDefaults !== false) {
+      if (dedicated) {
         // 初始化完成後把 active 切回中央編輯區（New tab），讓使用者可直接開始編輯；
         // 避免 active 停留在右側欄第一個 view（「開啟完成時 New tab 被切走」的錯覺）。
         try {
@@ -1817,8 +1949,10 @@ export class WindowLayoutManager {
       return result.win;
     } catch (e) {
       console.warn("Failed to open new popout window:", e);
+      return null;
+    } finally {
+      if (dedicated) this.plugin.endDedicatedSpacePopout();
     }
-    return null;
   }
 
   private async saveLayoutFromWindow(targetWin: Window): Promise<void> {
@@ -1930,6 +2064,7 @@ export class WindowLayoutManager {
    * 實時自動保存指定的 Popout 視窗佈局 (包含 0 檔案清空防呆保護)
    */
   async autoSaveWindowLayout(targetWin: Window): Promise<void> {
+    if (this.isWindowDisabled(targetWin)) return;
     const layoutName = this.layoutNames.get(targetWin);
     if (!layoutName) return;
 
@@ -2017,20 +2152,98 @@ export class WindowLayoutManager {
   }
 
   /**
+   * 取得指定 Popout 視窗的穩定識別碼（Obsidian floating window id）。
+   *
+   * 實機 CDP 驗證：同一 id 同時存在於 `Workspace.floatingSplit.children[].id`、
+   * `workspace.getLayout().floating.children[].id` 與匯出的 `workspace.json`，
+   * 且跨 Obsidian 重啟保留。這是 Space ↔ Window 對應的權威鍵。
+   */
+  getWindowId(targetWin: Window | null | undefined): string | null {
+    if (!targetWin) return null;
+    try {
+      const floatingChildren = (this.app.workspace as unknown as {
+        floatingSplit?: { children?: { id?: string; win?: Window; doc?: Document }[] };
+      }).floatingSplit?.children;
+      if (Array.isArray(floatingChildren)) {
+        const match = floatingChildren.find(
+          (child) => child?.win === targetWin || child?.doc?.defaultView === targetWin
+        );
+        if (match && typeof match.id === "string" && match.id) return match.id;
+      }
+    } catch {
+      // 非標準 runtime：忽略，回退全 undefined。
+    }
+    try {
+      const floating = (this.app.workspace as unknown as {
+        getLayout?: () => { floating?: { children?: { id?: string; x?: number; y?: number; width?: number; height?: number }[] } };
+      }).getLayout?.()?.floating?.children;
+      if (Array.isArray(floating) && typeof this.getElectronBounds === "function") {
+        const bounds = this.getElectronBounds(targetWin);
+        if (bounds) {
+          const exact = floating.find(
+            (child) =>
+              child?.width === bounds.width &&
+              child?.height === bounds.height &&
+              child?.x === bounds.x &&
+              child?.y === bounds.y
+          );
+          if (exact && typeof exact.id === "string" && exact.id) return exact.id;
+        }
+      }
+    } catch {
+      // 忽略。
+    }
+    return null;
+  }
+
+  /** 在目前所有存活 Popout 中，以穩定 window id 找出對應的 DOM Window。 */
+  private findWindowByWindowId(windowId: string | null | undefined): Window | null {
+    if (!windowId) return null;
+    try {
+      const floatingChildren = (this.app.workspace as unknown as {
+        floatingSplit?: { children?: { id?: string; win?: Window }[] };
+      }).floatingSplit?.children;
+      if (Array.isArray(floatingChildren)) {
+        const match = floatingChildren.find(
+          (child) => child?.id === windowId && child?.win && !child.win.closed
+        );
+        if (match?.win) return match.win;
+      }
+    } catch {
+      // 忽略。
+    }
+    return null;
+  }
+
+  /**
+   * 判定某 Space 是否目前正由指定視窗所持有（純 ID 對應，不做內容推測）。
+   * 依序核對：明確標籤名稱 → 穩定 window id。
+   */
+  isLayoutOwnedByWindow(layout: WindowLayout, targetWin: Window): boolean {
+    if (!layout || !targetWin || targetWin.closed) return false;
+    const labelled = this.getLayoutNameForWindow(targetWin);
+    if (labelled) return labelled === layout.name;
+    const winId = this.getWindowId(targetWin);
+    return !!winId && layout.windowInfo?.windowId === winId;
+  }
+
+  /**
    * 檢查指定 Layout 是否目前已在某個存活的 Popout 視窗中開啟。
+   *
+   * 身分判定**全面改以 ID 對應**（先標籤名、再穩定 window id），
+   * 不再以「檔案／leaf 組合內容比對」作為 active 徽章依據；內容比對只能
+   * 作為找不到 ID 時的舊資料回退，避免新開的同檔 popout 讓多個 Space 同時亮起。
    */
   getOpenWindowForLayout(layout: WindowLayout): Window | null {
     if (!layout) return null;
 
-    // 1. 先查記憶體對映的 layoutWindows
-    const mappedWin = this.layoutWindows.get(layout);
-    if (mappedWin && !mappedWin.closed && this.isPopoutDocument(mappedWin.document)) {
-      if (this.getLeavesForWindow(mappedWin).length > 0) {
-        return mappedWin;
-      }
+    // 1. 穩定 window id 直接對應（最強且跨重啟保留，使用者要求的唯一權威鍵）。
+    const byWindowId = this.findWindowByWindowId(layout.windowInfo?.windowId);
+    if (byWindowId && this.isPopoutDocument(byWindowId.document)) {
+      return byWindowId;
     }
 
-    // 2. 遍歷目前所有存活的 Popout 視窗，依名稱與標籤比對
+    // 2. 依標籤名稱對應（標籤由 setLayoutLabelForWindow 寫入，具唯一性）。
     const liveWindows = new Set<Window>();
     const workspace = this.app.workspace as unknown as ExtendedWorkspace;
     if (typeof workspace.iterateAllLeaves === "function") {
@@ -2041,21 +2254,37 @@ export class WindowLayoutManager {
         }
       });
     }
-
     for (const win of Array.from(liveWindows)) {
       const label = this.getLayoutNameForWindow(win);
-      if (label && label === layout.name) {
-        return win;
+      if (label && label === layout.name) return win;
+    }
+
+    // 3. 舊資料回退（無 windowId 且未帶標籤的歷史 Space）：保留原本內容比對，
+    // 但嚴格要求「該視窗本身沒有任何已指派名稱」才允許，避免已具名的
+    // 其他 Space 視窗被內容巧合誤認。
+    const mappedWin = this.layoutWindows.get(layout);
+    if (mappedWin && !mappedWin.closed && this.isPopoutDocument(mappedWin.document)) {
+      if (this.getLeavesForWindow(mappedWin).length > 0 && !this.getLayoutNameForWindow(mappedWin)) {
+        return mappedWin;
       }
     }
 
-    // 3. 多級比對：比對檔案與 Leaves (必須有高精確度 matchScore > 0，嚴禁盲目 fallback 單一視窗)
+    const unlabelledWindows = Array.from(liveWindows).filter(
+      (win) => !this.getLayoutNameForWindow(win)
+    );
+    if (unlabelledWindows.length === 0) return null;
+
     const savedLeaves = this.getSavedViewStates(layout);
-    if (savedLeaves.length > 0) {
-      const matchedWin = this.findWindowForSavedLeaves(savedLeaves, undefined, null, new Set(), true);
-      if (matchedWin && !matchedWin.closed && this.isPopoutDocument(matchedWin.document)) {
-        return matchedWin;
-      }
+    if (savedLeaves.length === 0) return null;
+    const matchedWin = this.findWindowForSavedLeaves(
+      savedLeaves,
+      undefined,
+      null,
+      new Set(),
+      true
+    );
+    if (matchedWin && !matchedWin.closed && this.isPopoutDocument(matchedWin.document)) {
+      if (!this.getLayoutNameForWindow(matchedWin)) return matchedWin;
     }
 
     return null;
@@ -2385,6 +2614,7 @@ export class WindowLayoutManager {
           pluginVersion: this.plugin?.manifest?.version || "1.0.0",
         },
         windowInfo: {
+          windowId: this.getWindowId(currentWin) ?? undefined,
           firstLeafId: leaves.length > 0 ? leaves[0].id : undefined,
         },
       };
@@ -2605,12 +2835,7 @@ export class WindowLayoutManager {
               ? {
                   x: layout.windowState.position?.x,
                   y: layout.windowState.position?.y,
-                  size: layout.windowState.size
-                    ? {
-                        width: layout.windowState.size.width,
-                        height: layout.windowState.size.height,
-                      }
-                    : undefined,
+                  size: compensatePopoutLeafSize(layout.windowState.size),
                 }
               : undefined;
           const popoutLeaf = extWs.openPopoutLeaf?.(popoutInitData);
@@ -2628,8 +2853,10 @@ export class WindowLayoutManager {
           targetWin = newlyCreatedWin || extPopoutLeaf?.containerEl?.ownerDocument?.defaultView || null;
 
           if (targetWin) {
+            // 在新視窗誕生時立即綁定 layout 名稱，確立其為明確 Space 視窗，避免在非同步還原期間被誤判為原生開窗
+            this.setLayoutLabelForWindow(targetWin, layout.name, false);
             // 【幾何前置】新視窗一誕生立即進行座標移動與尺寸縮放，消弭兩階段鋸齒 jump
-            this.restoreWindowGeometry(targetWin, layout.windowState, layout.includeGeometry, true);
+            this.restoreWindowGeometry(targetWin, layout.windowState, layout.includeGeometry, false);
           }
 
           // 重新讀取最新的 Layout
@@ -2734,11 +2961,10 @@ export class WindowLayoutManager {
         targetWin
       ) || targetWin;
 
-      // 【幾何立即套用】changeLayout 以 window.open features 重建視窗，其
-      // x/y 不一定被 Electron 採用；立即用 windowState 強制校正，再開始
-      // 開啟檔案，消除「先偏位、開檔後才回正」的位移感。
+      // 【幾何立即套用】以差異校正視窗尺寸與位置（force=false），
+      // 避免視窗已在目標位置時無謂強制呼叫 moveTo/resizeTo 觸發 OS 視窗重繪抖動。
       if (targetWin) {
-        this.restoreWindowGeometry(targetWin, layout.windowState, layout.includeGeometry, true);
+        this.restoreWindowGeometry(targetWin, layout.windowState, layout.includeGeometry, false);
       }
 
       await new Promise((resolve) => window.setTimeout(resolve, 150));
@@ -3100,7 +3326,9 @@ export class WindowLayoutManager {
       const extLeaf = leaf as unknown as ExtendedWorkspaceLeaf;
       const win = extLeaf.containerEl?.ownerDocument?.defaultView;
       if (win && this.isPopoutDocument(win.document) && !wins.includes(win)) {
-        wins.push(win);
+        if (!this.isWindowDisabled(win)) {
+          wins.push(win);
+        }
       }
     });
     return wins;
@@ -3140,10 +3368,22 @@ export class WindowLayoutManager {
   }
 
   /**
-   * 使用 outer dimensions，與 Window.resizeTo() 的參數語意一致。
-   * innerWidth/innerHeight 是內容區大小，不能直接拿來恢復整個視窗。
+   * 取得可用於精確還原的視窗幾何（Bounds 座標空間）。
+   *
+   * 為何一律以 Electron `getBounds()` 為準（實機 CDP 驗證結論）：
+   * - Obsidian 序列化 layout 的浮動窗 `x/y/width/height` 就是 **bounds 空間**
+   *   （實測 schema 1028x804 == getBounds() 1028x804），因此擷取與還原必須同空間。
+   * - `window.outerWidth/outerHeight/screenX/screenY` 在 Popout 建構過渡期是
+   *   **不可靠的瞬時值**（實測開窗後一度爆衝到 1133x1192），拿它當還原依據會震盪。
+   * - `window.resizeTo(w,h)` 的 w/h 語意為 **inner（內容）** 尺寸，卻用 outer 餵入，
+   *   每次套用固定膨脹約 13x7px，永不收斂。
+   * 無 electronWindow 的環境（測試 / 非標準 runtime）才回退至 outer/inner 尺寸。
    */
   private getWindowState(targetWin: Window): WindowState {
+    const bounds = this.getElectronBounds(targetWin);
+    if (bounds) {
+      return { size: { width: bounds.width, height: bounds.height }, position: { x: bounds.x, y: bounds.y } };
+    }
     return {
       size: {
         width: targetWin.outerWidth || targetWin.innerWidth,
@@ -3157,6 +3397,29 @@ export class WindowLayoutManager {
             }
           : undefined,
     };
+  }
+
+  /** 讀取 Electron 視窗 bounds（Popout 精確幾何的唯一可靠來源）。 */
+  private getElectronBounds(
+    targetWin: Window
+  ): { x: number; y: number; width: number; height: number } | null {
+    try {
+      const electronWindow = (targetWin as unknown as {
+        electronWindow?: { getBounds?: () => { x?: number; y?: number; width?: number; height?: number } };
+      }).electronWindow;
+      const bounds = electronWindow?.getBounds?.();
+      if (
+        bounds &&
+        typeof bounds.width === "number" && bounds.width > 0 &&
+        typeof bounds.height === "number" && bounds.height > 0 &&
+        typeof bounds.x === "number" && typeof bounds.y === "number"
+      ) {
+        return { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height };
+      }
+    } catch {
+      // 非 Electron runtime 或 API 不可用時回退。
+    }
+    return null;
   }
 
   /**
@@ -4612,59 +4875,114 @@ export class WindowLayoutManager {
     });
   }
 
-  /** 在 changeLayout 重建 popout 後恢復實際視窗尺寸與座標（僅在幾何有顯著差異或強制時呼叫，防止重複無謂位移與 OS 邊框重算）。 */
+  /**
+   * 還原 Popout 幾何。
+   *
+   * 依實機 CDP 驗證，一律使用 Electron `setBounds()` 於 bounds 空間一次到位：
+   * - `resizeTo(w,h)` 的 w/h 是 **inner** 尺寸語意，與儲存的 bounds 尺寸不同空間，
+   *   會造成每次套用固定膨脹（約 13x7px）且永不收斂（實測 3 次即 1040→1079）。
+   * - `window.screenX/outerWidth` 在建構過渡期是不可靠的瞬時值（曾測得 1133x1192），
+   *   不能作為「當前幾何」的比對基準。
+   * - `setBounds()` 冪等穩定（重複套用僅漂移 1px），能精確收斂至目標。
+   *
+   * @param force 保留參數相容性；無論何值均以 bounds 差値判定是否需要套用。
+   */
   private restoreWindowGeometry(
     targetWin: Window,
     windowState: WindowState | null | undefined,
     includeGeometry = true,
     force = true
   ): void {
+    void force;
     if (!windowState || includeGeometry === false || !targetWin) return;
 
     const size = windowState.size;
-    if (
-      size &&
-      size.width > 0 &&
-      size.height > 0 &&
-      typeof targetWin.resizeTo === "function"
-    ) {
+    const position = windowState.position;
+    const wantSize = !!size && size.width > 0 && size.height > 0;
+    const wantPos = !!position;
+    if (!wantSize && !wantPos) return;
+
+    const target = {
+      width: wantSize ? size.width : 0,
+      height: wantSize ? size.height : 0,
+      x: wantPos ? position.x : 0,
+      y: wantPos ? position.y : 0,
+    };
+
+    // 首選：Electron setBounds（bounds 空間，與儲存值同空間、冪等收斂）。
+    const currentBounds = this.getElectronBounds(targetWin);
+    const electronWindow = (targetWin as unknown as {
+      electronWindow?: {
+        setBounds?: (bounds: { x: number; y: number; width: number; height: number }) => void;
+        getBounds?: () => { x?: number; y?: number; width?: number; height?: number };
+      };
+    }).electronWindow;
+    if (currentBounds && electronWindow && typeof electronWindow.setBounds === "function") {
+      const widthDiff = wantSize ? Math.abs(currentBounds.width - target.width) : 0;
+      const heightDiff = wantSize ? Math.abs(currentBounds.height - target.height) : 0;
+      const xDiff = wantPos ? Math.abs(currentBounds.x - target.x) : 0;
+      const yDiff = wantPos ? Math.abs(currentBounds.y - target.y) : 0;
+      if (
+        widthDiff > WINDOW_GEOMETRY_TOLERANCE ||
+        heightDiff > WINDOW_GEOMETRY_TOLERANCE ||
+        xDiff > WINDOW_GEOMETRY_TOLERANCE ||
+        yDiff > WINDOW_GEOMETRY_TOLERANCE
+      ) {
+        electronWindow.setBounds({
+          x: wantPos ? target.x : currentBounds.x,
+          y: wantPos ? target.y : currentBounds.y,
+          width: wantSize ? target.width : currentBounds.width,
+          height: wantSize ? target.height : currentBounds.height,
+        });
+      }
+      return;
+    }
+
+    // 回退：非 Electron runtime 使用 resizeTo/moveTo，並以差值修正語意落差。
+    if (wantSize && typeof targetWin.resizeTo === "function") {
       const currentWidth = typeof targetWin.outerWidth === "number" ? targetWin.outerWidth : 0;
       const currentHeight = typeof targetWin.outerHeight === "number" ? targetWin.outerHeight : 0;
-      if (force || currentWidth === 0 || Math.abs(currentWidth - size.width) > WINDOW_GEOMETRY_TOLERANCE || Math.abs(currentHeight - size.height) > WINDOW_GEOMETRY_TOLERANCE) {
-        targetWin.resizeTo(size.width, size.height);
+      const widthDiff = Math.abs(currentWidth - target.width);
+      const heightDiff = Math.abs(currentHeight - target.height);
+      if (currentWidth === 0 || widthDiff > WINDOW_GEOMETRY_TOLERANCE || heightDiff > WINDOW_GEOMETRY_TOLERANCE) {
+        // resizeTo 語意為 inner 尺寸，以差值收斂 outer 目標。
+        const innerWidth = typeof targetWin.innerWidth === "number" ? targetWin.innerWidth : 0;
+        const innerHeight = typeof targetWin.innerHeight === "number" ? targetWin.innerHeight : 0;
+        const nextWidth = innerWidth > 0 ? Math.max(1, innerWidth - (currentWidth - target.width)) : target.width;
+        const nextHeight = innerHeight > 0 ? Math.max(1, innerHeight - (currentHeight - target.height)) : target.height;
+        targetWin.resizeTo(nextWidth, nextHeight);
       }
     }
 
-    if (windowState.position && typeof targetWin.moveTo === "function") {
+    if (wantPos && typeof targetWin.moveTo === "function") {
       const currentX = typeof targetWin.screenX === "number" ? targetWin.screenX : 0;
       const currentY = typeof targetWin.screenY === "number" ? targetWin.screenY : 0;
-      if (force || currentX === 0 || Math.abs(currentX - windowState.position.x) > WINDOW_GEOMETRY_TOLERANCE || Math.abs(currentY - windowState.position.y) > WINDOW_GEOMETRY_TOLERANCE) {
-        targetWin.moveTo(windowState.position.x, windowState.position.y);
+      const xDiff = Math.abs(currentX - target.x);
+      const yDiff = Math.abs(currentY - target.y);
+      if (currentX === 0 || xDiff > WINDOW_GEOMETRY_TOLERANCE || yDiff > WINDOW_GEOMETRY_TOLERANCE) {
+        targetWin.moveTo(target.x, target.y);
       }
     }
   }
 
   /**
-   * 當發動 changeLayout 時，將非 Restore 目標之活體 Popout 視窗最新實際 outerWidth/outerHeight/screenX/screenY 帶入 floating schema，
+   * 當發動 changeLayout 時，將非 Restore 目標之活體 Popout 視窗最新實際 bounds 帶入 floating schema，
    * 避免多螢幕異質 DPI 縮放率下呼叫全域 changeLayout 時，其他存活 Popout 視窗尺寸被重複縮放衰減。
+   * 一律使用 bounds 空間（與 Obsidian schema 同空間）；outer/screenX 於過渡期不可靠。
    */
   private syncLiveWindowBoundsToFloatingChild(child: unknown, liveWin: Window): unknown {
     if (!child || typeof child !== "object" || !liveWin || liveWin.closed) return child;
     try {
       const cloned = { ...(child as Record<string, unknown>) };
-      if (typeof liveWin.outerWidth === "number" && liveWin.outerWidth > 0) {
-        cloned.width = liveWin.outerWidth;
+      const bounds = this.getElectronBounds(liveWin);
+      if (bounds) {
+        cloned.width = bounds.width;
+        cloned.height = bounds.height;
+        cloned.x = bounds.x;
+        cloned.y = bounds.y;
+        return cloned;
       }
-      if (typeof liveWin.outerHeight === "number" && liveWin.outerHeight > 0) {
-        cloned.height = liveWin.outerHeight;
-      }
-      if (typeof liveWin.screenX === "number") {
-        cloned.x = liveWin.screenX;
-      }
-      if (typeof liveWin.screenY === "number") {
-        cloned.y = liveWin.screenY;
-      }
-      return cloned;
+      return child;
     } catch {
       return child;
     }

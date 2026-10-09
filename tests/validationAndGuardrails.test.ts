@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, vi } from "vitest";
-import { WindowLayoutManager } from "../src/manager";
+import { WindowLayoutManager, compensatePopoutLeafSize } from "../src/manager";
 import { WindowLayout } from "../src/types";
 import { initI18n } from "../src/i18n";
 import * as obsidianModule from "obsidian";
@@ -16,6 +16,9 @@ describe("Validation & Auto-Save Guardrails (validationAndGuardrails.test.ts)", 
         sortBy: "updated-desc",
       },
       saveSettings: async () => {},
+      // 專屬 Space 啟動的開窗意圖 API（manager.openNewPopoutWindow 會使用）。
+      beginDedicatedSpacePopout: vi.fn(),
+      endDedicatedSpacePopout: vi.fn(),
     };
     initI18n(mockPlugin.app);
     manager = new WindowLayoutManager(mockPlugin);
@@ -252,6 +255,49 @@ describe("Validation & Auto-Save Guardrails (validationAndGuardrails.test.ts)", 
     expect(result).toBe(popoutWindow);
     expect(mockPlugin.popoutLayout.getCenterLeafSync).toHaveBeenCalledWith(popoutWindow);
     expect(mockPlugin.app.workspace.setActiveLeaf).toHaveBeenCalledWith(centerLeaf, { focus: true });
+  });
+
+  test("openNewPopoutWindow declares the dedicated Space intent only for default-initialized windows", async () => {
+    const popoutWindow = {
+      document: {
+        body: {
+          classList: {
+            contains: (className: string) => className === "is-popout-window",
+          },
+        },
+      },
+      focus: vi.fn(),
+    } as unknown as Window;
+    mockPlugin.popoutLayout = {
+      openNewPopoutWindow: vi.fn().mockResolvedValue({ win: popoutWindow, leaf: {} }),
+      getCenterLeafSync: vi.fn().mockReturnValue(null),
+    };
+
+    await manager.openNewPopoutWindow();
+    expect(mockPlugin.beginDedicatedSpacePopout).toHaveBeenCalledTimes(1);
+    expect(mockPlugin.endDedicatedSpacePopout).toHaveBeenCalledTimes(1);
+
+    // 非專屬啟動（交由既有視窗／上層流程決定）不得宣告意圖。
+    mockPlugin.beginDedicatedSpacePopout.mockClear();
+    mockPlugin.endDedicatedSpacePopout.mockClear();
+    await manager.openNewPopoutWindow({ initializeDefaults: false });
+    expect(mockPlugin.beginDedicatedSpacePopout).not.toHaveBeenCalled();
+    expect(mockPlugin.endDedicatedSpacePopout).not.toHaveBeenCalled();
+  });
+
+  test("openNewPopoutWindow always releases the dedicated Space intent, even on failure", async () => {
+    mockPlugin.popoutLayout = {
+      openNewPopoutWindow: vi.fn().mockRejectedValue(new Error("boom")),
+      getCenterLeafSync: vi.fn(),
+    };
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const result = await manager.openNewPopoutWindow();
+    warn.mockRestore();
+
+    expect(result).toBeNull();
+    // 若不釋放，後續其他外掛委託開的 popout 會被誤判為專屬 Space 而強制完整初始化。
+    expect(mockPlugin.beginDedicatedSpacePopout).toHaveBeenCalledTimes(1);
+    expect(mockPlugin.endDedicatedSpacePopout).toHaveBeenCalledTimes(1);
   });
 
   test("manual restore of an open target uses target-only reconcile", async () => {
@@ -715,16 +761,20 @@ describe("Validation & Auto-Save Guardrails (validationAndGuardrails.test.ts)", 
     ).toBe(1);
   });
 
-  test("preserved popout geometry should use and restore outer dimensions", () => {
+  test("popout geometry is captured and restored in Electron bounds space", () => {
+    const setBounds = vi.fn();
     const resizeTo = vi.fn();
     const moveTo = vi.fn();
+    const bounds = { x: 100, y: 200, width: 1280, height: 720 };
     const popoutWindow = {
-      outerWidth: 1280,
-      outerHeight: 720,
-      innerWidth: 640,
-      innerHeight: 360,
-      screenX: 100,
+      // outer/inner 故意設為與 bounds 不同，證明不再使用它們
+      outerWidth: 1294,
+      outerHeight: 727,
+      innerWidth: 1280,
+      innerHeight: 720,
+      screenX: 94,
       screenY: 200,
+      electronWindow: { getBounds: () => ({ ...bounds }), setBounds },
       resizeTo,
       moveTo,
     } as unknown as Window;
@@ -735,15 +785,31 @@ describe("Validation & Auto-Save Guardrails (validationAndGuardrails.test.ts)", 
       position: { x: 100, y: 200 },
     });
 
+    // 目標與當前 bounds 相同 → 不應觸發任何幾何變更（幂等，避免震盪）
     (manager as any).restoreWindowGeometry(popoutWindow, state);
-    expect(resizeTo).toHaveBeenCalledWith(1280, 720);
-    expect(moveTo).toHaveBeenCalledWith(100, 200);
+    expect(setBounds).not.toHaveBeenCalled();
+    expect(resizeTo).not.toHaveBeenCalled();
+    expect(moveTo).not.toHaveBeenCalled();
+
+    // 目標有差異 → 以 setBounds 於 bounds 空間一次到位，不使用 resizeTo/moveTo
+    (manager as any).restoreWindowGeometry(popoutWindow, {
+      size: { width: 1000, height: 600 },
+      position: { x: 10, y: 20 },
+    });
+    expect(setBounds).toHaveBeenCalledWith({ x: 10, y: 20, width: 1000, height: 600 });
+    expect(resizeTo).not.toHaveBeenCalled();
+    expect(moveTo).not.toHaveBeenCalled();
   });
 
   test("geometry reconcile tolerates up to five pixels of native restore drift", () => {
+    const setBounds = vi.fn();
     const resizeTo = vi.fn();
     const moveTo = vi.fn();
     const popoutWindow = {
+      electronWindow: {
+        getBounds: () => ({ x: 4, y: 5, width: 1276, height: 748 }),
+        setBounds,
+      },
       outerWidth: 1276,
       outerHeight: 748,
       screenX: 4,
@@ -757,6 +823,7 @@ describe("Validation & Auto-Save Guardrails (validationAndGuardrails.test.ts)", 
       position: { x: 0, y: 0 },
     }, true, false);
 
+    expect(setBounds).not.toHaveBeenCalled();
     expect(resizeTo).not.toHaveBeenCalled();
     expect(moveTo).not.toHaveBeenCalled();
   });
@@ -784,6 +851,100 @@ describe("Validation & Auto-Save Guardrails (validationAndGuardrails.test.ts)", 
     };
 
     expect(manager.getOpenWindowForLayout(layout)).toBe(mockWindow);
+  });
+
+  test("popout leaf size is compensated so initial bounds hit the target within tolerance", () => {
+    // 實測：openPopoutLeaf 會固定膨脹 bounds 約 +4x+5px，此補償必須被套用，
+    // 否則落點會落在 WINDOW_GEOMETRY_TOLERANCE 邊界外而觸發一次多餘的收縮校正。
+    expect(compensatePopoutLeafSize({ width: 1038, height: 809 })).toEqual({ width: 1034, height: 804 });
+    // 無效尺寸應回傳 undefined，不得產生負尺寸
+    expect(compensatePopoutLeafSize(undefined)).toBeUndefined();
+    expect(compensatePopoutLeafSize({ width: 0, height: 0 })).toBeUndefined();
+    expect(compensatePopoutLeafSize({ width: 2, height: 3 })).toEqual({ width: 1, height: 1 });
+  });
+
+  test("workspace window id resolves Space identity without content matching", () => {
+    const win = {
+      closed: false,
+      document: {
+        body: {
+          classList: { contains: (c: string) => c === "is-popout-window" },
+          getAttribute: () => null,
+        },
+      },
+    } as unknown as Window;
+
+    mockPlugin.app.workspace.floatingSplit = {
+      children: [{ id: "win-id-alpha", win, doc: { defaultView: win } }],
+    };
+
+    const alpha: WindowLayout = {
+      id: "l-alpha",
+      name: "Alpha",
+      timestamp: Date.now(),
+      windowState: { size: { width: 900, height: 700 } },
+      workspace: { layout: {}, leaves: [{ id: "leaf-a", type: "markdown", state: { file: "a.md" } }] },
+      metadata: { fileCount: 1, tabCount: 1, splitCount: 0 },
+      windowInfo: { windowId: "win-id-alpha" },
+    };
+    // 完全相同的內容，但沒有 windowId → 不得因內容巧合而誤認
+    const impostor: WindowLayout = {
+      ...alpha,
+      id: "l-impostor",
+      name: "Impostor",
+      windowInfo: {},
+    };
+
+    expect((manager as any).getWindowId(win)).toBe("win-id-alpha");
+    expect(manager.getOpenWindowForLayout(alpha)).toBe(win);
+    expect(manager.getOpenWindowForLayout(impostor)).toBeNull();
+  });
+
+  test("startup match backfills windowId for already-labelled windows (plugin reload path)", () => {
+    // 外掛 reload（而非程序重啟）時，popout DOM 不會重建，body 仍留有
+    // data-layout-name；此路徑必須仍舊把穩定 window id 回寫進 Space，
+    // 否則 data.json 永遠缺 windowId，下次識別退化成內容比對。
+    const saved: WindowLayout[] = [];
+    const getAttribute = (name: string) => (name === "data-layout-name" ? "Alpha" : null);
+    const win = {
+      closed: false,
+      document: {
+        body: {
+          classList: { contains: (c: string) => c === "is-popout-window" },
+          getAttribute,
+          querySelectorAll: () => [],
+        },
+      },
+    } as unknown as Window;
+
+    mockPlugin.app.workspace.floatingSplit = {
+      children: [{ id: "win-id-alpha", win, doc: { defaultView: win } }],
+    };
+    mockPlugin.app.workspace.iterateAllLeaves = (cb: (leaf: any) => void) => {
+      cb({
+        id: "leaf-a",
+        containerEl: { ownerDocument: { defaultView: win } },
+        getViewState: () => ({ type: "markdown", state: { file: "a.md" } }),
+      });
+    };
+    mockPlugin.app.workspace.on = () => ({});
+    mockPlugin.settings.spaces = saved;
+    mockPlugin.saveSettings = async () => {};
+
+    const alpha: WindowLayout = {
+      id: "l-alpha",
+      name: "Alpha",
+      timestamp: Date.now(),
+      windowState: { size: { width: 900, height: 700 } },
+      workspace: { layout: {}, leaves: [] },
+      metadata: { fileCount: 1, tabCount: 1, splitCount: 0 },
+    };
+    saved.push(alpha);
+
+    manager.matchUnlabeledPopoutWindows(false);
+
+    // 已具名視窗不得被重新標籤（startup 不碰 native layout），但 windowId 必須回寫
+    expect(alpha.windowInfo?.windowId).toBe("win-id-alpha");
   });
 
   test("getOpenWindowForLayout should return null for unrelated layouts when 1 popout is open", () => {

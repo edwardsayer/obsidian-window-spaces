@@ -18,6 +18,12 @@ import {
   WindowLayoutsView,
 } from "./views/windowLayoutsView";
 import {
+  canInjectSidebars,
+  canInjectStatusBar,
+  getWindowPopoutPolicy,
+  isWindowDisabledByPolicy,
+} from "./popout/entrypointPolicy";
+import {
   getWindowOfLeaf,
   isPopoutWindow,
   PopoutLayoutEngine,
@@ -68,6 +74,9 @@ function createDefaultSettings(): WindowSettings {
       activityBar: true,
     },
     workspaceInterceptorEnabled: true,
+    disableOnUrlPopouts: true,
+    nativePopoutPolicy: "status-bar-only",
+    urlPopoutPolicy: "disabled",
   };
 }
 
@@ -80,6 +89,11 @@ export default class WindowSpacesPlugin extends Plugin {
   popoutLayout: PopoutLayoutEngineWithWindow;
   activityBars: PopoutActivityBarManager;
   workspaceInterceptor: WorkspaceInterceptor;
+
+  /** 本外掛專屬 Space 啟動的開窗意圖（由 manager.openNewPopoutWindow 設定）。 */
+  private dedicatedSpacePopoutPending = false;
+  /** 本外掛專屬啟動所開、在取得 Space 名稱前即視為 explicit Space 的視窗。 */
+  private dedicatedSpaceWindows?: WeakSet<Window>;
 
   async onload() {
     // 初始化國際化
@@ -102,14 +116,20 @@ export default class WindowSpacesPlugin extends Plugin {
       // 新 popout window 的初始化 policy：注入 activity bars、依 activityBarDefaults
       // 建立側欄結構與 sizing。供 Folder Spaces 等外掛經 shared openNewPopoutWindow()
       // 開啟視窗時，仍由 Window Spaces 統一管理「新視窗行為」。
-      initializeNewPopoutWindow: (win: Window) =>
-        this.activityBars ? this.activityBars.initializeNewWindow(win) : Promise.resolve(),
+      //
+      // 兩種開窗來源必須分流：
+      // - 本外掛專屬啟動（Switcher 建立新 Space）：標記為 explicit Space 並強制完整
+      //   初始化，因為此刻 Space 名稱尚未寫入 layout，policy 會誤判為一般原生視窗。
+      // - 其他外掛（如 Folder Spaces）委託開窗：完全依 nativePopoutPolicy 裝飾，
+      //   不強制建立側欄結構，避免產生「有 sidebar 卻沒有 activity bar」的不一致狀態。
+      initializeNewPopoutWindow: (win: Window) => this.initializeNewPopoutWindowFor(win),
     });
     this.activityBars = new PopoutActivityBarManager(this, this.popoutLayout);
     this.workspaceInterceptor = new WorkspaceInterceptor(this.app, this.popoutLayout);
     this.workspaceInterceptor.enabled = this.settings.workspaceInterceptorEnabled !== false;
     // 僅對已注入 Activity Bar 且非 Obsidian UI 視窗（如設定 popout）攔截
     this.workspaceInterceptor.isManagedWindow = (win) => {
+      if (this.isWindowDisabled(win)) return false;
       if (!this.activityBars.isInjected(win)) return false;
       if (win.document?.body?.querySelector(".modal-container")) return false;
       return true;
@@ -215,6 +235,26 @@ export default class WindowSpacesPlugin extends Plugin {
     if (this.settings.layoutStatusBarDefaultApplied !== true) {
       this.settings.showLayoutStatusBar = true;
       this.settings.layoutStatusBarDefaultApplied = true;
+      await this.saveSettings();
+    }
+
+    // 預設啟用 URL popout 停用功能；舊版未設定也啟用
+    if (this.settings.disableOnUrlPopouts === undefined) {
+      this.settings.disableOnUrlPopouts = true;
+      await this.saveSettings();
+    }
+
+    // 遷移或初始化開窗管道策略
+    if (!this.settings.nativePopoutPolicy) {
+      this.settings.nativePopoutPolicy = "status-bar-only";
+      await this.saveSettings();
+    }
+    if (!this.settings.urlPopoutPolicy) {
+      if (this.settings.disableOnUrlPopouts === false) {
+        this.settings.urlPopoutPolicy = "full";
+      } else {
+        this.settings.urlPopoutPolicy = "disabled";
+      }
       await this.saveSettings();
     }
 
@@ -494,16 +534,154 @@ export default class WindowSpacesPlugin extends Plugin {
     return leaf;
   }
 
+  /**
+   * shared openNewPopoutWindow() 對所有 candidate 呼叫的初始化 policy。
+   *
+   * 見 onload 內的註解：專屬 Space 啟動強制完整初始化，其他外掛委託開窗
+   * 完全依 nativePopoutPolicy 裝飾。
+   */
+  async initializeNewPopoutWindowFor(win: Window): Promise<void> {
+    const dedicated = this.takeDedicatedSpacePopoutIntent();
+    // 先標記再判定政策，讓專屬 Space 視窗在取得 Space 名稱前就被視為 explicit Space。
+    if (dedicated) (this.dedicatedSpaceWindows ??= new WeakSet<Window>()).add(win);
+    if (this.isWindowDisabled(win)) return;
+    if (!this.activityBars) return;
+    await this.activityBars.initializeNewWindow(win, dedicated);
+  }
+
+  isExplicitSpaceWindow(win: Window): boolean {
+    if (!win || win.closed) return false;
+    // 本外掛專屬啟動所開的視窗在取得 Space 名稱前即視為 explicit Space；
+    // 否則開窗當下的 policy 檢查會把它誤判成一般原生視窗而拆掉剛建好的側欄。
+    if (this.dedicatedSpaceWindows?.has(win)) return true;
+    return Boolean(this.manager?.getLayoutNameForWindow(win));
+  }
+
+  /** 標記「接下來由本外掛開出的 popout 屬於專屬 Space 啟動」（供 manager 使用）。 */
+  beginDedicatedSpacePopout(): void {
+    this.dedicatedSpacePopoutPending = true;
+  }
+
+  /** 結束專屬 Space 啟動的開窗區間。 */
+  endDedicatedSpacePopout(): void {
+    this.dedicatedSpacePopoutPending = false;
+  }
+
+  /**
+   * 取出（消費）一次專屬 Space 啟動意圖。
+   *
+   * shared openNewPopoutWindow() 會對所有候選呼叫 initializeNewPopoutWindow，
+   * 但一次建立只會產生一個視窗，故意圖取用一次即失效，避免後續非本外掛開的
+   * 視窗被誤判為專屬 Space。
+   */
+  private takeDedicatedSpacePopoutIntent(): boolean {
+    if (!this.dedicatedSpacePopoutPending) return false;
+    this.dedicatedSpacePopoutPending = false;
+    return true;
+  }
+
+  getWindowPolicy(win: Window) {
+    return getWindowPopoutPolicy(win, this.settings, this.app, this.isExplicitSpaceWindow(win));
+  }
+
+  canInjectSidebars(win: Window): boolean {
+    return canInjectSidebars(win, this.settings, this.app, this.isExplicitSpaceWindow(win));
+  }
+
+  canInjectStatusBar(win: Window): boolean {
+    return canInjectStatusBar(win, this.settings, this.app, this.isExplicitSpaceWindow(win));
+  }
+
+  isWindowDisabled(win: Window): boolean {
+    return isWindowDisabledByPolicy(win, this.settings, this.app, this.isExplicitSpaceWindow(win));
+  }
+
+  checkAndHandleUrlPopout(win: Window): boolean {
+    const policy = this.getWindowPolicy(win);
+    if (policy === "disabled") {
+      this.activityBars?.cleanupWindow(win);
+      this.manager?.unregisterPopoutWindow(win);
+      return true;
+    }
+    if (policy === "status-bar-only") {
+      this.activityBars?.cleanupWindow(win);
+      this.manager?.refreshLayoutStatusBar(win);
+      return false;
+    }
+    return false;
+  }
+
+  checkAndCleanupUrlPopouts(): void {
+    const livePopouts = this.popoutLayout?.getLivePopoutWindows?.() ?? [];
+    for (const win of livePopouts) {
+      this.checkAndHandleUrlPopout(win);
+    }
+  }
+
+  scheduleUrlPopoutCheck(win: Window): void {
+    if (this.manager?.isRestoringLayout || this.isExplicitSpaceWindow(win)) return;
+    const delays = [50, 150, 300, 600, 1000];
+    delays.forEach((delay) => {
+      win.setTimeout(() => {
+        try {
+          if (win.closed || this.manager?.isRestoringLayout || this.isExplicitSpaceWindow(win)) return;
+          this.checkAndHandleUrlPopout(win);
+        } catch {
+          // Cross-origin or destroyed window access safety
+        }
+      }, delay);
+    });
+  }
+
+  handleUrlPopoutsSettingChange(): void {
+    this.handlePopoutPolicyChange();
+  }
+
+  handlePopoutPolicyChange(): void {
+    const livePopouts = this.popoutLayout?.getLivePopoutWindows?.() ?? [];
+    for (const win of livePopouts) {
+      const policy = this.getWindowPolicy(win);
+      if (policy === "disabled") {
+        this.activityBars?.cleanupWindow(win);
+        this.manager?.unregisterPopoutWindow(win);
+      } else if (policy === "status-bar-only") {
+        this.activityBars?.cleanupWindow(win);
+        this.manager?.registerPopoutWindow(win);
+        this.manager?.refreshLayoutStatusBar(win);
+      } else {
+        this.manager?.registerPopoutWindow(win);
+        this.activityBars?.injectForWindow(win);
+        this.activityBars?.scheduleLayoutIntegrityCheck(win);
+      }
+    }
+    this.activityBars?.refreshAll();
+    this.manager?.matchUnlabeledPopoutWindows();
+    this.manager?.refreshLayoutLabels();
+  }
+
   private setupEventListeners() {
     // 監聽視窗開關
     this.registerEvent(
       this.app.workspace.on("window-open", (_workspaceWindow, popoutWindow) => {
+        const policy = this.getWindowPolicy(popoutWindow);
+        if (policy === "disabled") {
+          this.activityBars?.cleanupWindow(popoutWindow);
+          this.manager?.unregisterPopoutWindow(popoutWindow);
+          WindowLayoutsModal.renderAllInstances();
+          return;
+        }
+
         this.manager.registerPopoutWindow(popoutWindow);
-        this.activityBars.injectForWindow(popoutWindow);
-        // 新 Popout 建立後排程佈局完整性檢查（補足側欄 / 藏起空側欄）
-        this.activityBars.scheduleLayoutIntegrityCheck(popoutWindow);
-        // Obsidian 原生 New Window 不經 shared initializer，補上欄位初始化
-        this.activityBars.scheduleNewWindowInitialization(popoutWindow);
+
+        if (this.canInjectSidebars(popoutWindow)) {
+          this.activityBars.injectForWindow(popoutWindow);
+          this.activityBars.scheduleLayoutIntegrityCheck(popoutWindow);
+          this.activityBars.scheduleNewWindowInitialization(popoutWindow);
+        } else {
+          this.activityBars.cleanupWindow(popoutWindow);
+        }
+
+        this.scheduleUrlPopoutCheck(popoutWindow);
         WindowLayoutsModal.renderAllInstances();
       })
     );
@@ -520,6 +698,7 @@ export default class WindowSpacesPlugin extends Plugin {
     this.registerEvent(
       this.app.workspace.on("layout-change", () => {
         if (this.manager?.isRestoringLayout) return;
+        this.checkAndCleanupUrlPopouts();
         this.manager.matchUnlabeledPopoutWindows();
         this.manager.checkAndDebouncedAutoSaveAll();
         this.activityBars.refreshAll();
@@ -530,6 +709,9 @@ export default class WindowSpacesPlugin extends Plugin {
       this.app.workspace.on("active-leaf-change", (leaf: WorkspaceLeaf | null) => {
         const leafWindow = leaf ? getWindowOfLeaf(leaf) : null;
         if (leaf && leafWindow && isPopoutWindow(leafWindow)) {
+          if (this.checkAndHandleUrlPopout(leafWindow)) {
+            return;
+          }
           this.popoutLayout.rememberActiveContentPane(leafWindow, leaf);
         }
 

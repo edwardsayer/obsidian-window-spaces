@@ -157,6 +157,13 @@ export interface TranslationStrings {
     showNotifications: string;
     showNotificationsDesc: string;
     popoutDefaultsSection: string;
+    nativePopoutPolicy: string;
+    nativePopoutPolicyDesc: string;
+    urlPopoutPolicy: string;
+    urlPopoutPolicyDesc: string;
+    policyFull: string;
+    policyStatusBarOnly: string;
+    policyDisabled: string;
     showLayoutStatusBar: string;
     showLayoutStatusBarDesc: string;
     showWindowLayoutsRibbonIcon: string;

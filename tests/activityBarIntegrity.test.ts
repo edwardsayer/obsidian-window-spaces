@@ -1149,3 +1149,39 @@ describe("sidebar tab detach guard and navigation fallback", () => {
   });
 });
 
+
+describe("cleanup degrades sidebars into plain content splits", () => {
+  test("cleanupWindow removes sidebar marks and clears engine sidebar hints", () => {
+    const env = buildEnv();
+    const { leftCol, centerCol, rightCol } = buildThreeColumns(env);
+
+    // 模擬 initializeNewWindow 建立的狀態：側欄欄位已標記、hints 已設定。
+    leftCol.classList.add("window-spaces-sidebar-column", "mod-sidedock", "mod-left-split");
+    rightCol.classList.add("window-spaces-sidebar-column", "mod-sidedock", "mod-right-split");
+    env.engine.setSidebarSides(window, {
+      left: true,
+      right: true,
+      originalCount: 3,
+      initialLeft: true,
+      initialRight: true,
+    });
+    expect(env.engine.getSidebarSides(window)?.left).toBe(true);
+
+    env.manager.cleanupWindow(window);
+
+    // 沒有 activity bar 就不應該留下任何 sidebar 語意標記。
+    for (const col of [leftCol, centerCol, rightCol]) {
+      expect(col.classList.contains("window-spaces-sidebar-column")).toBe(false);
+      expect(col.classList.contains("mod-sidedock")).toBe(false);
+      expect(col.classList.contains("mod-left-split")).toBe(false);
+      expect(col.classList.contains("mod-right-split")).toBe(false);
+    }
+    // 欄位本身保留（內容不得遺失），只是降級為一般 content split。
+    expect(env.rootEl.contains(centerCol)).toBe(true);
+    // hints 必須清除，否則 getColumnElement 仍會把已降級的欄位當成側欄。
+    expect(env.engine.getSidebarSides(window)?.left).toBe(false);
+    expect(env.engine.getSidebarSides(window)?.right).toBe(false);
+
+    teardown(env);
+  });
+});

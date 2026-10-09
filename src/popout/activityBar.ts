@@ -115,6 +115,22 @@ export class PopoutActivityBarManager {
     return true;
   }
 
+  private isWindowDisabled(win: Window): boolean {
+    const pluginWithDisabled = this.plugin as unknown as { isWindowDisabled?: (win: Window) => boolean };
+    return pluginWithDisabled.isWindowDisabled?.(win) ?? false;
+  }
+
+  private canInjectSidebars(win: Window): boolean {
+    const pluginWithCan = this.plugin as unknown as {
+      canInjectSidebars?: (w: Window) => boolean;
+      isWindowDisabled?: (w: Window) => boolean;
+    };
+    if (typeof pluginWithCan.canInjectSidebars === "function") {
+      return pluginWithCan.canInjectSidebars(win);
+    }
+    return !this.isWindowDisabled(win);
+  }
+
   getItemsForSide(side: PopoutSide): ActivityBarItem[] {
     return this.settings.activityBars?.[side] ?? [];
   }
@@ -137,8 +153,9 @@ export class PopoutActivityBarManager {
    * When no view is available, ensureSideColumn intentionally leaves a New Tab
    * panel in that sidebar instead.
    */
-  async initializeNewWindow(win: Window): Promise<void> {
+  async initializeNewWindow(win: Window, force = false): Promise<void> {
     if (!win || win.closed) return;
+    if (!force && !this.canInjectSidebars(win)) return;
     // shared openNewPopoutWindow 的 initializer 與 window-open 的補欄排程可能
     // 同時觸發，重複初始化會多建側欄；以進行中集合做重入防護。
     if (this.initializingWindows.has(win)) return;
@@ -156,7 +173,7 @@ export class PopoutActivityBarManager {
   private async initializeNewWindowInternal(win: Window): Promise<void> {
     if (!win || win.closed) return;
 
-    this.injectForWindow(win);
+    this.injectForWindow(win, true);
     const leftVisible = this.isSideVisibleForWindow(win, "left");
     const rightVisible = this.isSideVisibleForWindow(win, "right");
     const engineWithSidebarHints = this.engine as PopoutLayoutEngine & {
@@ -201,7 +218,12 @@ export class PopoutActivityBarManager {
   scheduleNewWindowInitialization(win: Window): void {
     if (!win || win.closed || !isPopoutWindow(win)) return;
     win.setTimeout(() => {
-      if (win.closed || !this.barsByWindow.has(win)) return;
+      if (win.closed) return;
+      if (!this.canInjectSidebars(win)) {
+        this.cleanupWindow(win);
+        return;
+      }
+      if (!this.barsByWindow.has(win)) return;
       if (this.initializingWindows.has(win)) return;
       const manager = (this.plugin as unknown as {
         manager?: { isRestoringLayout?: boolean };
@@ -226,6 +248,7 @@ export class PopoutActivityBarManager {
    * sidebar].
    */
   private ensureLayoutColumns(win: Window): Promise<void> {
+    if (!this.canInjectSidebars(win)) return Promise.resolve();
     const existing = this.columnEnsurePromises.get(win);
     if (existing !== undefined) return existing;
 
@@ -945,10 +968,10 @@ export class PopoutActivityBarManager {
     }
   }
 
-  /** 針對單一 Popout 注入（若已注入且仍連接著 DOM 則重新渲染按鈕）。 */
-  injectForWindow(win: Window): void {
+  /** 針對單一 Popout 注入（若已注入且仍連接着 DOM 則重新渲染按鈕）。 */
+  injectForWindow(win: Window, force = false): void {
     if (!win || win.closed || !isPopoutWindow(win)) return;
-    if (!this.isEnabled()) {
+    if (!this.isEnabled() || (!force && !this.canInjectSidebars(win))) {
       this.cleanupWindow(win);
       return;
     }
@@ -1036,6 +1059,15 @@ export class PopoutActivityBarManager {
     body?.classList.remove("window-spaces-left-activity-hidden");
     body?.classList.remove("window-spaces-right-activity-hidden");
     this.clearTabHeaderAvoidance(win);
+    // 「沒有 activity bar 就不應該有 sidebar」是硬性不變式：
+    // cleanup 若只移除 activity bar 元素而留下 sidebar 欄位標記，會產生
+    // 語意上不可能的「有 sidebar、無 activity bar」狀態（Folder Spaces 等
+    // 外掛委託開窗後被判定為 status-bar-only 時即會遇到）。因此這裡把欄位
+    // 標記全部降級為一般 content split，並清除 shared engine 的 sidebar hints，
+    // 讓 getColumnElement / getSidebarSides 不再回報已不存在的側欄。
+    this.clearSidebarMarks(win);
+    this.sidebarHintsByWindow.delete(win);
+    this.engine.setSidebarSides(win, { left: false, right: false });
     body?.style.removeProperty("--window-space-color");
     body?.style.removeProperty("--window-space-border-inset");
     body?.classList.remove("has-window-space-color");
@@ -1061,13 +1093,17 @@ export class PopoutActivityBarManager {
   refreshAll(): void {
     const live = this.engine.getLivePopoutWindows();
     live.forEach((win) => {
+      if (!this.canInjectSidebars(win)) {
+        this.cleanupWindow(win);
+        return;
+      }
       this.injectForWindow(win);
       // 佈局改變後排程完整性檢查（補足側欄 / 藏起空側欄）
       this.scheduleLayoutIntegrityCheck(win);
     });
 
     Array.from(this.injectedWindows).forEach((win) => {
-      if (!live.includes(win)) this.cleanupWindow(win);
+      if (!live.includes(win) || !this.canInjectSidebars(win)) this.cleanupWindow(win);
     });
   }
 
@@ -1226,6 +1262,15 @@ export class PopoutActivityBarManager {
 
   /** 重建指定視窗的按鈕內容。 */
   renderWindow(win: Window, options: { allowDuringRestore?: boolean } = {}): void {
+    if (!win || win.closed) return;
+    if (!this.canInjectSidebars(win)) {
+      this.cleanupWindow(win);
+      return;
+    }
+    if (!this.barsByWindow.has(win)) {
+      this.injectForWindow(win);
+      return;
+    }
     const allowDuringRestore = options.allowDuringRestore === true;
     if (this.shouldDeferRestoreRender(win, allowDuringRestore)) {
       this.applyDeferredRestoreVisibility(win);
@@ -1452,9 +1497,13 @@ export class PopoutActivityBarManager {
         && index === last;
 
       if (columns.length < requiredColumns) {
-        if (isPureEditor) {
-          if (index === 0) isLeftSidebar = false;
-          if (index === last) isRightSidebar = false;
+        // 當欄位數不足 requiredColumns（例如雙側 activity bar 開啟但只有 2 欄）：
+        // 若該欄位不包含任何側欄 view（例如是純編輯器或新分頁 New Tab），
+        // 它屬於內容區，絕不可標為側欄。
+        const isContentCandidate = isPureEditor || !this.columnContainsSidebarView(win, el);
+        if (isContentCandidate) {
+          if (index === 0 && columns.length > 1 && rightActivityVisible) isLeftSidebar = false;
+          if (index === last && leftActivityVisible) isRightSidebar = false;
         }
       }
 
@@ -1791,7 +1840,10 @@ export class PopoutActivityBarManager {
 
   /** 更新所有已注入視窗的 active 狀態（layout-change 時呼叫）。 */
   updateActiveStatesAll(): void {
-    Array.from(this.injectedWindows).forEach((win) => this.updateActiveStates(win));
+    Array.from(this.injectedWindows).forEach((win) => {
+      if (!this.canInjectSidebars(win)) return;
+      this.updateActiveStates(win);
+    });
   }
 
   // ===== 佈局完整性守護 =====
@@ -1807,14 +1859,24 @@ export class PopoutActivityBarManager {
    * 因此延遲一段時間等結構穩定後再檢查，避免在重建途中誤判。
    */
   scheduleLayoutIntegrityCheck(win: Window): void {
-    if (!win || win.closed || !this.barsByWindow.has(win)) return;
+    if (!win || win.closed) return;
+    if (!this.canInjectSidebars(win)) {
+      this.cleanupWindow(win);
+      return;
+    }
+    if (!this.barsByWindow.has(win)) return;
     const existing = this.integrityCheckTimers.get(win);
     if (existing !== undefined) {
       win.clearTimeout(existing);
     }
     const timer = win.setTimeout(() => {
       this.integrityCheckTimers.delete(win);
-      if (win.closed || !this.barsByWindow.has(win)) return;
+      if (win.closed) return;
+      if (!this.canInjectSidebars(win)) {
+        this.cleanupWindow(win);
+        return;
+      }
+      if (!this.barsByWindow.has(win)) return;
       void this.ensureLayoutIntegrity(win);
     }, 350);
     this.integrityCheckTimers.set(win, timer);

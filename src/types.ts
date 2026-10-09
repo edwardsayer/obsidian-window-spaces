@@ -35,6 +35,12 @@ export interface WindowLayout {
   };
   // 用於識別視窗的資訊
   windowInfo?: {
+    /**
+     * 穩定的 window instance 識別碼（取自 Obsidian floating child 的 `id`）。
+     * 實機 CDP 驗證：此 id 同時存在於 `workspace.getLayout().floating.children[].id`、
+     * `workspace.floatingSplit.children[].id` 與 `workspace.json`，且**跨重啟保留**，
+     * 因此可作為 Space ↔ Window 的權威識別，不需組合 layout 內容推測。
+     */
     windowId?: string;
     firstLeafId?: string;
   };
@@ -178,7 +184,18 @@ export interface WindowSettings {
   popoutAccents?: PopoutAccentSettings;
   // Workspace API 攔截器（Monkey Patch）開關，預設開啟
   workspaceInterceptorEnabled?: boolean;
+  /**
+   * 當彈出的 Popout 視窗為網址（如 OpenID/OAuth 登入或網頁檢視）時，
+   * 停用側邊欄、活動列等 Window Space 功能。預設啟用（舊版相容標記）。
+   */
+  disableOnUrlPopouts?: boolean;
+  /** Obsidian 原生開窗策略，預設 "status-bar-only" */
+  nativePopoutPolicy?: PopoutPolicyMode;
+  /** URL 與網頁彈窗策略，預設 "disabled" */
+  urlPopoutPolicy?: PopoutPolicyMode;
 }
+
+export type PopoutPolicyMode = "full" | "status-bar-only" | "disabled";
 
 export interface PopoutAccentSettings {
   enabled: boolean;

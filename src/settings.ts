@@ -141,6 +141,32 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
         heading: t("settings.popoutDefaultsSection"),
         items: [
           {
+            name: t("settings.nativePopoutPolicy"),
+            desc: t("settings.nativePopoutPolicyDesc"),
+            control: {
+              type: "dropdown",
+              key: "nativePopoutPolicy",
+              options: {
+                "status-bar-only": t("settings.policyStatusBarOnly"),
+                full: t("settings.policyFull"),
+                disabled: t("settings.policyDisabled"),
+              },
+            },
+          },
+          {
+            name: t("settings.urlPopoutPolicy"),
+            desc: t("settings.urlPopoutPolicyDesc"),
+            control: {
+              type: "dropdown",
+              key: "urlPopoutPolicy",
+              options: {
+                disabled: t("settings.policyDisabled"),
+                "status-bar-only": t("settings.policyStatusBarOnly"),
+                full: t("settings.policyFull"),
+              },
+            },
+          },
+          {
             name: t("settings.autoSaveEnabled"),
             desc: t("settings.autoSaveDescription"),
             control: { type: "toggle", key: "autoSave" }
@@ -200,6 +226,8 @@ export class WindowSpacesSettingTab extends PluginSettingTab {
       else this.removeAutoSave();
     } else if (key === "workspaceInterceptorEnabled") {
       this.plugin.workspaceInterceptor.enabled = value !== false;
+    } else if (key === "nativePopoutPolicy" || key === "urlPopoutPolicy") {
+      this.plugin.handlePopoutPolicyChange();
     } else if (key === "showWindowLayoutsRibbonIcon") {
       this.plugin.refreshRibbonIcons();
     } else if (

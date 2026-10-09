@@ -501,7 +501,15 @@ export class WindowLayoutsModal extends Modal {
           throw new Error(t("errors.cannotRestore"));
         }
 
-        const emptyLayout: WindowLayout = {
+        // 現場捕獲新視窗初始化完成後的真實完整佈局（包含左側欄、中央 New tab、右側欄）
+        let initialLayout: WindowLayout | null = null;
+        try {
+          initialLayout = await this.plugin.manager.captureCurrentLayout({ name: cleanName }, newWin);
+        } catch {
+          // ignore capture fallback
+        }
+
+        const layoutToSave: WindowLayout = initialLayout || {
           id: typeof this.plugin.manager?.generateId === "function"
             ? this.plugin.manager.generateId()
             : `layout_${Date.now()}`,
@@ -531,11 +539,17 @@ export class WindowLayoutsModal extends Modal {
           },
         };
 
-        await this.plugin.manager.saveLayout(emptyLayout);
+        layoutToSave.id = typeof this.plugin.manager?.generateId === "function"
+          ? this.plugin.manager.generateId()
+          : `layout_${Date.now()}`;
+        layoutToSave.name = cleanName;
+        layoutToSave.activityBars = layoutToSave.activityBars || this.plugin.activityBars?.getDefaultSettingsForNewSpace();
+
+        await this.plugin.manager.saveLayout(layoutToSave, newWin, { refreshLivePresentation: false });
 
         if (newWin) {
           if (this.plugin.manager?.layoutWindows) {
-            this.plugin.manager.layoutWindows.set(emptyLayout, newWin);
+            this.plugin.manager.layoutWindows.set(layoutToSave, newWin);
           }
           if (typeof this.plugin.manager?.setLayoutLabelForWindow === "function") {
             this.plugin.manager.setLayoutLabelForWindow(newWin, cleanName);
@@ -586,11 +600,14 @@ export class WindowLayoutsModal extends Modal {
 
   private static collapsedSections = new Set<string>();
   private renderedLayoutEntries: { layout: WindowLayout; element: HTMLElement }[] = [];
+  /** 本輪渲染已認領的開啟中視窗（一個視窗最多對應一個 Space 的 active 徒章）。 */
+  private claimedOpenWindows = new Set<Window>();
 
   private renderLayouts(): void {
     if (!this.listEl) return;
     this.listEl.empty();
     this.renderedLayoutEntries = [];
+    this.claimedOpenWindows = new Set<Window>();
 
     const rawQuery = this.searchInput?.value.trim() || "";
     const query = rawQuery.toLowerCase();
@@ -958,7 +975,17 @@ export class WindowLayoutsModal extends Modal {
       ? this.plugin.manager.getOpenWindowForLayout(layout)
       : null;
 
+    // 同一輪渲染中，一個視窗只能屬於一個 Space；避免舊資料殘留導致多個項目同時亮起。
+    let isOpen = !!openWin;
     if (openWin) {
+      if (this.claimedOpenWindows.has(openWin)) {
+        isOpen = false;
+      } else {
+        this.claimedOpenWindows.add(openWin);
+      }
+    }
+
+    if (isOpen) {
       pathEl.createSpan({
         text: `🟢 ${t("manageModal.windowOpenBadge") || "視窗開啟中"}`,
         cls: "layout-open-status",
