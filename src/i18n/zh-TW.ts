@@ -208,8 +208,6 @@ export const zhTW: TranslationStrings = {
     popoutAccentsActivityBarDesc: "在左右兩側 Activity Bar 注入柔和的空間主題底色",
     manageSpaces: "管理空間...",
     showInSystemExplorer: "在系統資料夾中顯示",
-    copyPath: "複製路徑",
-    pathCopied: "路徑已複製到剪貼簿",
   },
 
   notifications: {

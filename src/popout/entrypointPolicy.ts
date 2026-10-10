@@ -36,7 +36,7 @@ export function isUrlLeaf(leaf: WorkspaceLeaf): boolean {
   const extLeaf = leaf as unknown as ExtendedWorkspaceLeaf;
   const viewState = typeof extLeaf.getViewState === "function" ? extLeaf.getViewState() : undefined;
   const viewType = viewState?.type || (leaf.view as { getViewType?: () => string })?.getViewType?.();
-  const state = viewState?.state as Record<string, unknown> | undefined;
+  const state = viewState?.state;
 
   // 已知常見瀏覽器/網頁視圖型別
   if (
@@ -102,7 +102,7 @@ export function isUrlPopoutWindow(win: Window, app?: App): boolean {
     if (isHttpOrHttpsUrl(href)) {
       return true;
     }
-  } catch (_securityError) {
+  } catch {
     // 跨來源安全性異常，表示已導向外部網域（如 OpenID / OAuth 登入頁面）
     return true;
   }

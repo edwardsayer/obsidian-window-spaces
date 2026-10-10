@@ -210,8 +210,6 @@ export const en: TranslationStrings = {
     popoutAccentsActivityBarDesc: "Inject a gentle space theme background tint into left and right Activity Bars",
     manageSpaces: "Manage spaces...",
     showInSystemExplorer: "Show in system explorer",
-    copyPath: "Copy path",
-    pathCopied: "Path copied to clipboard",
   },
 
   notifications: {

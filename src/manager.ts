@@ -95,7 +95,9 @@ type NativeDocumentTitleGetter = (this: Document) => string;
 type NativeDocumentTitleSetter = (this: Document, title: string) => void;
 
 function cloneJsonValue<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value));
+  // JSON.parse 回傳 any：必須明確標註回傳型別，否則會觸發
+  // @typescript-eslint/no-unsafe-return（Community Store 審核會攔）。
+  return JSON.parse(JSON.stringify(value)) as T;
 }
 
 function invokeManagerMethod<TResult>(method: unknown, receiver: unknown, args: unknown[]): TResult | undefined {
@@ -1517,7 +1519,7 @@ export class WindowLayoutManager {
     this.markSpaceMenu(menu, targetWin);
   }
 
-  /** 仿 vault switcher 右鍵選單：Show in system explorer / Copy path。 */
+  /** 仿 vault switcher 右鍵選單：Show in system explorer。 */
   private showSpaceContextMenu(targetWin: Window, e: MouseEvent): void {
     const menu = new Menu();
     menu.addItem((item) => {
@@ -1530,11 +1532,6 @@ export class WindowLayoutManager {
           console.warn("Failed to reveal vault in system explorer:", err);
         }
       });
-    });
-    menu.addItem((item) => {
-      item.setTitle(t("settings.copyPath"));
-      item.setIcon("clipboard");
-      item.onClick(() => void this.copyVaultPath(targetWin));
     });
     menu.showAtMouseEvent(e);
     this.markSpaceMenu(menu, targetWin);
@@ -1887,18 +1884,6 @@ export class WindowLayoutManager {
     }
 
     return this.getLeavesForWindow(targetWin);
-  }
-
-  /** 複製 vault 根目錄路徑到剪貼簿。 */
-  private async copyVaultPath(targetWin: Window): Promise<void> {
-    try {
-      const adapter = this.app.vault.adapter as { getFullPath?: (path: string) => string };
-      const path = adapter?.getFullPath?.("") ?? this.app.vault.getName();
-      await targetWin.navigator.clipboard.writeText(path);
-      new Notice(`${this.app.vault.getName()}: ${t("settings.pathCopied")}`);
-    } catch (err) {
-      console.warn("Failed to copy vault path:", err);
-    }
   }
 
   /** 開啟 Window Spaces 設定頁面。 */

@@ -211,8 +211,6 @@ export interface TranslationStrings {
     popoutAccentsActivityBarDesc: string;
     manageSpaces: string;
     showInSystemExplorer: string;
-    copyPath: string;
-    pathCopied: string;
   };
 
   // 通知

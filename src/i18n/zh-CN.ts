@@ -208,8 +208,6 @@ export const zhCN: TranslationStrings = {
     popoutAccentsActivityBarDesc: "在左右两侧 Activity Bar 注入柔和的空间主题底色",
     manageSpaces: "管理空间...",
     showInSystemExplorer: "在系统文件夹中显示",
-    copyPath: "复制路径",
-    pathCopied: "路径已复制到剪贴板",
   },
 
   notifications: {
