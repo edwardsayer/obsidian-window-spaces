@@ -244,17 +244,18 @@ export default class WindowSpacesPlugin extends Plugin {
       await this.saveSettings();
     }
 
-    // 遷移或初始化開窗管道策略
-    if (!this.settings.nativePopoutPolicy) {
+    // 遷移或初始化開窗管道策略。必須以「實際持久化的資料」判定缺鍵：
+    // 此時 this.settings 已與 createDefaultSettings() 合併，兩個策略鍵必定有值，
+    // 用 this.settings 判定會讓本區塊成為死碼，使舊版 disableOnUrlPopouts:false 的
+    // 使用者被靜默降級為 "disabled"（與其原意相反）。以 saved 判定同時保留
+    // 原本的 falsy 語意（null 視為缺鍵）。
+    if (!savedSettings || !savedSettings.nativePopoutPolicy) {
       this.settings.nativePopoutPolicy = "status-bar-only";
       await this.saveSettings();
     }
-    if (!this.settings.urlPopoutPolicy) {
-      if (this.settings.disableOnUrlPopouts === false) {
-        this.settings.urlPopoutPolicy = "full";
-      } else {
-        this.settings.urlPopoutPolicy = "disabled";
-      }
+    if (!savedSettings || !savedSettings.urlPopoutPolicy) {
+      this.settings.urlPopoutPolicy =
+        savedSettings?.disableOnUrlPopouts === false ? "full" : "disabled";
       await this.saveSettings();
     }
 

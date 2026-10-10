@@ -1185,3 +1185,122 @@ describe("cleanup degrades sidebars into plain content splits", () => {
     teardown(env);
   });
 });
+
+describe("原生 popout 指派為 Space 後的欄位結構（F5）", () => {
+  /**
+   * F5（pre-release reviewer finding）：
+   * `entrypointPolicy.test.ts` 的既有轉換測試只斷言「有注入 Activity Bar」，
+   * 未驗證欄位結構。真實使用者路徑是 status-bar-only 視窗按「儲存」→
+   * `setLayoutLabelForWindow` → `renderWindow` → `ensureLayoutColumns`
+   * **此時才補出 3 欄**（左側欄 + 中央 + 右側欄）。
+   *
+   * 注意：`isPopoutWindow()` 對 `win === window` 恆為 false，故必須建立
+   * 獨立的 popout document/window（同本檔其他 popout 測試的做法）。
+   */
+  const topColumns = (rootEl: HTMLElement): HTMLElement[] =>
+    Array.from(rootEl.children).filter(
+      (el): el is HTMLElement =>
+        el instanceof HTMLElement &&
+        (el.classList.contains("workspace-tabs") ||
+          el.classList.contains("workspace-split")),
+    );
+
+  interface F5Env {
+    env: MockEnv;
+    popoutWin: Window;
+    popoutDoc: Document;
+    plugin: {
+      settings: Record<string, unknown>;
+      canInjectSidebars?: (w: Window) => boolean;
+      manager?: { getLayoutNameForWindow?: (w: Window) => string | null };
+    };
+    centerCol: HTMLElement;
+  }
+
+  function buildPopoutEnv(): F5Env {
+    const env = buildEnv();
+    const plugin = (env.manager as unknown as { plugin: F5Env["plugin"] }).plugin;
+    plugin.settings.spaces = [];
+
+    const popoutDoc = document.implementation.createHTMLDocument("popout");
+    popoutDoc.body.classList.add("is-popout-window");
+    const popoutWin = {
+      document: popoutDoc,
+      closed: false,
+      // waitForLayoutFrame 恆 await 兩次 rAF（其判斷 `typeof raf === "function"`
+      // 恆真），缺 requestAnimationFrame 會讓 promise 永不 resolve → 測試逾時。
+      requestAnimationFrame: (cb: FrameRequestCallback) => {
+        setTimeout(() => cb(0), 0);
+        return 0;
+      },
+      // no-op 掛載，避免測試結束後的完整性檢查計時器外洩到其他測試。
+      setTimeout: () => 0,
+      clearTimeout: () => undefined,
+    } as unknown as Window;
+    Object.defineProperty(popoutDoc, "defaultView", { value: popoutWin });
+    popoutDoc.body.appendChild(env.rootEl);
+
+    // 單一 content 欄位：模擬 status-bar-only 的原生 popout。
+    const centerLeaf = {
+      id: "center",
+      win: popoutWin,
+      containerEl: popoutDoc.createElement("div"),
+      view: { containerEl: popoutDoc.createElement("div") },
+      getViewState: () => ({ type: "markdown" }),
+    } as unknown as MockLeaf;
+    const centerCol = popoutDoc.createElement("div");
+    centerCol.classList.add("workspace-tabs");
+    centerCol.appendChild(centerLeaf.containerEl);
+    env.rootEl.appendChild(centerCol);
+    env.leaves.push(centerLeaf);
+
+    return { env, popoutWin, popoutDoc, plugin, centerCol };
+  }
+
+  test("指派 Space 前後：1 欄無標記 → 3 欄且左右兩欄帶 sidebar 標記", async () => {
+    const { env, popoutWin, plugin, centerCol } = buildPopoutEnv();
+
+    // ── 階段一：尚未指派 Space（原生 popout，nativePopoutPolicy=status-bar-only）──
+    plugin.canInjectSidebars = () => false;
+    plugin.manager = { getLayoutNameForWindow: () => null };
+    env.manager.renderWindow(popoutWin);
+
+    expect(env.manager.isInjected(popoutWin)).toBe(false);
+    expect(topColumns(env.rootEl)).toHaveLength(1);
+    expect(centerCol.classList.contains("window-spaces-sidebar-column")).toBe(false);
+
+    // ── 階段二：指派為 Space（等同 setLayoutLabelForWindow 後的狀態）──
+    // layout.activityBars 必須存在：isSideVisibleForWindow() 在「有 layout 卻無
+    // activityBars」時會刻意回傳 false（legacy Space 預設隱藏側欄）。
+    plugin.settings.spaces = [
+      {
+        id: "ws-transition",
+        name: "Work Space",
+        activityBars: {
+          left: { show: true, items: [] },
+          right: { show: true, items: [] },
+        },
+      },
+    ];
+    plugin.manager = { getLayoutNameForWindow: () => "Work Space" };
+    plugin.canInjectSidebars = () => true;
+
+    // 第一次 render：barsByWindow 尚未建立 → 只注入 Activity Bar（會提前 return）。
+    env.manager.renderWindow(popoutWin);
+    expect(env.manager.isInjected(popoutWin)).toBe(true);
+
+    // 第二次 render：走 ensureLayoutColumns 補欄（與生產環境的多次 render 週期相同）。
+    env.manager.renderWindow(popoutWin);
+    await (env.manager as unknown as { ensureLayoutColumns: (w: Window) => Promise<void> }).ensureLayoutColumns(popoutWin);
+
+    const columns = topColumns(env.rootEl);
+    expect(columns).toHaveLength(3);
+    expect(columns[0].classList.contains("window-spaces-sidebar-column")).toBe(true);
+    expect(columns[2].classList.contains("window-spaces-sidebar-column")).toBe(true);
+    // 中央欄位必須維持 content 語意。
+    expect(columns[1].classList.contains("window-spaces-sidebar-column")).toBe(false);
+    expect(columns[1]).toBe(centerCol);
+
+    teardown(env);
+  });
+});
