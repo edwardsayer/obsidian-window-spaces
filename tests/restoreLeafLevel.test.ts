@@ -282,7 +282,7 @@ describe("isSimpleLayoutStructure", () => {
 });
 
 describe("buildSimpleWindowStructure", () => {
-  test("單 tabs 群組：重用 initial leaf，檔案 leaf 跳過 setViewState、非檔案 leaf 建立 view", async () => {
+  test("單 tabs 群組：重用 initial leaf，建立時立即設定每個檔案 view", async () => {
     const targetWin = makeTargetWin();
     const leaves: MockLeaf[] = [];
     const initial = makeLeaf(leaves, targetWin); // openPopoutLeaf 的初始 leaf
@@ -306,8 +306,12 @@ describe("buildSimpleWindowStructure", () => {
     const built = await (manager as any).buildSimpleWindowStructure(targetWin, saved);
     expect(built.length).toBe(2);
     expect(built[0]).toBe(initial); // 重用初始 leaf
-    expect(initial.setViewState).not.toHaveBeenCalled(); // 檔案 leaf 交給 openFile
-    expect(built[1].setViewState).not.toHaveBeenCalled();
+    expect(initial.setViewState).toHaveBeenCalledWith({
+      type: "markdown", active: false, state: { file: "a.md" },
+    });
+    expect(built[1].setViewState).toHaveBeenCalledWith({
+      type: "markdown", active: false, state: { file: "b.md" },
+    });
   });
 
   test("垂直三群組：以 createLeafBySplit 建立分割、createLeafInParent 加入同群組", async () => {

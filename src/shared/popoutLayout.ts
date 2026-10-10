@@ -642,7 +642,7 @@ export class PopoutLayoutEngine {
   }
 
   /**
-   * 攔截器專用（同步版本）：`app.workspace.getLeftLeaf` 為同步 API，無法 await。
+   * Synchronous sidebar creation for explicit getLeaf("left"/"right") routing.
    * 同步建立/回傳側欄 leaf，不進行 reveal / setViewState（由第三方呼叫端後續設定）。
    */
   openSideLeafSync(win: Window, side: PopoutSide): WorkspaceLeaf | null {

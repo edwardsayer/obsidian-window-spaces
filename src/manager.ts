@@ -1,4 +1,4 @@
-import { App, OpenViewState, WorkspaceLeaf, Notice, Menu, TFile, setIcon, WorkspaceWindowInitData } from "obsidian";
+import { App, FileView, WorkspaceLeaf, Notice, Menu, TFile, setIcon, WorkspaceWindowInitData } from "obsidian";
 import {
   WindowLayout,
   WindowState,
@@ -3716,7 +3716,7 @@ export class WindowLayoutManager {
    *    leaf 為錨點遞迴展開（此時錨點位於外層正確層級，createLeafBySplit
    *    建立的新 split 會正確替換佔位位置）。
    *
-   * 回傳依建立順序（= saved 樹先序）的 leaf 清單，供後續 openFile 配對。
+   * 回傳依建立順序（= saved 樹先序）的 leaf 清單，供後續狀態配對。
    */
   private async buildSimpleWindowStructure(
     targetWin: Window,
@@ -4086,8 +4086,9 @@ export class WindowLayoutManager {
 
   /**
    * 為 leaf 層級建立的 leaf 設定 view state。
-   * 檔案 leaf 交由 restoreFileStatesForWindow 的 openFile 處理（此處跳過）；
-   * 非檔案 leaf 在此先建立 view，讓後續的 ensureViewRenderedWithRetries 能渲染。
+   * Initialize every saved view as its leaf is inserted. Leaving file tabs
+   * empty until the later reconciliation pass lets navigation plugins remove
+   * those placeholders during layout-change, collapsing the saved structure.
    */
   private async applyBuiltLeafState(leaf: WorkspaceLeaf, node: LayoutNode): Promise<void> {
     if (!leaf || !node) return;
@@ -4097,13 +4098,16 @@ export class WindowLayoutManager {
       type: viewType,
       state: nodeState.state || {},
     });
-    if (filePath) return;
-
     await leaf.setViewState({
+      ...nodeState,
       type: viewType || "empty",
       active: false,
-      state: nodeState.state || {},
+      state: { ...nodeState.state },
     });
+
+    // File views use native loading/deferral; only sidebar views need the
+    // explicit render step below.
+    if (filePath) return;
 
     // 核心 view（file-explorer / search / outline 等）是 deferred view：
     // setViewState 只建立 tab 標題，內容需 loadIfDeferred() 才會載入。
@@ -4120,8 +4124,7 @@ export class WindowLayoutManager {
   }
 
   /**
-   * leaf 層級建立後，依 saved 順序套用 pinned 狀態
-   * （檔案 leaf 需於 openFile 之後才 toggle，避免 openFile 重置）。
+   * leaf 層級建立後，依 saved 順序套用 pinned 狀態。
    */
   private applyPinnedStateToBuiltLeaves(built: WorkspaceLeaf[], saved: ViewState[]): void {
     built.forEach((leaf, i) => {
@@ -4621,6 +4624,7 @@ export class WindowLayoutManager {
 
           if (
             skipUnchanged &&
+            currentState?.type === leafState.type &&
             currentFilePath === filePath &&
             (!viewMode || currentViewMode === viewMode)
           ) {
@@ -4630,11 +4634,18 @@ export class WindowLayoutManager {
             continue;
           }
 
-          const openOptions: OpenViewState = { active: false };
-          if (viewMode) {
-            openOptions.state = { mode: viewMode };
-          }
-          await targetLeaf.openFile(file, openOptions);
+          // Restoring a saved layout must address this exact leaf. openFile
+          // hooks may redirect duplicate files to another window and detach
+          // the destination. Native view state also preserves custom file
+          // views and their saved state instead of inferring by extension.
+          const savedState = (typeof leafState.state?.file === "string"
+            ? leafState.state
+            : leafState.state?.state || leafState.state || {}) as Record<string, unknown>;
+          await targetLeaf.setViewState({
+            type: leafState.type,
+            active: false,
+            state: { ...savedState, file: file.path },
+          });
 
           if (activeFilePath && filePath === activeFilePath && !targetActiveLeaf) {
             targetActiveLeaf = targetLeaf;
@@ -4992,7 +5003,19 @@ export class WindowLayoutManager {
 
   /** 是否為檔案類 view（markdown / pdf / 圖片等），此類 view 不參與強制渲染。 */
   private isFileView(leaf: WorkspaceLeaf | null): boolean {
-    return !!leaf && !!(leaf.view as { file?: unknown } | null)?.file;
+    if (!leaf) return false;
+    // FileView.file can be null while a note is opening. Deferred file views
+    // expose the pending path through their saved state instead of .file.
+    if (leaf.view instanceof FileView || (leaf.view as { file?: unknown } | null)?.file) return true;
+    return typeof leaf.getViewState === "function" &&
+      !!this.getFilePathFromLeafState(leaf.getViewState());
+  }
+
+  private isViewOpening(leaf: WorkspaceLeaf): boolean {
+    // INTERNAL API: WorkspaceLeaf.working guards an unfinished setViewState.
+    // Rebuilding during that operation can make subsequent openFile calls
+    // return without applying their state.
+    return (leaf as unknown as { working?: boolean }).working === true;
   }
 
   /** 檢查 leaf 是否已渲染出實際內容。 */
@@ -5047,7 +5070,7 @@ export class WindowLayoutManager {
    * 多個 lifecycle retry 不得因 DOM 尚未及時更新而連續重建同一個 leaf。
    */
   ensureViewRendered(leaf: WorkspaceLeaf | null): void {
-    if (!leaf || this.isFileView(leaf)) return;
+    if (!leaf || this.isFileView(leaf) || this.isViewOpening(leaf)) return;
     if (this.hasRenderedContent(leaf)) {
       this.renderAttemptedLeaves.delete(leaf);
       return;
@@ -5073,7 +5096,9 @@ export class WindowLayoutManager {
   }
 
   private rebuildViewIfNeeded(leaf: WorkspaceLeaf): void {
-    if (this.hasRenderedContent(leaf) || this.renderAttemptedLeaves.has(leaf)) return;
+    // A deferred load may have yielded while the user opened a file here.
+    if (this.isFileView(leaf) || this.isViewOpening(leaf) ||
+      this.hasRenderedContent(leaf) || this.renderAttemptedLeaves.has(leaf)) return;
     this.renderAttemptedLeaves.add(leaf);
     this.forceRenderView(leaf);
   }
@@ -5119,7 +5144,7 @@ export class WindowLayoutManager {
       // 依序 await 處理，避免多個 rebuildView 並發互相衝突（working 標記會
       // 讓彼此的 setViewState 被跳過，導致停在半初始化空白）。
       for (const leaf of leaves) {
-        if (this.isFileView(leaf) || this.hasRenderedContent(leaf)) continue;
+        if (this.isFileView(leaf) || this.isViewOpening(leaf) || this.hasRenderedContent(leaf)) continue;
         const extLeaf = leaf as unknown as {
           isDeferred?: boolean;
           loadIfDeferred?: () => Promise<void>;

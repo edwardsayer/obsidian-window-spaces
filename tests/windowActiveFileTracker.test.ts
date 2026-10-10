@@ -124,6 +124,38 @@ describe("WindowActiveFileTracker", () => {
     assert.equal(tracker.getActiveFileForWindow(null), globalFile);
   });
 
+  it("reads the newly selected note before delayed tab-change events update the cache", () => {
+    const popout = createMockWindow("popout");
+    const vscode = createMockFile("Tech/Vscode.md");
+    const haute = createMockFile("Tech/Haute42.md");
+    const vscodeLeaf = createMockLeaf(popout, vscode);
+    const hauteLeaf = createMockLeaf(popout, haute);
+    const tracker = new WindowActiveFileTracker(mockApp);
+    tracker.trackActiveLeaf(vscodeLeaf);
+
+    // Native setActiveLeaf changes activeLeaf synchronously, then schedules
+    // active-leaf-change. A lookup during that interval must read the editor.
+    for (const leaf of [hauteLeaf, vscodeLeaf, hauteLeaf, vscodeLeaf]) {
+      (mockApp.workspace as { activeLeaf: WorkspaceLeaf }).activeLeaf = leaf;
+      expect(tracker.getActiveFileForWindow(popout)).toBe((leaf.view as any).file);
+      tracker.trackActiveLeaf(leaf);
+    }
+  });
+
+  it("keeps a popout's cached note when a different window or its sidebar is active", () => {
+    const popout = createMockWindow("popout");
+    const main = createMockWindow("main");
+    const popoutFile = createMockFile("Popout.md");
+    const mainFile = createMockFile("Main.md");
+    const tracker = new WindowActiveFileTracker(mockApp);
+    tracker.trackActiveLeaf(createMockLeaf(popout, popoutFile));
+
+    (mockApp.workspace as { activeLeaf: WorkspaceLeaf }).activeLeaf = createMockLeaf(main, mainFile);
+    expect(tracker.getActiveFileForWindow(popout)).toBe(popoutFile);
+    (mockApp.workspace as { activeLeaf: WorkspaceLeaf }).activeLeaf = createMockLeaf(popout);
+    expect(tracker.getActiveFileForWindow(popout)).toBe(popoutFile);
+  });
+
   it("shouldProcessFileOpen suppresses cross-window file open", () => {
     const tracker = new WindowActiveFileTracker(mockApp);
     const win1 = createMockWindow("win1");

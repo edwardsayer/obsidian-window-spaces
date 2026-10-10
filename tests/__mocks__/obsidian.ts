@@ -225,6 +225,10 @@ export class ItemView {
   constructor(public leaf: any) {}
 }
 
+export class FileView extends ItemView {
+  file: TFile | null = null;
+}
+
 export class Setting {
   constructor(public containerEl: HTMLElement) {}
   setName(name: string) { return this; }

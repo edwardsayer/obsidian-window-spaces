@@ -116,6 +116,30 @@ function getViewRegistry(app: App): ExtendedViewRegistry {
   return (app as unknown as { viewRegistry?: ExtendedViewRegistry })?.viewRegistry ?? {};
 }
 
+/** Discover already-open views without constructing a view or running its lifecycle. */
+function getOpenViewMetadata(app: App): { type: string; label?: string }[] {
+  const views: { type: string; label?: string }[] = [];
+  const workspace = (app as unknown as {
+    workspace?: { iterateAllLeaves?: (callback: (leaf: WorkspaceLeaf) => void) => void };
+  })?.workspace;
+  if (typeof workspace?.iterateAllLeaves !== "function") return views;
+  try {
+    workspace.iterateAllLeaves((leaf) => {
+      try {
+        const type = leaf.view?.getViewType?.() || leaf.getViewState?.()?.type;
+        if (!type || EXCLUDED_VIEW_TYPES.has(type)) return;
+        const label = leaf.view?.getDisplayText?.();
+        views.push({ type, ...(typeof label === "string" && label.trim() ? { label } : {}) });
+      } catch {
+        // Deferred or third-party metadata must not hide other available views.
+      }
+    });
+  } catch {
+    // The host may not expose a usable leaf iterator yet.
+  }
+  return views;
+}
+
 /** 從 viewRegistry 動態取得 view type 清單（防禦式）。 */
 export function getRegistryViewTypes(app: App): string[] {
   try {
@@ -464,7 +488,7 @@ export function formatViewTypeId(viewType: string): string {
     .join(" ");
 }
 
-/** 取得某 view type 的顯示名稱（registry → 已知社群外掛表 → 內建清單 → 美化 viewType）。 */
+/** Resolve labels from registry, known defaults, or an open view before formatting the ID. */
 export function resolveViewLabel(app: App, viewType: string): string {
   // 1. 優先取 view 自己在 viewRegistry 註冊的 display text
   try {
@@ -484,7 +508,11 @@ export function resolveViewLabel(app: App, viewType: string): string {
   const builtin = BUILTIN_SIDEBAR_VIEWS.find((item) => item.viewType === viewType);
   if (builtin?.label) return builtin.label;
 
-  // 4. Fallback：純粹將 ID 的 '-' 替換為空格，單詞首字母大寫
+  // Community views often expose their display name only on the live instance.
+  const openLabel = getOpenViewMetadata(app).find((view) => view.type === viewType && view.label)?.label;
+  if (openLabel) return openLabel;
+
+  // Fallback：純粹將 ID 的 '-' 替換為空格，單詞首字母大寫
   return formatViewTypeId(viewType);
 }
 
@@ -521,7 +549,10 @@ export function enumerateAvailableViews(app: App): {
 
   BUILTIN_SIDEBAR_VIEWS.forEach(push);
 
-  const registryTypes = getRegistryViewTypes(app);
+  const registryTypes = new Set([
+    ...getRegistryViewTypes(app),
+    ...getOpenViewMetadata(app).map((view) => view.type),
+  ]);
   for (const type of registryTypes) {
     if (!seen.has(type)) {
       push({

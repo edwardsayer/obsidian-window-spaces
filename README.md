@@ -75,7 +75,7 @@ With **focus interception technology**, **popout activity bar engines**, and **p
 Obsidian popout windows natively lack sidebars. Window Spaces injects a **true, native-like Activity Bar & Collapsible Sidebar engine** directly into popout windows:
 - **Collapsible Sidebars**: Toggle left/right sidebars using native-styled toolbar buttons or customizable hotkeys.
 - **Right-Click Context Menu**: Right-click directly on any Activity Bar icon to toggle view visibility, switch sidebars, or hide/show the activity bar and sidebar.
-- **Dynamic View Discovery & Prewarming**: Embed File Explorer, Bookmarks, Search, Outline, or third-party views directly in popouts.
+- **Dynamic View Discovery & Prewarming**: Embed File Explorer, Bookmarks, Search, Outline, or third-party views directly in popouts. Add view includes registered and already-open views, using their display names when available.
 - **Ultra-Smooth Sidebar Resizing**: Uses exact `borderBoxSize` measurements with a 1px change-threshold guard to eliminate sidebar jitter, bounce-back, and slow border shrinkage.
 - **Drag-to-Reorder & One-Click Import in Settings**: Rearrange popout activity bar buttons with intuitive drag-and-drop, and import your current main window sidebar layout with a single click; resetting settings safely preserves your saved spaces.
 
@@ -94,9 +94,11 @@ Never lose track of your open cabins across multiple displays:
 - **Atmospheric Accents**: Subtle theme glows on pane splitters and soft background tints on activity bars.
 
 ### 🎯 4. Window-Locked Routing & Dual Layout Guardrails *(New in v1.2+)*
-Obsidian's architecture is natively designed around a single main window. Opening an Outline, Backlinks, or community views (such as Grid Explorer or Notebook Navigator) in a popout window frequently causes views to jump back to the main window, steal focus, or overwrite each other due to global `getLeavesOfType` lookups. Window Spaces introduces **Window-Locked Routing & Deep Leaf Interception**, paired with comprehensive layout collapse defenses:
-- **Multi-Instance Concurrency for Core & Community Views**: Breaks Obsidian's singleton limitations. Native core views (Outline, Backlinks, Tags, Search, Bookmarks) and community plugin views (e.g. Grid Explorer, Notebook Navigator) can now **co-exist as multiple independent instances across different windows simultaneously** without stealing focus or colliding.
-- **Per-Window Event Gating & Active File Tracking**: Intercepts `file-open` event broadcasts and `workspace.getActiveFile()`. An Outline in Window A strictly tracks the note active in Window A, while an Outline in Window B tracks Window B — completely eliminating cross-window context bleeding.
+Window Spaces opens sidebar views through its popout activity bars and tracks note context by window. Global `getLeavesOfType()` discovery and native `getLeftLeaf()`/`getRightLeaf()` creation retain their normal behavior, so background panel rebuilds keep their main-sidebar destination even when focus changes:
+- **Explicit Popout Sidebar Creation**: Use the popout's activity-bar button to open a view there. Plugin commands that call the native main-sidebar APIs target the main window; explicit `ensureSideLeaf()` and `getLeaf("left"/"right")` requests route to the focused managed popout.
+- **Multiple Views Across Windows**: Core sidebar views and community views that support multiple instances can coexist in different windows. Each plugin's own view lifecycle and startup refresh policy still apply.
+- **Per-Window Event Gating & Active File Tracking**: Gates `file-open` broadcasts and resolves `workspace.getActiveFile()` by window. During tab switches, the live active note takes priority over the cached note; the cache keeps a window's note context when a sidebar or another window has focus.
+- **Saved Tab Restoration**: Restores each tab's saved view type and state in its intended window as the layout is built. This preserves tabs when navigation plugins remove empty panes or redirect duplicate file opens, while native file loading remains in control of deferred file views.
 - **Dual Layout Collapse Guardrails**:
   - **In-Place New Tab Conversion**: When closing the last remaining tab in the central content area, Window Spaces intercepts `detach` and converts the view in-place into an Obsidian native New Tab (`empty` view), preventing container destruction and split collapse.
   - **Sidebar Tab Protection**: Attempting to close the sole remaining tab in a popout sidebar is cleanly blocked with a native notice (*"The last tab in the sidebar cannot be closed"*), safeguarding the sidebar container.
