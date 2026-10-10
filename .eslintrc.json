@@ -33,8 +33,17 @@
       "warn",
       {
         "argsIgnorePattern": "^_",
-        "caughtErrorsIgnorePattern": "^_",
         "varsIgnorePattern": "^_"
+      }
+    ],
+    "@typescript-eslint/no-unsafe-return": "error",
+    "@typescript-eslint/no-unnecessary-type-assertion": "error",
+    "no-restricted-properties": [
+      "error",
+      {
+        "object": "navigator",
+        "property": "clipboard",
+        "message": "Community Store 審核會把任何剪貼簿存取（即使僅寫入）列為 Behavior 通報項。請改用原生等價功能，不要使用 navigator.clipboard。"
       }
     ],
     "@typescript-eslint/no-explicit-any": "off"
