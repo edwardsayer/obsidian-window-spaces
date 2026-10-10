@@ -121,6 +121,14 @@ Obsidian's architecture is natively designed around a single main window. Openin
 - **Section Groups & Archiving**: Organize your spaces into collapsible sections, drag to reorder, and archive inactive spaces (`📦 Archived`).
 - **Hover Content Preview**: Hover over any Space to instantly preview its included files, active tab, and pinned document structure.
 
+
+### 🧭 8. Per-Entry-Point Popout Behavior
+Window Spaces decides, for each way a window can be opened, how much it should take over. Both switches live under **Settings → Window Spaces → New Popout Defaults**:
+- **Native popout window behavior**: applies to popouts opened by Obsidian's own commands (Move to new window, the tab context menu), and to popouts another plugin opens for you (for example *Folder Spaces → Open in new window*). **Status bar only (default)** keeps a plain single-column popout with just the status bar, so you can save it as a Space whenever you want; **Full** builds the complete three-column layout with both activity bars; **Disabled** leaves the window untouched.
+- **URL & web popout behavior**: applies to popouts displaying a URL, such as OpenID/OAuth login redirects and web viewers. **Disabled (default)** keeps them completely native; **Status bar only** and **Full** opt into the same two levels when you want Window Spaces present in web windows too.
+- **Show space status bar** stays a global switch: turning it off removes the status bar from every popout, regardless of the two policies above.
+- Spaces created by the Window Spaces switcher always restore in full, whatever these settings say.
+
 ---
 
 ## 🚀 Typical Space Workflows

@@ -179,6 +179,68 @@ for (const sf of sharedFiles) {
   }
 }
 
+// ---------- 7. README 語言對稱性 ----------
+// PROJECT_STRUCTURE.md:24 要求 `README.md` / `README.zh-TW.md` / `README.zh-CN.md` 對稱維護。
+// 翻譯後標題文字必然不同，因此比較的是**結構**而非字串：標題層級序列，以及
+// 「✨ 核心特色」區段內的頂層項目符號數量。任一語言新增內容卻忘了同步時，這裡會失敗。
+console.log("\n🌐 README 語言對稱性檢查...");
+{
+  const readmeFiles = ["README.md", "README.zh-TW.md", "README.zh-CN.md"];
+  const structure = (file) => {
+    const lines = readFileSync(join(root, file), "utf8").split(/\r?\n/);
+    const headings = [];
+    let featureBullets = 0;
+    let inFeatures = false;
+    for (const line of lines) {
+      const h = /^(#{2,4})\s/.exec(line);
+      if (h) {
+        // 以 emoji 錨定「核心特色」區段（跨語言相同，不依賴譯文）
+        if (h[1].length === 2) inFeatures = line.includes("✨");
+        headings.push(h[1].length);
+        continue;
+      }
+      if (inFeatures && /^- /.test(line)) featureBullets += 1;
+    }
+    return { headings: headings.join(","), featureBullets };
+  };
+
+  let base = null;
+  const results = [];
+  for (const file of readmeFiles) {
+    if (!existsSync(join(root, file))) {
+      fail(`缺少 ${file}`);
+      continue;
+    }
+    const content = readFileSync(join(root, file), "utf8");
+    // 語言切換導覽必須三向齊全
+    const missingNav = readmeFiles.filter((other) => !content.includes(`](${other})`));
+    if (missingNav.length > 0) {
+      fail(`${file} 的語言切換導覽缺少連結：${missingNav.join(", ")}`);
+    }
+    const s = structure(file);
+    results.push({ file, ...s });
+    if (!base) base = { file, ...s };
+  }
+
+  for (const r of results) {
+    if (!base) break;
+    if (r.file === base.file) continue;
+    if (r.headings !== base.headings) {
+      fail(
+        `${r.file} 的標題結構與 ${base.file} 不對稱（${base.headings} vs ${r.headings}）——` +
+          `請同步補上缺少的章節`
+      );
+    } else if (r.featureBullets !== base.featureBullets) {
+      fail(
+        `${r.file} 的「✨ 核心特色」項目數與 ${base.file} 不對稱（${base.featureBullets} vs ${r.featureBullets}）——` +
+          `請同步補上缺少的功能說明`
+      );
+    } else {
+      ok(`${r.file} ↔ ${base.file}（標題 ${r.featureBullets} 個特色項目對稱）`);
+    }
+  }
+}
+
 // ---------- 總結 ----------
 console.log("\n" + (failures === 0 ? "🎉 專案檢查全部通過！" : `❗ 專案檢查失敗：${failures} 項問題`));
 process.exit(failures === 0 ? 0 : 1);

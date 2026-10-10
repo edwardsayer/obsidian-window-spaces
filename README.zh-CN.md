@@ -75,7 +75,7 @@ Obsidian 灵活的布局与强大的插件生态，让许多人将其视为终�
 Obsidian 原生 Popout 弹出式窗口完全没有侧边栏。Window Spaces 为弹出式窗口注入了**原生级左右垂直活动栏（Activity Bar）与折叠侧边栏容器**：
 - **可折叠双侧栏**：通过顶部原生风格工具栏按钮或快捷键，自由展开/收合左右侧边栏。
 - **右键视图上下文菜单**：直接在活动栏按钮上按右键，可呼出原生右键菜单快速切换/启用/停用各个 View，或切换侧栏与活动栏的可见性。
-- **动态视图探索与预热**：直接在 Popout 侧栏嵌入 File Explorer、Bookmarks（书签）、Outline（大纲）、Search（搜索）或第三方插件视图。
+- **动态视图探索与预热**：直接在 Popout 侧栏嵌入 File Explorer、Bookmarks（书签）、Outline（大纲）、Search（搜索）或第三方插件视图。「添加 View」会列出已注册**以及当前已打开**的视图，并在可用时采用该视图自身的显示名称。
 - **极度平滑的侧栏调整**：采用精确的 `borderBoxSize` 测量与 1px 变动防护阈值，彻底消除侧边栏拖拽时的回弹与边框缩水现象。
 - **设置页拖拽排序与一键导入**：在插件设置中通过直观的拖拽手柄（Drag-to-Reorder）自定义按钮顺序，支持从主窗口侧边栏一键导入常用视图配置；重置设置时安全保留所有已保存的 Spaces。
 
@@ -94,9 +94,12 @@ Obsidian 原生 Popout 弹出式窗口完全没有侧边栏。Window Spaces 为�
 - **氛围增强**：窗格调整分隔条带有主题色微光，左右活动栏注入柔和底色。
 
 ### 🎯 4. 窗口锁定路由与双重防坍塌保护（Window-Locked Routing & Dual Guardrails）*(v1.2+ 核心技术)*
-Obsidian 原生架构以单一主窗口为中心，当在弹出式窗口中打开 Outline、Backlinks 或第三方插件检视（如 Grid Explorer、Notebook Navigator）时，往往会因为全局检索（`getLeavesOfType`）而跳回主窗口、抢夺焦点或互相覆盖。Window Spaces 深度研发了**窗口锁定路由与 Leaf 拦截技术（Window-Locked Routing）**，并加入全方位的版面防坍塌保护：
+Obsidian 原生架构以单一主窗口为中心，当在弹出式窗口中打开 Outline、Backlinks 或第三方插件检视（如 Grid Explorer、Notebook Navigator）时，往往会因为全局检索（`getLeavesOfType`）而跳回主窗口、抢夺焦点或互相覆盖。Window Spaces 深度研发了**窗口锁定路由（Window-Locked Routing）**，并加入全方位的版面防坍塌保护：
 - **内置与社区 View 多实体独立共存**：突破官方单例限制，让原生核心视图（Outline 大纲、Backlinks 反向链接、Tags 标签、Search 搜索）与社区插件视图（如 Grid Explorer、Notebook Navigator 等）在主窗口与多个弹出式窗口中**同时存在多个独立实体（Multi-Instance Concurrency）**，各自运作、永不抢焦。
-- **事件广播与活动文件窗口感知**：精确拦截 `file-open` 事件传递与 `workspace.getActiveFile()`。窗口 A 的大纲与反链只追踪窗口 A 当前阅读的笔记，窗口 B 只追踪窗口 B，彻底解决官方跨窗口联动错乱与画面跳动的陈年痛点。
+- **窗口范围的视图探索（Window-Scoped View Discovery）**：当受管理的 Popout 获得焦点时，`getLeavesOfType()` 会以该 Popout 为范围解析；`getLeaf("left"/"right")`、`ensureSideLeaf()`、`getLeftLeaf()` 与 `getRightLeaf()` 也会在该 Popout 建立 Leaf，而不是主窗口。若某个第三方插件依赖 Obsidian 原生的全局探索，可在设置中以**「将 View 路由至所属的 Popout 窗口」**按库关闭；该开关只影响路由，各窗口自身的笔记语境仍会保留。注意：本开关无法关闭其他同样做这类路由的插件（例如 Folder Spaces）；需停用该插件，或请其作者提供对应开关。
+- **事件广播与活动文件窗口感知**：精确拦截 `file-open` 事件传递与 `workspace.getActiveFile()`。窗口 A 的大纲与反链只追踪窗口 A 当前阅读的笔记，窗口 B 只追踪窗口 B，彻底解决官方跨窗口联动错乱与画面跳动的陈年痛点。切换标签页时，**当前实际处于活动状态的笔记优先于缓存的笔记**；当焦点落在侧栏或其他窗口时，缓存则负责保留该窗口的笔记语境。
+- **「添加 View」纳入已打开的视图**：`添加 View` 会列出已注册的视图**以及当前已打开的视图**；若某个视图只在其实例上提供显示名称（例如 MAKE.md Navigator），会直接采用该名称，而不是把 view type id 美化后的字符串。
+- **已保存标签页还原（Saved Tab Restoration）**：建立版面时，逐一将标签页保存的视图类型与状态还原到正确的窗口。当导航类插件移除空白窗格、或把重复的打开文件重定向时，标签页仍能保留；延迟加载的文件视图则仍交由 Obsidian 原生机制控制。
 - **双重版面崩溃防护网（Dual Layout Collapse Guardrails）**：
   - **中央最后标签页原地转 New Tab**：当关闭中央编辑区最后一个标签页时，Window Spaces 会拦截 `detach`，原地将其转换为 Obsidian 原生 New Tab (`empty` view)，防止所属的 `WorkspaceTabs` 容器被销毁导致分栏崩溃或窗口结构失衡。
   - **侧边栏最后标签页防删保护**：尝试关闭侧边栏上的最后一个标签页时，自动阻止关闭并弹出“侧边栏上最后一个标签页不可删除”原生提示，杜绝侧边栏被意外销毁。
@@ -117,6 +120,14 @@ Obsidian 原生架构以单一主窗口为中心，当在弹出式窗口中打�
 - **弹性停靠位置**：管理面板可自由停靠于**左侧边栏**、**右侧边栏**、**编辑区标签页（Tab）**，或通过 **Ribbon 图标与快捷键** 呼出快速浮动对话框。
 - **Section 分组与归档**：支持将 Spaces 依照项目分类分组、拖拽排序、双击重命名，并支持一键归档（`📦 归档空间`）。
 - **悬停内容预览**：光标悬停即可实时预览该空间收录的文件列表与固定结构。
+
+
+### 🧭 8. 各打开窗口管道的行爲（Per-Entry-Point Popout Behavior）
+Window Spaces 可以针对每一种「窗口被打开的方式」决定要介入多少。两个开关都位于 **设置 → Window Spaces → 新 Popout 默认设置**：
+- **Obsidian 原生开窗行为**：适用于由 Obsidian 自身命令打开的 Popout（Move to new window、标签页右键菜单），以及其他插件替你打开的 Popout（例如 *Folder Spaces → Open in new window*）。**仅启用状态栏（默认）** 只保留单栏的纯净 Popout 与状态栏，让你随时可将它保存成 Space；**完整开启** 会建立含左右活动栏的完整三栏版面；**完全禁用** 则完全不介入该窗口。
+- **URL 与网页弹窗行为**：适用于显示网址的 Popout，例如 OpenID／OAuth 登录跳转与网页查看器。**完全禁用（默认）** 让它们保持完全原生；**仅启用状态栏** 与 **完整开启** 则可选择同样的两个介入层级。
+- **显示空间状态栏** 仍是全局开关：关闭后，无论上面两个策略为何，所有 Popout 都不再显示状态栏。
+- 由 Window Spaces 切换器建立的 Space，一律以完整模式还原，不受上述设置影响。
 
 ---
 
