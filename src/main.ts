@@ -92,23 +92,6 @@ export default class WindowSpacesPlugin extends Plugin {
 
   /** 本外掛專屬 Space 啟動的開窗意圖（由 manager.openNewPopoutWindow 設定）。 */
   private dedicatedSpacePopoutPending = false;
-  /**
-   * 暫時停用 popout 路由（同步、極短）。用於**明確指定目標視窗**的呼叫：
-   * `workspace.getLeftLeaf` / `getRightLeaf` 預設會路由到「當前有焦點的 managed popout」，
-   * 但這類呼叫已明確決定要在哪個視窗開啟，不應再依焦點推斷。
-   */
-  private suppressPopoutRouting = false;
-
-  /** 在 fn 執行期間暫停 popout 路由（保證 finally 還原）。 */
-  private withPopoutRoutingSuppressed<T>(fn: () => T): T {
-    const previous = this.suppressPopoutRouting;
-    this.suppressPopoutRouting = true;
-    try {
-      return fn();
-    } finally {
-      this.suppressPopoutRouting = previous;
-    }
-  }
   /** 本外掛專屬啟動所開、在取得 Space 名稱前即視為 explicit Space 的視窗。 */
   private dedicatedSpaceWindows?: WeakSet<Window>;
 
@@ -146,11 +129,6 @@ export default class WindowSpacesPlugin extends Plugin {
     this.workspaceInterceptor.enabled = this.settings.workspaceInterceptorEnabled !== false;
     // 僅對已注入 Activity Bar 且非 Obsidian UI 視窗（如設定 popout）攔截
     this.workspaceInterceptor.isManagedWindow = (win) => {
-      // 明確指定目標視窗的呼叫（如 restoreModal 會傳入 targetWin，或 openWindowLayoutsPanel
-      // 的主視窗分支）不得被路由走：此時「以當前焦點 popout 為路由目標」的預設假設是錯的，
-      // 若焦點恰好還在某個 popout，面板會被開到那個 popout 而不是指定視窗。
-      // （注意：命令列的呼叫不指定視窗，以焦點視窗為準是正確行為，不經此處。）
-      if (this.suppressPopoutRouting) return false;
       if (this.isWindowDisabled(win)) return false;
       if (!this.activityBars.isInjected(win)) return false;
       if (win.document?.body?.querySelector(".modal-container")) return false;
@@ -530,10 +508,11 @@ export default class WindowSpacesPlugin extends Plugin {
     // 沒有就在該 split 開啟 Window Space tab
     let leaf: WorkspaceLeaf;
     if (location === "left") {
-      // 明確要求主視窗左側欄：暫停 popout 路由，避免焦點在某個 popout 時被路由過去。
-      leaf = this.withPopoutRoutingSuppressed(() => workspace.getLeftLeaf(false));
+      // 走到這裡代表目標視窗就是主視窗，而這只會在主視窗有焦點時發生（命令列以焦點視窗為準，
+      // 且 modal 需使用者點擊才取得焦點），因此 interceptor 的 popout 路由在此不會生效。
+      leaf = workspace.getLeftLeaf(false);
     } else if (location === "right") {
-      leaf = this.withPopoutRoutingSuppressed(() => workspace.getRightLeaf(false));
+      leaf = workspace.getRightLeaf(false);
     } else {
       let mainLeaf: WorkspaceLeaf | null = null;
       workspace.iterateAllLeaves((candidate: WorkspaceLeaf) => {
