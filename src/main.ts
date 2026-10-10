@@ -92,6 +92,23 @@ export default class WindowSpacesPlugin extends Plugin {
 
   /** 本外掛專屬 Space 啟動的開窗意圖（由 manager.openNewPopoutWindow 設定）。 */
   private dedicatedSpacePopoutPending = false;
+  /**
+   * 暫時停用 popout 路由（同步、極短）。用於「明確要求主視窗」的呼叫：
+   * `workspace.getLeftLeaf` / `getRightLeaf` 會被 interceptor 路由到當前 popout，
+   * 若不暫停，主視窗側欄面板會被開到 popout 去。
+   */
+  private suppressPopoutRouting = false;
+
+  /** 在 fn 執行期間暫停 popout 路由（保證 finally 還原）。 */
+  private withPopoutRoutingSuppressed<T>(fn: () => T): T {
+    const previous = this.suppressPopoutRouting;
+    this.suppressPopoutRouting = true;
+    try {
+      return fn();
+    } finally {
+      this.suppressPopoutRouting = previous;
+    }
+  }
   /** 本外掛專屬啟動所開、在取得 Space 名稱前即視為 explicit Space 的視窗。 */
   private dedicatedSpaceWindows?: WeakSet<Window>;
 
@@ -129,6 +146,9 @@ export default class WindowSpacesPlugin extends Plugin {
     this.workspaceInterceptor.enabled = this.settings.workspaceInterceptorEnabled !== false;
     // 僅對已注入 Activity Bar 且非 Obsidian UI 視窗（如設定 popout）攔截
     this.workspaceInterceptor.isManagedWindow = (win) => {
+      // 明確要求「主視窗」的同步呼叫（如 openWindowLayoutsPanel 的主視窗分支）
+      // 必須繞過 popout 路由，否則焦點在某個 popout 時會被路由到那裡。
+      if (this.suppressPopoutRouting) return false;
       if (this.isWindowDisabled(win)) return false;
       if (!this.activityBars.isInjected(win)) return false;
       if (win.document?.body?.querySelector(".modal-container")) return false;
@@ -508,9 +528,10 @@ export default class WindowSpacesPlugin extends Plugin {
     // 沒有就在該 split 開啟 Window Space tab
     let leaf: WorkspaceLeaf;
     if (location === "left") {
-      leaf = workspace.getLeftLeaf(false);
+      // 明確要求主視窗左側欄：暫停 popout 路由，避免焦點在某個 popout 時被路由過去。
+      leaf = this.withPopoutRoutingSuppressed(() => workspace.getLeftLeaf(false));
     } else if (location === "right") {
-      leaf = workspace.getRightLeaf(false);
+      leaf = this.withPopoutRoutingSuppressed(() => workspace.getRightLeaf(false));
     } else {
       let mainLeaf: WorkspaceLeaf | null = null;
       workspace.iterateAllLeaves((candidate: WorkspaceLeaf) => {

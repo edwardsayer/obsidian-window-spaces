@@ -36,8 +36,8 @@ interface InterceptableWorkspace {
   requestSaveLayout?: unknown;
   getLeftLeaf?: (split: boolean) => WorkspaceLeaf | null;
   getRightLeaf?: (split: boolean) => WorkspaceLeaf | null;
-  getLeavesOfType?: (type: string) => WorkspaceLeaf[];
   getLeaf?: unknown;
+  getLeavesOfType?: (type: string) => WorkspaceLeaf[];
   ensureSideLeaf?: (
     viewType: string,
     side: "left" | "right",
@@ -51,7 +51,10 @@ interface InterceptableWorkspace {
   tryTrigger?: (subscription: EventSubscription, args: unknown[]) => void;
   getActiveFile?: () => TFile | null;
   __workspaceInterceptorInstalled?: boolean;
+  __workspaceInterceptorOriginalGetLeftLeaf?: (split: boolean) => WorkspaceLeaf | null;
+  __workspaceInterceptorOriginalGetRightLeaf?: (split: boolean) => WorkspaceLeaf | null;
   __workspaceInterceptorOriginalGetLeaf?: unknown;
+  __workspaceInterceptorOriginalGetLeavesOfType?: (type: string) => WorkspaceLeaf[];
   __workspaceInterceptorOriginalEnsureSideLeaf?: (
     viewType: string,
     side: "left" | "right",
@@ -65,12 +68,10 @@ interface InterceptableWorkspace {
 }
 
 interface OriginalWorkspaceMethods {
-  // Keep the v1 coordinator's metadata shape for older participants' teardown.
-  // These native methods are captured for compatibility, never overridden.
   getLeftLeaf: { hadOwn: boolean; value?: InterceptableWorkspace["getLeftLeaf"] };
   getRightLeaf: { hadOwn: boolean; value?: InterceptableWorkspace["getRightLeaf"] };
-  getLeavesOfType: { hadOwn: boolean; value?: InterceptableWorkspace["getLeavesOfType"] };
   getLeaf: { hadOwn: boolean; value?: InterceptableWorkspace["getLeaf"] };
+  getLeavesOfType: { hadOwn: boolean; value?: InterceptableWorkspace["getLeavesOfType"] };
   ensureSideLeaf: { hadOwn: boolean; value?: InterceptableWorkspace["ensureSideLeaf"] };
   tryTrigger: { hadOwn: boolean; value?: InterceptableWorkspace["tryTrigger"] };
   getActiveFile: { hadOwn: boolean; value?: InterceptableWorkspace["getActiveFile"] };
@@ -177,6 +178,19 @@ function getParticipantForWindow(
     }
   }
   return null;
+}
+
+function routeSideLeaf(state: InterceptorState, side: "left" | "right"): WorkspaceLeaf | null {
+  const activeWindow = getActivePopoutWindow(state);
+  const participant = activeWindow ? getParticipantForWindow(state, activeWindow) : null;
+  const engine = participant?.engine ?? null;
+  if (!activeWindow || !engine) return null;
+
+  try {
+    return engine.openSideLeafSync(activeWindow, side);
+  } catch {
+    return null;
+  }
 }
 
 function routeGetLeaf(
@@ -311,9 +325,15 @@ function install(state: InterceptorState): void {
   const workspace = state.workspace;
   state.originalMethods = {
     getLeftLeaf: { hadOwn: hasOwnMethod(workspace, "getLeftLeaf"), value: workspace.getLeftLeaf },
-    getRightLeaf: { hadOwn: hasOwnMethod(workspace, "getRightLeaf"), value: workspace.getRightLeaf },
-    getLeavesOfType: { hadOwn: hasOwnMethod(workspace, "getLeavesOfType"), value: workspace.getLeavesOfType },
+    getRightLeaf: {
+      hadOwn: hasOwnMethod(workspace, "getRightLeaf"),
+      value: workspace.getRightLeaf,
+    },
     getLeaf: { hadOwn: hasOwnMethod(workspace, "getLeaf"), value: workspace.getLeaf },
+    getLeavesOfType: {
+      hadOwn: hasOwnMethod(workspace, "getLeavesOfType"),
+      value: workspace.getLeavesOfType,
+    },
     ensureSideLeaf: {
       hadOwn: hasOwnMethod(workspace, "ensureSideLeaf"),
       value: workspace.ensureSideLeaf,
@@ -324,15 +344,22 @@ function install(state: InterceptorState): void {
       value: workspace.getActiveFile,
     },
   };
+  workspace.__workspaceInterceptorOriginalGetLeftLeaf = workspace.getLeftLeaf;
+  workspace.__workspaceInterceptorOriginalGetRightLeaf = workspace.getRightLeaf;
   workspace.__workspaceInterceptorOriginalGetLeaf = workspace.getLeaf;
+  workspace.__workspaceInterceptorOriginalGetLeavesOfType = workspace.getLeavesOfType;
   workspace.__workspaceInterceptorOriginalEnsureSideLeaf = workspace.ensureSideLeaf;
   workspace.__workspaceInterceptorOriginalTryTrigger = workspace.tryTrigger;
   workspace.__workspaceInterceptorOriginalGetActiveFile = workspace.getActiveFile;
 
-  // Native main-sidebar APIs must keep their destination during asynchronous
-  // plugin initialization/rebuilds, even if focus moves to a managed popout.
-  // Explicit popout sidebar requests use getLeaf("left"/"right"),
-  // ensureSideLeaf, or the activity bar's window-scoped layout engine.
+  workspace.getLeftLeaf = function (split: boolean): WorkspaceLeaf | null {
+    const original = state.originalMethods?.getLeftLeaf.value;
+    return routeSideLeaf(state, "left") ?? invokeWorkspaceMethod(original, workspace, [split]) ?? null;
+  };
+  workspace.getRightLeaf = function (split: boolean): WorkspaceLeaf | null {
+    const original = state.originalMethods?.getRightLeaf.value;
+    return routeSideLeaf(state, "right") ?? invokeWorkspaceMethod(original, workspace, [split]) ?? null;
+  };
   workspace.getLeaf = function (newLeaf?: boolean | string): WorkspaceLeaf {
     const original = state.originalMethods?.getLeaf.value;
     const routed = routeGetLeaf(state, newLeaf);
@@ -341,9 +368,13 @@ function install(state: InterceptorState): void {
     if (restored) return restored;
     throw new Error("Workspace.getLeaf is unavailable");
   };
-  // Keep getLeavesOfType's global enumeration and ordering intact. Plugins use
-  // it to reconcile existing panels, not just to choose a window for commands.
-  // Window-local sidebar selection belongs in routeEnsureSideLeaf/the engine.
+  workspace.getLeavesOfType = function (type: string): WorkspaceLeaf[] {
+    const original = state.originalMethods?.getLeavesOfType.value;
+    const leaves = invokeWorkspaceMethod<WorkspaceLeaf[]>(original, workspace, [type]) ?? [];
+    const activeWindow = getActivePopoutWindow(state);
+    const participant = activeWindow ? getParticipantForWindow(state, activeWindow) : null;
+    return participant ? leaves.filter((leaf) => getWindowOfLeaf(leaf) === activeWindow) : leaves;
+  };
   workspace.ensureSideLeaf = function (
     viewType: string,
     side: "left" | "right",
@@ -430,7 +461,10 @@ function uninstall(state: InterceptorState): void {
   const workspace = state.workspace;
   const original = state.originalMethods;
   if (original) {
+    restoreMethod(workspace, "getLeftLeaf", original.getLeftLeaf);
+    restoreMethod(workspace, "getRightLeaf", original.getRightLeaf);
     restoreMethod(workspace, "getLeaf", original.getLeaf);
+    restoreMethod(workspace, "getLeavesOfType", original.getLeavesOfType);
     restoreMethod(workspace, "ensureSideLeaf", original.ensureSideLeaf);
     restoreMethod(workspace, "tryTrigger", original.tryTrigger);
     restoreMethod(workspace, "getActiveFile", original.getActiveFile);
@@ -446,7 +480,10 @@ function uninstall(state: InterceptorState): void {
     state.eventRefs = [];
   }
 
+  delete workspace.__workspaceInterceptorOriginalGetLeftLeaf;
+  delete workspace.__workspaceInterceptorOriginalGetRightLeaf;
   delete workspace.__workspaceInterceptorOriginalGetLeaf;
+  delete workspace.__workspaceInterceptorOriginalGetLeavesOfType;
   delete workspace.__workspaceInterceptorOriginalEnsureSideLeaf;
   delete workspace.__workspaceInterceptorOriginalTryTrigger;
   delete workspace.__workspaceInterceptorOriginalGetActiveFile;

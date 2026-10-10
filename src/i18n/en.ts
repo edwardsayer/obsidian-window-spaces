@@ -177,7 +177,7 @@ export const en: TranslationStrings = {
     popoutSidebarSection: "Popout Window Views",
     enableInterceptor: "Route views to their popout windows",
     enableInterceptorDesc:
-      "When opening a view from a popout window—whether in a sidebar or editor tab area—keep it in that popout instead of routing it to the main window.",
+      "When a view is opened from a popout window—whether into a sidebar or the editor tab area—keep it in that popout instead of routing it to the main window. This also scopes other plugins' getLeavesOfType() lookups to the focused popout. Turn it off to restore Obsidian's native global behavior, for example when a navigation plugin keeps losing its panel.",
     leftBar: "Left Activity Bar",
     rightBar: "Right Activity Bar",
     addView: "Add view",
