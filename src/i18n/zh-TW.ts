@@ -175,7 +175,7 @@ export const zhTW: TranslationStrings = {
     popoutSidebarSection: "Popout 視窗 View 設定",
     enableInterceptor: "將 View 路由至所屬的 Popout 視窗",
     enableInterceptorDesc:
-      "當從 Popout 視窗開啟 View 時（不論目標是側欄或 editor tab area），都將 View 保留在該 Popout，而不是路由回主視窗。此選項同時會把其他外掛的 getLeavesOfType() 查詢範圍限定在該 Popout；若某個外掛因此找不到面板，可關閉此選項以回到 Obsidian 原生（全域）行為。",
+      "當從 Popout 視窗開啟 View 時（不論目標是側欄或 editor tab area），都將 View 保留在該 Popout，而不是路由回主視窗。此選項同時會把其他外掛的 getLeavesOfType() 查詢範圍限定在該 Popout；若某個外掛因此找不到面板，可關閉此選項以回到 Obsidian 原生（全域）行為。注意：若同時安裝也做同類路由的外掛（例如 Folder Spaces），它仍會自行路由，需一併關閉該外掛的對應設定。",
     leftBar: "左側 Activity Bar",
     rightBar: "右側 Activity Bar",
     addView: "新增 View",

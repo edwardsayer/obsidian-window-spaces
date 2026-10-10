@@ -5004,11 +5004,21 @@ export class WindowLayoutManager {
   /** 是否為檔案類 view（markdown / pdf / 圖片等），此類 view 不參與強制渲染。 */
   private isFileView(leaf: WorkspaceLeaf | null): boolean {
     if (!leaf) return false;
-    // FileView.file can be null while a note is opening. Deferred file views
-    // expose the pending path through their saved state instead of .file.
-    if (leaf.view instanceof FileView || (leaf.view as { file?: unknown } | null)?.file) return true;
-    return typeof leaf.getViewState === "function" &&
-      !!this.getFilePathFromLeafState(leaf.getViewState());
+    const view = leaf.view as { file?: unknown } | null;
+    if (view?.file) return true;
+    // 檔案正在開啟時 view.file 可能仍為 null，改看 leaf 的 view state 是否帶檔案路徑。
+    // 這道 duck-type 檢查不依賴 class identity，是主要判斷依據。
+    if (typeof leaf.getViewState === "function") {
+      const statePath = this.getFilePathFromLeafState(leaf.getViewState());
+      if (statePath) return true;
+    }
+    // 最後手段：`instanceof` 在跨 window（popout）情境下的 class identity 不可靠，
+    // 故僅在前兩道 duck-type 都無法判定時才使用，且失敗不影響結果。
+    try {
+      return view instanceof FileView;
+    } catch {
+      return false;
+    }
   }
 
   private isViewOpening(leaf: WorkspaceLeaf): boolean {

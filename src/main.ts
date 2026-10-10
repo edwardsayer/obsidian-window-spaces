@@ -93,9 +93,9 @@ export default class WindowSpacesPlugin extends Plugin {
   /** 本外掛專屬 Space 啟動的開窗意圖（由 manager.openNewPopoutWindow 設定）。 */
   private dedicatedSpacePopoutPending = false;
   /**
-   * 暫時停用 popout 路由（同步、極短）。用於「明確要求主視窗」的呼叫：
-   * `workspace.getLeftLeaf` / `getRightLeaf` 會被 interceptor 路由到當前 popout，
-   * 若不暫停，主視窗側欄面板會被開到 popout 去。
+   * 暫時停用 popout 路由（同步、極短）。用於**明確指定目標視窗**的呼叫：
+   * `workspace.getLeftLeaf` / `getRightLeaf` 預設會路由到「當前有焦點的 managed popout」，
+   * 但這類呼叫已明確決定要在哪個視窗開啟，不應再依焦點推斷。
    */
   private suppressPopoutRouting = false;
 
@@ -146,8 +146,10 @@ export default class WindowSpacesPlugin extends Plugin {
     this.workspaceInterceptor.enabled = this.settings.workspaceInterceptorEnabled !== false;
     // 僅對已注入 Activity Bar 且非 Obsidian UI 視窗（如設定 popout）攔截
     this.workspaceInterceptor.isManagedWindow = (win) => {
-      // 明確要求「主視窗」的同步呼叫（如 openWindowLayoutsPanel 的主視窗分支）
-      // 必須繞過 popout 路由，否則焦點在某個 popout 時會被路由到那裡。
+      // 明確指定目標視窗的呼叫（如 restoreModal 會傳入 targetWin，或 openWindowLayoutsPanel
+      // 的主視窗分支）不得被路由走：此時「以當前焦點 popout 為路由目標」的預設假設是錯的，
+      // 若焦點恰好還在某個 popout，面板會被開到那個 popout 而不是指定視窗。
+      // （注意：命令列的呼叫不指定視窗，以焦點視窗為準是正確行為，不經此處。）
       if (this.suppressPopoutRouting) return false;
       if (this.isWindowDisabled(win)) return false;
       if (!this.activityBars.isInjected(win)) return false;
