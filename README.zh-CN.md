@@ -67,6 +67,11 @@ Obsidian 灵活的布局与强大的插件生态，让许多人将其视为终�
 | ![统一 Window Spaces 面板与切换器](assets/screenshots/07-unified-panels.png) |
 | *左侧 Folder Space Explorer、中间与右侧 Window Spaces 面板，以及按 Project／Research／Writing 分组的七个 Space 切换器* |
 
+| 🧩 侧边栏切换器 |
+| :---: |
+| ![常驻于主窗口右侧栏的 Window Spaces 切换器](assets/screenshots/08-window-spaces-switcher.png) |
+| *同一面板常驻于主窗口右侧栏：以键盘快速切换 Project／Research／Writing 各分区的 Space* |
+
 ---
 
 ## ✨ 核心特色与近期重磅亮点

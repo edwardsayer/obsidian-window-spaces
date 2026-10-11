@@ -58,6 +58,9 @@ Window Spaces provides unified and consistent interfaces across your workflow:
 ![Unified Window Spaces panels and switcher](../assets/screenshots/07-unified-panels.png)
 *The unified example keeps Folder Space Explorer on the left while Window Spaces is available in the center and right panels.*
 
+![Window Spaces switcher docked in the main window's right sidebar](../assets/screenshots/08-window-spaces-switcher.png)
+*Docked in the right sidebar next to a note: the switcher lists every Space by section and shows the keyboard hints for fast retrieval.*
+
 ### 2.2 Tab Panel Mode
 - **How to Open**: Run `Window Spaces: Open as tab panel`.
 - **Highlights**: Expands into a full-page view inside the main editor area, ideal for large screens, bulk management, and renaming.

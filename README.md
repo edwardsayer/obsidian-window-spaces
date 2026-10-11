@@ -67,6 +67,11 @@ With **focus interception technology**, **popout activity bar engines**, and **p
 | ![Unified Window Spaces panels and switcher](assets/screenshots/07-unified-panels.png) |
 | *Folder Space Explorer on the left, Window Spaces panels in the center and right, plus a seven-space Project / Research / Writing switcher* |
 
+| 🧩 Sidebar Switcher |
+| :---: |
+| ![Window Spaces switcher docked in the main window's right sidebar](assets/screenshots/08-window-spaces-switcher.png) |
+| *The same panel docked in the main window's right sidebar: keyboard-driven switching across Project / Research / Writing sections* |
+
 ---
 
 ## ✨ Key Features & Recent Highlights

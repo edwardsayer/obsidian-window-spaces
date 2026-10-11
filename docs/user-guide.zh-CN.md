@@ -58,6 +58,9 @@ Window Spaces 提供高度整合且一致的操作界面：
 ![统一 Window Spaces 面板与切换器](../assets/screenshots/07-unified-panels.png)
 *统一示例中，左侧是 Folder Space Explorer，中间与右侧都可使用 Window Spaces 面板。*
 
+![常驻于主窗口右侧栏的 Window Spaces 切换器](../assets/screenshots/08-window-spaces-switcher.png)
+*常驻于主窗口右侧栏（紧贴笔记）：切换器按分区列出所有 Space，底部并显示键盘操作提示。*
+
 ### 2.2 标签页模式（Tab Panel）
 - **开启方式**：执行 `Window Spaces: Open as tab panel`。
 - **特点**：在主编辑区以一个独立标签页展开，适合大屏幕综览所有已保存的 Spaces、进行批量整理与重新命名。
