@@ -592,11 +592,13 @@ describe("WorkspaceInterceptor", () => {
     return { app: { workspace }, originalLeft, originalRight };
   }
 
-  test("install patches methods but falls back when no popout active", () => {
+  test("install preserves native main-sidebar methods", () => {
     const { app, originalLeft, originalRight } = buildMockApp();
     const interceptor = new WorkspaceInterceptor(app);
     interceptor.install();
 
+    expect(app.workspace.getLeftLeaf).toBe(originalLeft);
+    expect(app.workspace.getRightLeaf).toBe(originalRight);
     const result = app.workspace.getLeftLeaf(false);
     expect(result).toBe("main-left-leaf");
     expect(originalLeft).toHaveBeenCalledWith(false);
@@ -958,7 +960,7 @@ describe("WorkspaceInterceptor", () => {
     });
 
     try {
-      expect(workspace.getLeftLeaf(false)).toBe("managed-engine");
+      expect(workspace.getLeaf("left")).toBe("managed-engine");
       expect(engineA.openSideLeafSync).not.toHaveBeenCalled();
       expect(engineB.openSideLeafSync).toHaveBeenCalledWith(popoutWin, "left");
     } finally {
@@ -976,9 +978,11 @@ describe("WorkspaceInterceptor", () => {
       },
     } as unknown as Window;
     const originalLeft = vi.fn().mockReturnValue("main-left-leaf");
+    const originalGetLeaf = vi.fn().mockReturnValue("main-content-leaf");
     const workspace = {
       getLeftLeaf: originalLeft,
       getRightLeaf: vi.fn().mockReturnValue(null),
+      getLeaf: originalGetLeaf,
     } as any;
     const engineA = { openSideLeafSync: vi.fn().mockReturnValue("participant-a") } as any;
     const engineB = { openSideLeafSync: vi.fn().mockReturnValue("participant-b") } as any;
@@ -997,17 +1001,18 @@ describe("WorkspaceInterceptor", () => {
     });
 
     try {
-      expect(workspace.getLeftLeaf(false)).toBe("participant-a");
-      expect(workspace.getRightLeaf(false)).toBe("participant-a");
+      expect(workspace.getLeaf("left")).toBe("participant-a");
+      expect(workspace.getLeaf("right")).toBe("participant-a");
       releaseWorkspaceInterceptor("coordinator-test-a");
-      expect(workspace.getLeftLeaf(false)).toBe("participant-b");
-      expect(workspace.getRightLeaf(false)).toBe("participant-b");
+      expect(workspace.getLeaf("left")).toBe("participant-b");
+      expect(workspace.getLeaf("right")).toBe("participant-b");
     } finally {
       releaseWorkspaceInterceptor("coordinator-test-b");
       delete (globalThis as any).activeWindow;
     }
 
     expect(workspace.getLeftLeaf).toBe(originalLeft);
+    expect(workspace.getLeaf).toBe(originalGetLeaf);
   });
 
   test("shared interceptor preserves document.hasFocus receivers with Window Spaces loaded first", async () => {
@@ -1068,7 +1073,7 @@ describe("WorkspaceInterceptor", () => {
     });
 
     try {
-      expect(workspace.getLeftLeaf(false)).toBe(leaf);
+      expect(workspace.getLeaf("left")).toBe(leaf);
       expect(windowEngine.openSideLeafSync).toHaveBeenCalledWith(popoutWindow, "left");
       expect(workspace.getLeavesOfType("tag")).toEqual([leaf]);
       await workspace.ensureSideLeaf("tag", "left", { active: true });
@@ -1084,7 +1089,7 @@ describe("WorkspaceInterceptor", () => {
     }
   });
 
-  test("getLeavesOfType filters leaves to the active window", () => {
+  test("getLeavesOfType keeps global view discovery while a popout is active", () => {
     const popoutWin = {
       document: {
         body: { classList: { contains: (cls: string) => cls === "is-popout-window" } },
@@ -1114,7 +1119,8 @@ describe("WorkspaceInterceptor", () => {
 
     try {
       const leaves = app.workspace.getLeavesOfType("grid-view");
-      expect(leaves).toEqual([leafInPopout]);
+      expect(app.workspace.getLeavesOfType).toBe(originalGetLeavesOfType);
+      expect(leaves).toEqual([leafInOtherWindow, leafInPopout]);
       expect(originalGetLeavesOfType).toHaveBeenCalledWith("grid-view");
     } finally {
       interceptor.uninstall();
@@ -1154,7 +1160,7 @@ describe("WorkspaceInterceptor", () => {
     }
   });
 
-  test("WorkspaceInterceptor ignores main window and only intercepts popout window sidebar leaves", () => {
+  test("explicit getLeaf('left') routes to the popout while the native sidebar getter stays global", () => {
     const popoutWin = {
       document: { body: { classList: { contains: (cls: string) => cls === "is-popout-window" } }, hasFocus: () => true },
     } as unknown as Window;
@@ -1182,9 +1188,10 @@ describe("WorkspaceInterceptor", () => {
     const openSideLeafSync = vi
       .spyOn((interceptor as any).engine, "openSideLeafSync")
       .mockReturnValue({ id: "popout-side-leaf" });
-    const leaf = app.workspace.getLeftLeaf(false);
+    const leaf = app.workspace.getLeaf("left");
     expect(openSideLeafSync).toHaveBeenCalledWith(popoutWin, "left");
     expect(leaf).toEqual({ id: "popout-side-leaf" });
+    expect(app.workspace.getLeftLeaf).toBe(originalGetLeftLeaf);
 
     interceptor.uninstall();
     delete (globalThis as any).activeWindow;

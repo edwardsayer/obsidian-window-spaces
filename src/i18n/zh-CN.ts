@@ -175,7 +175,7 @@ export const zhCN: TranslationStrings = {
     popoutSidebarSection: "Popout 窗口 View 设置",
     enableInterceptor: "将 View 路由至所属的 Popout 窗口",
     enableInterceptorDesc:
-      "从 Popout 窗口打开 View 时（无论目标是侧栏还是 editor tab area），都会保留在该 Popout，而不是路由回主窗口。此选项同时会把其他插件的 getLeavesOfType() 查询范围限定在该 Popout；若某个插件因此找不到面板，可关闭此选项以回到 Obsidian 原生（全局）行为。注意：本开关无法关闭其他同样做这类路由的插件（例如 Folder Spaces）；需停用该插件，或请其作者提供对应开关。",
+      "将开档导向 Popout 的中央编辑区，并将明确的侧栏请求导向该 Popout。视图探索保持全局，原生主窗口侧栏方法的目标位置维持不变。关闭后改用原生路由，各窗口的笔记情境仍会保留。本开关无法阻止其他同样路由的插件（例如 Folder Spaces）；需停用该插件，或请其作者提供对应开关。",
     leftBar: "左侧 Activity Bar",
     rightBar: "右侧 Activity Bar",
     addView: "添加 View",
