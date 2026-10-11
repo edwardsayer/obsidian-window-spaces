@@ -635,15 +635,23 @@ describe("WorkspaceInterceptor", () => {
     expect(app.workspace.getLeftLeaf).toBe(originalLeft);
   });
 
-  test("install without getLeftLeaf/getRightLeaf is safe and restores absent methods", () => {
+  test("install on a workspace without native sidebar methods restores the patched set", () => {
     const app = { workspace: {} } as any;
     const interceptor = new WorkspaceInterceptor(app);
     interceptor.install();
+
+    // The coordinator owns these two (plus the event/active-file patches);
+    // getLeftLeaf/getRightLeaf/getLeavesOfType are never replaced, so install
+    // must not conjure them either (PR #2).
+    expect("getLeaf" in app.workspace).toBe(true);
+    expect("ensureSideLeaf" in app.workspace).toBe(true);
+
     interceptor.uninstall();
+    expect("getLeaf" in app.workspace).toBe(false);
+    expect("ensureSideLeaf" in app.workspace).toBe(false);
     expect("getLeftLeaf" in app.workspace).toBe(false);
     expect("getRightLeaf" in app.workspace).toBe(false);
     expect("getLeavesOfType" in app.workspace).toBe(false);
-    expect("ensureSideLeaf" in app.workspace).toBe(false);
   });
 
   test("routes ensureSideLeaf through the shared Popout engine", async () => {
@@ -1125,38 +1133,6 @@ describe("WorkspaceInterceptor", () => {
     } finally {
       interceptor.uninstall();
       delete (globalThis as any).activeWindow;
-    }
-  });
-
-  test("does not route a main-window API call while a popout remains active", () => {
-    const popoutWin = {
-      document: {
-        body: { classList: { contains: (cls: string) => cls === "is-popout-window" } },
-        hasFocus: () => true,
-      },
-    } as unknown as Window;
-    const originalGetLeftLeaf = vi.fn().mockReturnValue("main-left-leaf");
-    const app = {
-      workspace: {
-        getLeftLeaf: originalGetLeftLeaf,
-        getRightLeaf: vi.fn().mockReturnValue(null),
-      },
-    } as any;
-    const interceptor = new WorkspaceInterceptor(app);
-    interceptor.isManagedWindow = () => true;
-    interceptor.install();
-    const openSideLeafSync = vi.spyOn((interceptor as any).engine, "openSideLeafSync");
-    const hasFocus = vi.spyOn(document, "hasFocus").mockReturnValue(true);
-    (globalThis as any).activeWindow = popoutWin;
-
-    try {
-      expect(app.workspace.getLeftLeaf(false)).toBe("main-left-leaf");
-      expect(originalGetLeftLeaf).toHaveBeenCalledWith(false);
-      expect(openSideLeafSync).not.toHaveBeenCalled();
-    } finally {
-      hasFocus.mockRestore();
-      delete (globalThis as any).activeWindow;
-      interceptor.uninstall();
     }
   });
 

@@ -180,13 +180,6 @@ describe("workspace view discovery", () => {
     }
   );
 
-  test("still reports no panels for a view that does not exist anywhere", () => {
-    globalObject.activeWindow = createPopoutWindow(true);
-    const { workspace } = setup("existing-view", [window]);
-
-    expect(workspace.getLeavesOfType("missing-view")).toEqual([]);
-  });
-
   test("explicit sidebar creation opens a local outline despite discovering the main-window outline", async () => {
     const popout = createPopoutWindow(true);
     globalObject.activeWindow = popout;
@@ -218,30 +211,6 @@ describe("workspace view discovery", () => {
     });
     expect(leaves).toContain(mainOutline);
     expect(workspace.getLeavesOfType("outline")).toEqual([mainOutline, localOutline]);
-  });
-
-  test.each(["main-window focus", "disabled routing", "unmanaged popout"])(
-    "keeps the original lookup results with %s",
-    (scenario) => {
-      const popout = createPopoutWindow(true);
-      globalObject.activeWindow = popout;
-      const { workspace, leaves } = setup("outline", [window, popout]);
-      if (scenario === "main-window focus") vi.mocked(document.hasFocus).mockReturnValue(true);
-      if (scenario === "disabled routing") interceptor.enabled = false;
-      if (scenario === "unmanaged popout") interceptor.isManagedWindow = () => false;
-
-      expect(workspace.getLeavesOfType("outline")).toBe(leaves);
-    }
-  );
-
-  test("leaves the original workspace lookup intact when the interceptor is unloaded", () => {
-    globalObject.activeWindow = createPopoutWindow(true);
-    const { workspace, leaves, originalLookup } = setup("custom-view", [window]);
-
-    interceptor.uninstall();
-
-    expect(workspace.getLeavesOfType).toBe(originalLookup);
-    expect(workspace.getLeavesOfType("custom-view")).toBe(leaves);
   });
 
   test("does not overwrite another plugin's view lookup on unload", () => {

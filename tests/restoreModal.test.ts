@@ -5,6 +5,7 @@ import WindowSpacesPlugin from "../src/main";
 import { WindowLayout } from "../src/types";
 import { initI18n } from "../src/i18n";
 import { collectPopoutColumns, PopoutLayoutEngine } from "../src/popout/popoutLayout";
+import { WorkspaceInterceptor } from "../src/popout/workspaceInterceptor";
 
 initI18n("en");
 
@@ -445,6 +446,75 @@ describe("WindowLayoutsModal restore target", () => {
     expect(revealLeaf).toHaveBeenCalledWith(newPanelLeaf);
     expect(setActiveLeaf).toHaveBeenCalledWith(newPanelLeaf, { focus: true });
     expect(leaf).toBe(newPanelLeaf);
+  });
+
+  test("openWindowLayoutsPanel keeps a main-window panel in the main window while a popout is focused", async () => {
+    // mainWindow must report "not focused" so the interceptor genuinely sees the
+    // popout as the active window; otherwise the routing under test is inert.
+    const mainWindow = {
+      document: { body: { classList: { contains: () => false } }, hasFocus: () => false },
+    } as any;
+    const popoutWin = {
+      document: {
+        body: { classList: { contains: (cls: string) => cls === "is-popout-window" } },
+        hasFocus: () => true,
+      },
+    } as any;
+
+    const newPanelLeaf = {
+      setViewState: vi.fn().mockResolvedValue(undefined),
+      getViewState: () => ({ type: "window-spaces-layouts" }),
+      view: { containerEl: { ownerDocument: { defaultView: mainWindow } } },
+    } as any;
+
+    const getLeftLeaf = vi.fn().mockReturnValue(newPanelLeaf);
+    const revealLeaf = vi.fn().mockResolvedValue(undefined);
+    const setActiveLeaf = vi.fn();
+    const workspace = {
+      leftSplit: { children: [] },
+      rightSplit: { children: [] },
+      iterateAllLeaves: () => {},
+      revealLeaf,
+      setActiveLeaf,
+      getLeftLeaf,
+      getRightLeaf: vi.fn().mockReturnValue(null),
+    } as any;
+
+    const app = { workspace } as any;
+    const engine = new PopoutLayoutEngine(app);
+    const openSideLeafSync = vi.spyOn(engine, "openSideLeafSync");
+    const interceptor = new WorkspaceInterceptor(app, engine);
+    interceptor.install();
+    const globals = globalThis as unknown as { activeWindow?: Window };
+    const previousActiveWindow = globals.activeWindow;
+    globals.activeWindow = popoutWin;
+    vi.mocked(document.hasFocus).mockReturnValue(false);
+
+    try {
+      const plugin = Object.assign(Object.create(WindowSpacesPlugin.prototype), {
+        app,
+        manager: { getActiveWindow: () => popoutWin },
+        popoutLayout: engine,
+      });
+
+      const leaf = await plugin.openWindowLayoutsPanel("left", mainWindow);
+
+      // A focused managed popout must not divert the main window's own panel:
+      // the native main-sidebar getter runs and no popout side leaf is created.
+      expect(getLeftLeaf).toHaveBeenCalledWith(false);
+      expect(openSideLeafSync).not.toHaveBeenCalled();
+      expect(newPanelLeaf.setViewState).toHaveBeenCalledWith({
+        type: "window-spaces-layouts",
+        state: {},
+      });
+      expect(revealLeaf).toHaveBeenCalledWith(newPanelLeaf);
+      expect(setActiveLeaf).toHaveBeenCalledWith(newPanelLeaf, { focus: true });
+      expect(leaf).toBe(newPanelLeaf);
+    } finally {
+      interceptor.uninstall();
+      if (previousActiveWindow === undefined) delete globals.activeWindow;
+      else globals.activeWindow = previousActiveWindow;
+    }
   });
 
   test("openWindowLayoutsPanel reuses existing panel in target split and creates new tab if in different split", async () => {
