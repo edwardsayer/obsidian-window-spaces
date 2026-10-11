@@ -309,16 +309,21 @@ function restoreMethod(
 function install(state: InterceptorState): void {
   if (state.installed) return;
   const workspace = state.workspace;
+  // Keep legacy descriptors for methods this coordinator no longer overrides:
+  // a pre-1.5 participant may leave a wrapper installed, and recapturing it
+  // would make that wrapper call itself. Refresh our own methods on each install
+  // so teardown preserves wrappers added by other plugins while we were unloaded.
+  const previousOriginals = state.originalMethods;
   state.originalMethods = {
-    getLeftLeaf: { hadOwn: hasOwnMethod(workspace, "getLeftLeaf"), value: workspace.getLeftLeaf },
-    getRightLeaf: {
-      hadOwn: hasOwnMethod(workspace, "getRightLeaf"),
-      value: workspace.getRightLeaf,
+    getLeftLeaf: previousOriginals?.getLeftLeaf ?? {
+      hadOwn: hasOwnMethod(workspace, "getLeftLeaf"), value: workspace.getLeftLeaf,
+    },
+    getRightLeaf: previousOriginals?.getRightLeaf ?? {
+      hadOwn: hasOwnMethod(workspace, "getRightLeaf"), value: workspace.getRightLeaf,
     },
     getLeaf: { hadOwn: hasOwnMethod(workspace, "getLeaf"), value: workspace.getLeaf },
-    getLeavesOfType: {
-      hadOwn: hasOwnMethod(workspace, "getLeavesOfType"),
-      value: workspace.getLeavesOfType,
+    getLeavesOfType: previousOriginals?.getLeavesOfType ?? {
+      hadOwn: hasOwnMethod(workspace, "getLeavesOfType"), value: workspace.getLeavesOfType,
     },
     ensureSideLeaf: {
       hadOwn: hasOwnMethod(workspace, "ensureSideLeaf"),
@@ -456,7 +461,9 @@ function uninstall(state: InterceptorState): void {
   delete workspace.__workspaceInterceptorOriginalTryTrigger;
   delete workspace.__workspaceInterceptorOriginalGetActiveFile;
   delete workspace.__workspaceInterceptorInstalled;
-  state.originalMethods = undefined;
+  // Keep originals across uninstall/install: an older participant's wrapper may
+  // still be installed and read these descriptors. Our own methods are recaptured
+  // on the next install, so their descriptors cannot become stale.
   state.installed = false;
 }
 

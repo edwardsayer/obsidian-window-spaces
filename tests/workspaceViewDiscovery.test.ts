@@ -2,6 +2,10 @@ import type { App, WorkspaceLeaf } from "obsidian";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { WorkspaceInterceptor } from "../src/popout/workspaceInterceptor";
 import { PopoutActivityBarManager } from "../src/popout/activityBar";
+import {
+  acquireWorkspaceInterceptor,
+  releaseWorkspaceInterceptor,
+} from "../src/shared/workspaceInterceptor";
 import type { PopoutLayoutEngine } from "../src/shared/popoutLayout";
 import type { WindowSettings } from "../src/types";
 
@@ -49,6 +53,8 @@ describe("workspace view discovery", () => {
 
   afterEach(() => {
     interceptor?.uninstall();
+    delete (window as unknown as { __obsidian_workspace_interceptor_state_v1__?: unknown })
+      .__obsidian_workspace_interceptor_state_v1__;
     vi.restoreAllMocks();
     if (previousActiveWindow === undefined) delete globalObject.activeWindow;
     else globalObject.activeWindow = previousActiveWindow;
@@ -92,6 +98,44 @@ describe("workspace view discovery", () => {
       expect(originalLookup).toHaveBeenCalledWith(viewType);
     }
   );
+
+  test("mixed-version teardown preserves legacy originals and avoids wrapper self-recursion", () => {
+    const leaves = [createLeaf(window)];
+    const originalLookup = vi.fn((type: string) => type === "outline" ? leaves : []);
+    const workspace = {
+      getLeavesOfType: originalLookup,
+      getLeftLeaf: vi.fn(),
+      getRightLeaf: vi.fn(),
+    };
+    const app = { workspace } as unknown as App;
+    const engine = {} as PopoutLayoutEngine;
+    const namespace = window as unknown as {
+      __obsidian_workspace_interceptor_state_v1__?: {
+        originalMethods: Record<string, { hadOwn: boolean; value: unknown }>;
+      };
+    };
+    delete namespace.__obsidian_workspace_interceptor_state_v1__;
+
+    try {
+      // Simulate an older bundle's first install and its wrapper reading the shared descriptor.
+      acquireWorkspaceInterceptor(app, { id: "older", engine });
+      const state = namespace.__obsidian_workspace_interceptor_state_v1__!;
+      workspace.getLeavesOfType = function (type: string): WorkspaceLeaf[] {
+        const original = state.originalMethods.getLeavesOfType.value as (type: string) => WorkspaceLeaf[];
+        return original.call(workspace, type).filter(Boolean);
+      };
+
+      releaseWorkspaceInterceptor("older");
+      acquireWorkspaceInterceptor(app, { id: "newer", engine });
+
+      expect(state.originalMethods.getLeavesOfType.value).not.toBe(workspace.getLeavesOfType);
+      expect(workspace.getLeavesOfType("outline")).toEqual(leaves);
+    } finally {
+      releaseWorkspaceInterceptor("older");
+      releaseWorkspaceInterceptor("newer");
+      delete namespace.__obsidian_workspace_interceptor_state_v1__;
+    }
+  });
 
   test("preserves panels in the main window and another popout when the active window has none", () => {
     globalObject.activeWindow = createPopoutWindow(true);
