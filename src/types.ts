@@ -276,19 +276,6 @@ export interface ExtendedViewRegistry {
   getDisplayText?(viewType: string): string;
 }
 
-/**
- * Obsidian 內部 workspace 擴充介面（含攔截器所需的方法）。
- */
-export interface ExtendedWorkspaceWithInterceptor extends ExtendedWorkspace {
-  getLeftLeaf: (split: boolean) => WorkspaceLeaf | null;
-  getRightLeaf: (split: boolean) => WorkspaceLeaf | null;
-  getLeavesOfType: (type: string) => WorkspaceLeaf[];
-  _windowSpacesOriginalGetLeftLeaf?: (split: boolean) => WorkspaceLeaf | null;
-  _windowSpacesOriginalGetRightLeaf?: (split: boolean) => WorkspaceLeaf | null;
-  _windowSpacesOriginalGetLeavesOfType?: (type: string) => WorkspaceLeaf[];
-  _windowSpacesInterceptorInstalled?: boolean;
-}
-
 export interface SaveLayoutOptions {
   name?: string;
   includePosition?: boolean;

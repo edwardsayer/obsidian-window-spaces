@@ -5,6 +5,23 @@ import { PopoutActivityBarManager } from "../src/popout/activityBar";
 import type { PopoutLayoutEngine } from "../src/shared/popoutLayout";
 import type { WindowSettings } from "../src/types";
 
+/**
+ * Popout 路由與全域檢視探索的**決議語意**（2026-10，社群 PR #1/#2 by @b4ll0b4）。
+ *
+ * 決議：**全域列舉 + 明確路由**。
+ * - `getLeavesOfType()` 維持 Obsidian 的全域結果與順序。把它以 focused popout 過濾會讓
+ *   以全域清單對帳面板的第三方外掛（Vertical Tabs、MAKE.md Navigator 等）在 popout
+ *   取得焦點時誤判面板不存在，或把已存在的面板搬回主側欄。
+ * - `getLeftLeaf()` / `getRightLeaf()` 維持原生，讓非同步的外掛初始化／重建仍以主側欄
+ *   為目的地。需要 popout 本地側欄時走明確的 `getLeaf("left"/"right")`、
+ *   `ensureSideLeaf()` 或活動列的 window-scoped layout engine。
+ * - 使用者層級的逃生開關仍是 `workspaceInterceptorEnabled`（設定頁
+ *   「Route views to their popout windows」），它只影響路由，per-window note context 不變。
+ *
+ * 因此本檔的意圖有兩層：(1) 把上述語意寫成可執行規格，避免日後被誤當 bug 再翻案；
+ * (2) 證明移除視窗化後，既有面板不會被誤判、也不會被搬到主側欄。
+ */
+
 function createPopoutWindow(focused: boolean): Window {
   return {
     document: {
