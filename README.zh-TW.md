@@ -5,10 +5,11 @@
 > **解放擁擠的主視窗。將重量級外掛與多元工作流，無痛遷移至獨立、專注的 Popout 彈出式視窗工作艙。**  
 > *獨立視窗佈局 · Popout 原生活動列 · Folder Spaces 協同 · 主題邊框與視覺標識*
 
-[![Obsidian Downloads](https://img.shields.io/badge/dynamic/json?logo=obsidian&color=7C3AED&label=Downloads&query=%24%5B%27window-spaces%27%5D.downloads&url=https%3A%2F%2Fraw.githubusercontent.com%2Fobsidianmd%2Fobsidian-releases%2Fmaster%2Fcommunity-plugin-stats.json)](https://obsidian.md/plugins?id=window-spaces)
-[![GitHub Release](https://img.shields.io/github/v/release/edwardsayer/obsidian-window-spaces?color=blue&logo=github)](https://github.com/edwardsayer/obsidian-window-spaces/releases)
-[![Obsidian Compatibility](https://img.shields.io/badge/Obsidian-v1.13.0%2B-purple.svg?logo=obsidian)](https://obsidian.md)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Downloads](https://img.shields.io/badge/dynamic/json?style=flat-square&logo=obsidian&color=7C3AED&label=Downloads&query=%24%5B%27window-spaces%27%5D.downloads&url=https%3A%2F%2Fraw.githubusercontent.com%2Fobsidianmd%2Fobsidian-releases%2Fmaster%2Fcommunity-plugin-stats.json)](https://obsidian.md/plugins?id=window-spaces)
+[![Release](https://img.shields.io/github/v/release/edwardsayer/obsidian-window-spaces?style=flat-square&logo=github)](https://github.com/edwardsayer/obsidian-window-spaces/releases)
+[![Obsidian Min Version](https://img.shields.io/badge/Obsidian-1.13.0%2B-purple?style=flat-square&logo=obsidian)](https://obsidian.md)
+[![Platform](https://img.shields.io/badge/Platform-Desktop%20only-lightgrey?style=flat-square)](#-系統相容性)
+[![License](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
 
 [ English ](README.md) | [ 繁體中文 ](README.zh-TW.md) | [ 简体中文 ](README.zh-CN.md)
 
