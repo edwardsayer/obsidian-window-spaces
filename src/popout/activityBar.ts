@@ -408,6 +408,8 @@ export class PopoutActivityBarManager {
       "mod-sidedock",
       "mod-left-split",
       "mod-right-split",
+      "mod-primary-split",
+      "mod-secondary-split",
       "window-spaces-has-hidden-next",
     ];
     this.engine.getTopLevelColumnElements(win).forEach((col) => {
@@ -537,9 +539,12 @@ export class PopoutActivityBarManager {
   private isMarkedSidebarColumn(colEl: HTMLElement | undefined, side: PopoutSide): boolean {
     if (!colEl) return false;
     const cls = side === "left" ? "mod-left-split" : "mod-right-split";
+    const modernCls = side === "left" ? "mod-primary-split" : "mod-secondary-split";
     return colEl.classList.contains(cls) ||
+      colEl.classList.contains(modernCls) ||
       colEl.classList.contains("window-spaces-sidebar-column") ||
       !!colEl.querySelector(`.${cls}`) ||
+      !!colEl.querySelector(`.${modernCls}`) ||
       !!colEl.querySelector(".window-spaces-sidebar-column");
   }
 
@@ -1512,6 +1517,9 @@ export class PopoutActivityBarManager {
       el.classList.toggle("mod-sidedock", isSidebar);
       el.classList.toggle("mod-left-split", isLeftSidebar);
       el.classList.toggle("mod-right-split", isRightSidebar);
+      // INTERNAL API: Obsidian 1.14+ renamed mod-left/right-split to mod-primary/secondary-split - set both so either version styles the column as a sidebar
+      el.classList.toggle("mod-primary-split", isLeftSidebar);
+      el.classList.toggle("mod-secondary-split", isRightSidebar);
       // 前一欄 handle 隱藏標記：下一欄是收合的側欄（window-spaces-column-hidden）
       // 時，本欄的 right-edge handle 由 CSS 隱藏（避免重複 handle 與拖曳誤位移
       // 右側邊框）。以 JS 標記 class 取代 :has(+ ...) 選擇器，避免 DOM invalidate。
@@ -1528,6 +1536,9 @@ export class PopoutActivityBarManager {
         tabsEl.classList.toggle("mod-sidedock", isSidebar);
         tabsEl.classList.toggle("mod-left-split", isLeftSidebar);
         tabsEl.classList.toggle("mod-right-split", isRightSidebar);
+        // INTERNAL API: Obsidian 1.14+ renamed mod-left/right-split to mod-primary/secondary-split - set both so either version styles the column as a sidebar
+        tabsEl.classList.toggle("mod-primary-split", isLeftSidebar);
+        tabsEl.classList.toggle("mod-secondary-split", isRightSidebar);
       });
       el.querySelectorAll<HTMLElement>(".workspace-split").forEach((nestedSplit) => {
         if (nestedSplit !== el) {
@@ -1535,6 +1546,9 @@ export class PopoutActivityBarManager {
           nestedSplit.classList.toggle("mod-sidedock", isSidebar);
           nestedSplit.classList.toggle("mod-left-split", isLeftSidebar);
           nestedSplit.classList.toggle("mod-right-split", isRightSidebar);
+          // INTERNAL API: Obsidian 1.14+ renamed mod-left/right-split to mod-primary/secondary-split - set both so either version styles the column as a sidebar
+          nestedSplit.classList.toggle("mod-primary-split", isLeftSidebar);
+          nestedSplit.classList.toggle("mod-secondary-split", isRightSidebar);
         }
       });
       if (isSidebar) {
