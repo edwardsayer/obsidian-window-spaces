@@ -38,7 +38,7 @@ Obsidian 灵活的布局与强大的插件生态，让许多人将其视为终�
 | **Popout 侧边栏与活动栏** | ❌ 无（仅为简陋标签页窗口） | **✅ 完整原生级左右垂直活动栏与折叠侧边栏** |
 | **窗口视觉识别** | ❌ 所有窗口外观一致无区别 | **✅ 4 边沉浸式主题边框、自定义 Logo 与状态栏徽章** |
 | **目录脉络隔离** | ❌ 显示全库上万篇杂乱文件树 | **✅ 深度整合 [Folder Spaces](https://github.com/edwardsayer/obsidian-folder-spaces) 锁定特定子目录** |
-| **开档路由保护** | 无，主窗口／弹出式窗口的文件标签页与功能检视互相影响 | **✅ 窗口锁定路由技术：开档智能导向中央区；内置（Outline / Backlinks）与社区 View（如 Grid Explorer）多实体独立共存、互不干扰** |
+| **开档路由保护** | 无，主窗口／弹出式窗口的文件标签页与功能检视互相影响 | **✅ Popout 路由技术：从 Popout 侧边栏开档导向该窗口中央编辑区、明确的侧边栏请求留在该 Popout；内置（Outline / Backlinks）与社区 View（如 Grid Explorer）多实体独立共存、互不干扰** |
 | **双重版面防坍塌保护** | ❌ 关闭最后标签页或视图时容器立即被销毁导致版面崩溃 | **✅ 双重版面防护网：中央关闭最后标签页原地转 New Tab 保留分栏；侧栏最后标签页防删保护** |
 | **自动保存粒度** | 仅支持手动保存快照 | **✅ 独立 Per-Space Auto-Save（5 秒防抖 + 关闭即存）** |
 | **多显示器几何坐标** | 多 DPI 环境易位移跑位 | **✅ 像素级精确还原坐标，内建显示器拔除防溢出保护** |
@@ -93,9 +93,9 @@ Obsidian 原生 Popout 弹出式窗口完全没有侧边栏。Window Spaces 为�
 - **状态栏空间徽章**：于 Popout 左下角实时显示当前空间名称与快速存档状态。
 - **氛围增强**：窗格调整分隔条带有主题色微光，左右活动栏注入柔和底色。
 
-### 🎯 4. 窗口锁定路由与双重防坍塌保护（Window-Locked Routing & Dual Guardrails）*(v1.2+ 核心技术)*
-Obsidian 原生架构以单一主窗口为中心，当在弹出式窗口中打开 Outline、Backlinks 或第三方插件检视（如 Grid Explorer、Notebook Navigator）时，往往会因为全局检索（`getLeavesOfType`）而跳回主窗口、抢夺焦点或互相覆盖。Window Spaces 深度研发了**窗口锁定路由（Window-Locked Routing）**，并加入全方位的版面防坍塌保护：
-- **内置与社区 View 多实体独立共存**：突破官方单例限制，让原生核心视图（Outline 大纲、Backlinks 反向链接、Tags 标签、Search 搜索）与社区插件视图（如 Grid Explorer、Notebook Navigator 等）在主窗口与多个弹出式窗口中**同时存在多个独立实体（Multi-Instance Concurrency）**，各自运作、永不抢焦。
+### 🎯 4. Popout 路由与双重防坍塌保护（Popout Routing & Dual Layout Guardrails）*(v1.2+ 核心技术)*
+Obsidian 原生架构以单一主窗口为中心。从弹出式窗口打开的 View，以及从 Popout 自身侧边栏打开的笔记，常因为 Obsidian 的全局解析而落到主窗口、抢夺焦点或互相覆盖。Window Spaces 会把这些请求导向发起它们的窗口，并加入全方位的版面防坍塌保护：
+- **内置与社区 View 多实体独立共存**：突破官方单例限制，让原生核心视图（Outline 大纲、Backlinks 反向链接、Tags 标签、Search 搜索）与社区插件视图（如 Grid Explorer、Notebook Navigator 等）在主窗口与多个弹出式窗口中**同时存在多个独立实体（Multi-Instance Concurrency）**，各自运作、永不抢焦。若某个视图已在其他窗口打开，请使用该 Popout 的活动栏或「添加 View」打开本地实体。
 - **全局探索与明确的 Popout 路由（Global Discovery with Explicit Popout Routing）**：`getLeavesOfType()` 保留 Obsidian 的全局结果与顺序；`getLeftLeaf()` / `getRightLeaf()` 维持原生行为，让插件在后台初始化时仍使用主窗口侧栏。受管理的 Popout 获得焦点时，明确的 `getLeaf("left"/"right")` / `ensureSideLeaf()` 请求仍会选择或建立本地侧栏 Leaf，从侧栏开档则导向中央编辑区。直接重用全局清单中第一个 Leaf 的命令仍可能跳到其他窗口；若需明确的本地视图，请使用 Popout 活动栏。关闭**「将 View 路由至所属的 Popout 窗口」**会恢复原生路由，但保留各窗口的笔记情境。本开关无法阻止其他同样路由的插件（例如 Folder Spaces）；需停用该插件，或请其作者提供对应开关。
 - **事件广播与活动文件窗口感知**：精确拦截 `file-open` 事件传递与 `workspace.getActiveFile()`。窗口 A 的大纲与反链只追踪窗口 A 当前阅读的笔记，窗口 B 只追踪窗口 B，彻底解决官方跨窗口联动错乱与画面跳动的陈年痛点。切换标签页时，**当前实际处于活动状态的笔记优先于缓存的笔记**；当焦点落在侧栏或其他窗口时，缓存则负责保留该窗口的笔记语境。
 - **「添加 View」纳入已打开的视图**：`添加 View` 会列出已注册的视图**以及当前已打开的视图**；若某个视图只在其实例上提供显示名称（例如 MAKE.md Navigator），会直接采用该名称，而不是把 view type id 美化后的字符串。

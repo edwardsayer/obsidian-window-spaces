@@ -38,7 +38,7 @@ Obsidian 靈活的佈局與強大的外掛生態，讓許多人將其視為終�
 | **Popout 側邊欄與活動列** | ❌ 無（僅為陽春分頁視窗） | **✅ 完整原生級左右垂直活動列與折疊側邊欄** |
 | **視窗視覺識別** | ❌ 所有視窗外觀一致無區別 | **✅ 4 邊沉浸式主題邊框、自訂 Logo 與狀態列徽章** |
 | **目錄脈絡隔離** | ❌ 顯示全庫上萬篇雜亂檔案樹 | **✅ 深度整合 [Folder Spaces](https://github.com/edwardsayer/obsidian-folder-spaces) 鎖定特定子目錄** |
-| **開檔路由保護** | 無，主視窗／彈出式視窗的檔案分頁與功能檢視互相影響 | **✅ 視窗鎖定路由技術：開檔智慧導向中央區；內建（Outline / Backlinks）與社群 View（如 Grid Explorer）多實體獨立共存、互不干擾** |
+| **開檔路由保護** | 無，主視窗／彈出式視窗的檔案分頁與功能檢視互相影響 | **✅ Popout 路由技術：從 Popout 側欄開檔導向該視窗中央編輯區、明確的側欄請求留在該 Popout；內建（Outline / Backlinks）與社群 View（如 Grid Explorer）多實體獨立共存、互不干擾** |
 | **雙重版面防坍塌保護** | ❌ 關閉最後分頁或頁籤時容器立即被銷毀導致版面崩塌 | **✅ 雙重版面防護網：中央關閉最後分頁原地轉 New Tab 保留分欄；側欄最後頁籤防刪保護** |
 | **自動儲存粒度** | 僅支援手動儲存快照 | **✅ 獨立 Per-Space Auto-Save（5 秒防抖 + 關閉即存）** |
 | **多螢幕幾何座標** | 多 DPI 環境易位移跑位 | **✅ 像素級精確還原座標，內建螢幕拔除防溢出保護** |
@@ -93,9 +93,9 @@ Obsidian 原生 Popout 彈出式視窗完全沒有側邊欄。Window Spaces 為�
 - **狀態列空間徽章**：於 Popout 左下角即時顯示目前空間名稱與快速存檔狀態。
 - **氛圍增強**：窗格調整分隔條帶有主題色微光，左右活動列注入柔和底色。
 
-### 🎯 4. 視窗鎖定路由與雙重防坍塌保護（Window-Locked Routing & Dual Guardrails）*(v1.2+ 核心技術)*
-Obsidian 原生架構以單一主視窗為中心，當在彈出式視窗中開啟 Outline、Backlinks 或第三方外掛檢視（如 Grid Explorer、Notebook Navigator）時，往往會因為全域檢索（`getLeavesOfType`）而跳回主視窗、搶奪焦點或互相覆蓋。Window Spaces 深度研發了**視窗鎖定路由（Window-Locked Routing）**，並加入全方位的版面防坍塌保護：
-- **內建與社群 View 多實體獨立共存**：突破官方單例限制，讓原生核心視圖（Outline 大綱、Backlinks 反向連結、Tags 標籤、Search 搜尋）與社群外掛視圖（如 Grid Explorer、Notebook Navigator 等）在主視窗與多個彈出式視窗中**同時存在多個獨立實體（Multi-Instance Concurrency）**，各自運作、永不搶焦。
+### 🎯 4. Popout 路由與雙重防坍塌保護（Popout Routing & Dual Layout Guardrails）*(v1.2+ 核心技術)*
+Obsidian 原生架構以單一主視窗為中心。從彈出式視窗開啟的 View，以及從 Popout 自身側欄開啟的筆記，常因為 Obsidian 的全域解析而落到主視窗、搶奪焦點或互相覆蓋。Window Spaces 會把這些請求導向發起它們的視窗，並加入全方位的版面防坍塌保護：
+- **內建與社群 View 多實體獨立共存**：突破官方單例限制，讓原生核心視圖（Outline 大綱、Backlinks 反向連結、Tags 標籤、Search 搜尋）與社群外掛視圖（如 Grid Explorer、Notebook Navigator 等）在主視窗與多個彈出式視窗中**同時存在多個獨立實體（Multi-Instance Concurrency）**，各自運作、永不搶焦。若某個視圖已在其他視窗開啟，請使用該 Popout 的活動列或「新增 View」開啟本地實體。
 - **全域探索與明確的 Popout 路由（Global Discovery with Explicit Popout Routing）**：`getLeavesOfType()` 保留 Obsidian 的全域結果與順序；`getLeftLeaf()` / `getRightLeaf()` 維持原生行為，讓外掛在背景初始化時仍使用主視窗側欄。受管理的 Popout 取得焦點時，明確的 `getLeaf("left"/"right")` / `ensureSideLeaf()` 請求仍會選取或建立本地側欄 Leaf，從側欄開檔則導向中央編輯區。直接重用全域清單中第一個 Leaf 的命令仍可能跳到其他視窗；若需明確的本地視圖，請使用 Popout 活動列。關閉**「將 View 路由至所屬的 Popout 視窗」**會恢復原生路由，但保留各視窗的筆記情境。本開關無法阻止其他同樣路由的外掛（例如 Folder Spaces）；需停用該外掛，或請其作者提供對應開關。
 - **事件廣播與作用檔案視窗感知**：精確攔截 `file-open` 事件傳遞與 `workspace.getActiveFile()`。視窗 A 的大綱與反鏈只追蹤視窗 A 當前閱讀的筆記，視窗 B 只追蹤視窗 B，徹底解決官方跨視窗連動錯亂與畫面跳動的陳年痛點。切換分頁時，**當前實際作用中的筆記優先於快取的筆記**；當焦點落在側欄或其他視窗時，快取則負責保留該視窗的筆記情境。
 - **「新增 View」納入已開啟的視圖**：`新增 View` 會列出已註冊的視圖**以及目前已開啟的視圖**；若某個視圖只在其實體上提供顯示名稱（例如 MAKE.md Navigator），會直接採用該名稱，而不是把 view type id 美化後的字串。
