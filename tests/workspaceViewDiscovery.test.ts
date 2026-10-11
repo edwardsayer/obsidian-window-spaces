@@ -1,151 +1,293 @@
-import { afterEach, describe, expect, test, vi } from "vitest";
-import { App } from "obsidian";
-import {
-  acquireWorkspaceInterceptor,
-  releaseWorkspaceInterceptor,
-} from "../src/shared/workspaceInterceptor";
+import type { App, WorkspaceLeaf } from "obsidian";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { WorkspaceInterceptor } from "../src/popout/workspaceInterceptor";
+import { PopoutActivityBarManager } from "../src/popout/activityBar";
+import type { PopoutLayoutEngine } from "../src/shared/popoutLayout";
+import type { WindowSettings } from "../src/types";
 
-/**
- * Window-locked view discovery 的**刻意語意**與**逃生開關**。
- *
- * 背景：Window Spaces 會把「從 popout 發起的路由」視窗化，這對部分第三方外掛
- * （它們用全域 `getLeavesOfType()` 對帳既有面板）造成副作用。社群有人提議移除
- * 這些覆寫；我們的決定是**保留**這個差異化能力，並以設定項
- * `workspaceInterceptorEnabled`（UI 標籤「Route views to their popout windows」）
- * 作為 opt-out。
- *
- * 本檔的價值有兩層：
- * 1. 把「刻意視窗化」寫成可執行的規格（避免日後被當成 bug 移除）。
- * 2. 證明**逃生開關確實有效** —— 使用者取消勾選後，`getLeavesOfType` 回全域、
- *    `getLeftLeaf` / `getRightLeaf` 走原生主側欄。這是回覆相容性問題的正解，
- *    而不是移除整個路由層。
- */
-
-const POPOUT_ID = "view-discovery-test";
-
-function makePopoutWindow(): Window {
+function createPopoutWindow(focused: boolean): Window {
   return {
     document: {
-      body: { classList: { contains: (cls: string) => cls === "is-popout-window" } },
-      hasFocus: () => true,
+      body: { classList: { contains: (name: string) => name === "is-popout-window" } },
+      hasFocus: () => focused,
     },
   } as unknown as Window;
 }
 
-interface Fixture {
-  app: App;
-  workspace: any;
-  popoutWin: Window;
-  leafInPopout: unknown;
-  leafInMain: unknown;
-  originalGetLeavesOfType: ReturnType<typeof vi.fn>;
-  originalLeft: ReturnType<typeof vi.fn>;
-  engine: { openSideLeafSync: ReturnType<typeof vi.fn> };
-}
-
-function buildFixture(): Fixture {
-  const popoutWin = makePopoutWindow();
-  const mainWin = {
-    document: { body: { classList: { contains: () => false } } },
-  } as unknown as Window;
-
-  const leafInPopout = { containerEl: { ownerDocument: { defaultView: popoutWin } } };
-  const leafInMain = { containerEl: { ownerDocument: { defaultView: mainWin } } };
-
-  const originalGetLeavesOfType = vi.fn().mockReturnValue([leafInMain, leafInPopout]);
-  const originalLeft = vi.fn().mockReturnValue("native-left-leaf");
-  const workspace = {
-    getLeftLeaf: originalLeft,
-    getRightLeaf: vi.fn().mockReturnValue("native-right-leaf"),
-    getLeavesOfType: originalGetLeavesOfType,
-  } as any;
-  const engine = { openSideLeafSync: vi.fn().mockReturnValue("popout-side-leaf") };
-
-  (globalThis as any).activeWindow = popoutWin;
+function createLeaf(win: Window): WorkspaceLeaf {
   return {
-    app: { workspace } as unknown as App,
-    workspace,
-    popoutWin,
-    leafInPopout,
-    leafInMain,
-    originalGetLeavesOfType,
-    originalLeft,
-    engine,
-  };
+    containerEl: { ownerDocument: { defaultView: win } },
+  } as unknown as WorkspaceLeaf;
 }
 
-afterEach(() => {
-  releaseWorkspaceInterceptor(POPOUT_ID);
-  delete (globalThis as any).activeWindow;
-});
+describe("workspace view discovery", () => {
+  const globalObject = globalThis as unknown as { activeWindow?: Window };
+  let previousActiveWindow: Window | undefined;
+  let interceptor: WorkspaceInterceptor;
 
-describe("window-locked view discovery（刻意語意）", () => {
-  test("受管理 popout 為焦點時，getLeavesOfType 僅回傳該視窗的 leaf", () => {
-    const f = buildFixture();
-    acquireWorkspaceInterceptor(f.app, {
-      id: POPOUT_ID,
-      engine: f.engine as never,
-      isEnabled: () => true,
-    });
-
-    expect(f.workspace.getLeavesOfType("outline")).toEqual([f.leafInPopout]);
-    // 原生實作仍被呼叫（我們在其結果上過濾，不改寫列舉來源）。
-    expect(f.originalGetLeavesOfType).toHaveBeenCalledWith("outline");
+  beforeEach(() => {
+    previousActiveWindow = globalObject.activeWindow;
+    vi.spyOn(document, "hasFocus").mockReturnValue(false);
   });
 
-  test("popout 為焦點時，getLeftLeaf / getRightLeaf 路由到該 popout 的引擎", () => {
-    const f = buildFixture();
-    acquireWorkspaceInterceptor(f.app, {
-      id: POPOUT_ID,
-      engine: f.engine as never,
-      isEnabled: () => true,
-    });
-
-    expect(f.workspace.getLeftLeaf(false)).toBe("popout-side-leaf");
-    expect(f.workspace.getRightLeaf(false)).toBe("popout-side-leaf");
-    expect(f.engine.openSideLeafSync).toHaveBeenCalledWith(f.popoutWin, "left");
-    expect(f.engine.openSideLeafSync).toHaveBeenCalledWith(f.popoutWin, "right");
-    expect(f.originalLeft).not.toHaveBeenCalled();
-  });
-});
-
-describe("逃生開關：取消「Route views to their popout windows」", () => {
-  test("getLeavesOfType 回傳全域清單（不再視窗化）", () => {
-    const f = buildFixture();
-    acquireWorkspaceInterceptor(f.app, {
-      id: POPOUT_ID,
-      engine: f.engine as never,
-      isEnabled: () => false,
-    });
-
-    // 這正是第三方外掛（MAKE.md Navigator、Vertical Tabs 等）需要的全域語意。
-    expect(f.workspace.getLeavesOfType("outline")).toEqual([f.leafInMain, f.leafInPopout]);
+  afterEach(() => {
+    interceptor?.uninstall();
+    vi.restoreAllMocks();
+    if (previousActiveWindow === undefined) delete globalObject.activeWindow;
+    else globalObject.activeWindow = previousActiveWindow;
   });
 
-  test("getLeftLeaf / getRightLeaf 走原生主側欄，不再路由到 popout", () => {
-    const f = buildFixture();
-    acquireWorkspaceInterceptor(f.app, {
-      id: POPOUT_ID,
-      engine: f.engine as never,
-      isEnabled: () => false,
-    });
+  function setup(viewType: string, hosts: Window[], engine?: PopoutLayoutEngine) {
+    const leaves = hosts.map(createLeaf);
+    const workspace = {
+      getLeftLeaf: vi.fn().mockReturnValue(null),
+      getRightLeaf: vi.fn().mockReturnValue(null),
+      revealLeaf: vi.fn().mockResolvedValue(undefined),
+      setActiveLeaf: vi.fn(),
+      getLeavesOfType: vi.fn(function (this: unknown, type: string): WorkspaceLeaf[] {
+        expect(this).toBe(workspace);
+        return type === viewType ? leaves : [];
+      }),
+    };
+    const originalLookup = workspace.getLeavesOfType;
+    const originalLeft = workspace.getLeftLeaf;
+    const originalRight = workspace.getRightLeaf;
+    interceptor = new WorkspaceInterceptor({ workspace } as unknown as App, engine);
+    interceptor.install();
+    return { workspace, leaves, originalLookup, originalLeft, originalRight };
+  }
 
-    expect(f.workspace.getLeftLeaf(false)).toBe("native-left-leaf");
-    expect(f.workspace.getRightLeaf(false)).toBe("native-right-leaf");
-    expect(f.engine.openSideLeafSync).not.toHaveBeenCalled();
+  test.each(["vertical-tabs", "custom-singleton-view"])(
+    "layout reconciliation keeps the existing %s panel when a popout is focused",
+    (viewType) => {
+      globalObject.activeWindow = createPopoutWindow(true);
+      const { workspace, leaves, originalLookup } = setup(viewType, [window]);
+      const createPanel = vi.fn();
+
+      // A singleton plugin checks for its panel on each layout-change event.
+      // Focusing a popout must not make that existing panel disappear.
+      for (let event = 0; event < 3; event++) {
+        if (workspace.getLeavesOfType(viewType).length === 0) createPanel();
+      }
+
+      expect(createPanel).not.toHaveBeenCalled();
+      expect(workspace.getLeavesOfType(viewType)).toBe(leaves);
+      expect(originalLookup).toHaveBeenCalledWith(viewType);
+    }
+  );
+
+  test("preserves panels in the main window and another popout when the active window has none", () => {
+    globalObject.activeWindow = createPopoutWindow(true);
+    const otherPopout = createPopoutWindow(false);
+    const { workspace, leaves } = setup("custom-view", [otherPopout, window]);
+
+    expect(workspace.getLeavesOfType("custom-view")).toBe(leaves);
   });
 
-  test("逃生開關不影響 uninstall 的精確還原", () => {
-    const f = buildFixture();
-    acquireWorkspaceInterceptor(f.app, {
-      id: POPOUT_ID,
-      engine: f.engine as never,
-      isEnabled: () => false,
-    });
-    releaseWorkspaceInterceptor(POPOUT_ID);
+  test.each(["vertical-tabs", "custom-sidebar-view"])(
+    "repeated activity-bar clicks do not relocate a newly opened %s into the main sidebar",
+    async (viewType) => {
+      const popout = createPopoutWindow(true);
+      globalObject.activeWindow = popout;
+      const { workspace, leaves } = setup(viewType, [window]);
+      const mainSidebar = document.createElement("div");
+      const popoutSidebar = document.createElement("div");
+      const roots = new Map<WorkspaceLeaf, HTMLElement>([[leaves[0], mainSidebar]]);
+      const relocateToMain = vi.fn((leaf: WorkspaceLeaf) => {
+        roots.set(leaf, mainSidebar);
+        Object.defineProperty(leaf.containerEl, "ownerDocument", { value: { defaultView: window } });
+        mainSidebar.appendChild(leaf.containerEl);
+      });
 
-    expect(f.workspace.getLeavesOfType).toBe(f.originalGetLeavesOfType);
-    expect(f.workspace.getLeftLeaf).toBe(f.originalLeft);
-    expect(f.workspace.getLeavesOfType("outline")).toEqual([f.leafInMain, f.leafInPopout]);
+      // Vertical Tabs checks the first globally discovered panel's root during
+      // onOpen/layout-change and moves it to the main sidebar if necessary.
+      // Model that policy with an arbitrary view type too: filtering the lookup
+      // must not change which existing panel the plugin considers its own.
+      const reconcilePanel = () => {
+        const first = workspace.getLeavesOfType(viewType)[0];
+        if (first && roots.get(first) !== mainSidebar) relocateToMain(first);
+      };
+      const engine = {
+        getColumnElement: vi.fn().mockReturnValue(popoutSidebar),
+        findLeafOfTypeInColumn: vi.fn(() => leaves.find((leaf) => roots.get(leaf) === popoutSidebar)),
+        ensureSideColumn: vi.fn(async () => {
+          const containerEl = document.createElement("div");
+          Object.defineProperty(containerEl, "ownerDocument", {
+            value: { defaultView: popout }, configurable: true,
+          });
+          popoutSidebar.appendChild(containerEl);
+          const localPanel = { containerEl } as unknown as WorkspaceLeaf;
+          roots.set(localPanel, popoutSidebar);
+          leaves.push(localPanel);
+          reconcilePanel();
+          return localPanel;
+        }),
+        isColumnHidden: vi.fn(() => popoutSidebar.style.display === "none"),
+        hideColumn: vi.fn(() => { popoutSidebar.style.display = "none"; }),
+        showColumn: vi.fn(() => { popoutSidebar.style.display = ""; }),
+      };
+      const manager = new PopoutActivityBarManager(
+        { app: { workspace } as unknown as App, settings: {} as WindowSettings },
+        engine as unknown as PopoutLayoutEngine
+      );
+      const activityBar = manager as unknown as {
+        toggleView(win: Window, item: { viewType: string; side: "left" }): Promise<void>;
+      };
+
+      try {
+        for (let click = 0; click < 4; click++) {
+          await activityBar.toggleView(popout, { viewType, side: "left" });
+          reconcilePanel();
+        }
+
+        expect(relocateToMain).not.toHaveBeenCalled();
+        expect(engine.ensureSideColumn).toHaveBeenCalledTimes(1);
+        expect(engine.ensureSideColumn).toHaveBeenCalledWith(popout, "left", viewType);
+        expect(leaves.filter((leaf) => roots.get(leaf) === mainSidebar)).toEqual([leaves[0]]);
+        expect(leaves.filter((leaf) => roots.get(leaf) === popoutSidebar)).toHaveLength(1);
+      } finally {
+        manager.cleanupAll();
+      }
+    }
+  );
+
+  test.each(["outline", "grid-view", "custom-view"])(
+    "preserves global %s panel discovery and ordering even when local panels exist",
+    (viewType) => {
+      const popout = createPopoutWindow(true);
+      globalObject.activeWindow = popout;
+      const { workspace, leaves, originalLookup } = setup(viewType, [window, popout, popout, createPopoutWindow(false)]);
+
+      expect(workspace.getLeavesOfType).toBe(originalLookup);
+      expect(workspace.getLeavesOfType(viewType)).toBe(leaves);
+    }
+  );
+
+  test("still reports no panels for a view that does not exist anywhere", () => {
+    globalObject.activeWindow = createPopoutWindow(true);
+    const { workspace } = setup("existing-view", [window]);
+
+    expect(workspace.getLeavesOfType("missing-view")).toEqual([]);
   });
+
+  test("explicit sidebar creation opens a local outline despite discovering the main-window outline", async () => {
+    const popout = createPopoutWindow(true);
+    globalObject.activeWindow = popout;
+    const localOutline = {
+      ...createLeaf(popout),
+      setViewState: vi.fn().mockResolvedValue(undefined),
+      loadIfDeferred: vi.fn().mockResolvedValue(undefined),
+    };
+    const engine = {
+      getColumnElement: vi.fn().mockReturnValue(null),
+      openSideLeafSync: vi.fn().mockReturnValue(localOutline),
+    };
+    const { workspace, leaves } = setup("outline", [window], engine as unknown as PopoutLayoutEngine);
+    const mainOutline = leaves[0];
+    localOutline.setViewState.mockImplementation(async () => {
+      leaves.push(localOutline as unknown as WorkspaceLeaf);
+    });
+
+    expect(workspace.getLeavesOfType("outline")).toEqual([mainOutline]);
+    const managedWorkspace = workspace as unknown as {
+      ensureSideLeaf(type: string, side: "left" | "right"): Promise<WorkspaceLeaf>;
+    };
+    const created = await managedWorkspace.ensureSideLeaf("outline", "right");
+
+    expect(created).toBe(localOutline);
+    expect(engine.openSideLeafSync).toHaveBeenCalledWith(popout, "right");
+    expect(localOutline.setViewState).toHaveBeenCalledWith({
+      type: "outline", active: undefined, state: undefined,
+    });
+    expect(leaves).toContain(mainOutline);
+    expect(workspace.getLeavesOfType("outline")).toEqual([mainOutline, localOutline]);
+  });
+
+  test.each(["main-window focus", "disabled routing", "unmanaged popout"])(
+    "keeps the original lookup results with %s",
+    (scenario) => {
+      const popout = createPopoutWindow(true);
+      globalObject.activeWindow = popout;
+      const { workspace, leaves } = setup("outline", [window, popout]);
+      if (scenario === "main-window focus") vi.mocked(document.hasFocus).mockReturnValue(true);
+      if (scenario === "disabled routing") interceptor.enabled = false;
+      if (scenario === "unmanaged popout") interceptor.isManagedWindow = () => false;
+
+      expect(workspace.getLeavesOfType("outline")).toBe(leaves);
+    }
+  );
+
+  test("leaves the original workspace lookup intact when the interceptor is unloaded", () => {
+    globalObject.activeWindow = createPopoutWindow(true);
+    const { workspace, leaves, originalLookup } = setup("custom-view", [window]);
+
+    interceptor.uninstall();
+
+    expect(workspace.getLeavesOfType).toBe(originalLookup);
+    expect(workspace.getLeavesOfType("custom-view")).toBe(leaves);
+  });
+
+  test("does not overwrite another plugin's view lookup on unload", () => {
+    globalObject.activeWindow = createPopoutWindow(true);
+    const { workspace, leaves, originalLookup } = setup("custom-view", [window]);
+    const pluginLookup = vi.fn((type: string) => originalLookup.call(workspace, type));
+    workspace.getLeavesOfType = pluginLookup;
+
+    interceptor.uninstall();
+
+    expect(workspace.getLeavesOfType).toBe(pluginLookup);
+    expect(workspace.getLeavesOfType("custom-view")).toBe(leaves);
+  });
+
+  test("keeps native method descriptors available to an older shared-coordinator participant", () => {
+    const { workspace, originalLookup, originalLeft, originalRight } = setup("custom-view", [window]);
+    const namespace = window as unknown as {
+      __obsidian_workspace_interceptor_state_v1__: {
+        originalMethods: Record<string, { hadOwn: boolean; value: unknown }>;
+      };
+    };
+    const originals = namespace.__obsidian_workspace_interceptor_state_v1__.originalMethods;
+
+    // An older participant reads these descriptors when it is the final one
+    // to release the v1 coordinator. Missing entries would break its teardown.
+    for (const [key, method] of [
+      ["getLeftLeaf", originalLeft], ["getRightLeaf", originalRight], ["getLeavesOfType", originalLookup],
+    ] as const) {
+      expect(originals[key].hadOwn).toBe(true);
+      expect(originals[key].value).toBe(method);
+      expect(workspace[key]).toBe(method);
+    }
+  });
+
+  test.each([
+    ["mk-path-view", "left"], ["mk-path-view", "right"],
+    ["custom-navigator", "left"], ["custom-navigator", "right"],
+  ] as const)(
+    "a background %s rebuild in the %s sidebar keeps its destination after popout focus changes",
+    async (viewType, side) => {
+      const popout = createPopoutWindow(true);
+      const mainPanel = { ...createLeaf(window), setViewState: vi.fn().mockResolvedValue(undefined) };
+      const popoutPanel = { ...createLeaf(popout), setViewState: vi.fn().mockResolvedValue(undefined) };
+      const engine = { openSideLeafSync: vi.fn().mockReturnValue(popoutPanel) };
+      const { workspace, originalLeft, originalRight } = setup(viewType, [window], engine as unknown as PopoutLayoutEngine);
+      originalLeft.mockReturnValue(mainPanel as unknown as WorkspaceLeaf);
+      originalRight.mockReturnValue(mainPanel as unknown as WorkspaceLeaf);
+
+      // MAKE.md awaits indexing, then recreates its Navigator via the native
+      // main-sidebar API. Focus may have moved to a popout during that await.
+      const rebuild = (async () => {
+        await Promise.resolve();
+        const leaf = side === "left" ? workspace.getLeftLeaf(false) : workspace.getRightLeaf(false);
+        await leaf?.setViewState({ type: viewType });
+      })();
+      globalObject.activeWindow = popout;
+      await rebuild;
+
+      expect(mainPanel.setViewState).toHaveBeenCalledWith({ type: viewType });
+      expect(popoutPanel.setViewState).not.toHaveBeenCalled();
+      expect(engine.openSideLeafSync).not.toHaveBeenCalled();
+      expect(workspace.getLeftLeaf).toBe(originalLeft);
+      expect(workspace.getRightLeaf).toBe(originalRight);
+    }
+  );
 });
