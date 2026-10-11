@@ -120,6 +120,10 @@ When clicking a file from a popout sidebar (such as File Explorer, Bookmarks, or
 - **Central Editor Priority**: Clicks from the sidebar are always routed into the central content area, never overwriting sidebar functional views.
 - **Navigation Fallback for Non-Navigable / Pinned Views**: If the active center tab contains a **non-navigable view** (e.g., Outline, Canvas, Graph) or is a **pinned tab**, attempting to navigate in-place would either fail or wipe out your active work. Window Spaces detects this state and automatically opens the file in a **new tab** in the central area.
 
+The routing is controlled by the **Route views to their popout windows** setting (`Settings → Window Spaces`). View discovery itself stays global, so single-instance panels from other plugins are not reported as missing; with the setting off, explicit sidebar requests and popout file opens fall back to Obsidian's native behaviour while per-window note context stays active.
+
+![Route views to their popout windows setting](../assets/screenshots/09-routing-setting.png)
+
 ---
 
 ## 5. Community Plugin Synergy Walkthroughs
